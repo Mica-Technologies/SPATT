@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Permissions for the manager and SPATT windows",
+  "windows": ["manager", "spatt"],
+  "permissions": ["core:default", "opener:default"]
+}
