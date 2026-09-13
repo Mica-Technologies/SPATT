@@ -1,0 +1,212 @@
+{
+  "app": "spatt",
+  "schemaVersion": 1,
+  "id": "two-phase",
+  "name": "Elm St & 3rd Ave",
+  "notes": "",
+  "units": {
+    "length": "ft",
+    "speed": "mph"
+  },
+  "intersections": [
+    {
+      "id": "two-phase",
+      "name": "Elm St & 3rd Ave",
+      "notes": "",
+      "phases": [
+        {
+          "number": 2,
+          "label": "EB",
+          "enabled": true,
+          "movement": {
+            "approach": "W",
+            "kind": "through"
+          },
+          "minGreen": 100,
+          "passage": 30,
+          "maxGreen1": 350,
+          "maxGreen2": 0,
+          "yellow": 40,
+          "redClear": 20,
+          "volumeDensity": {
+            "addedInitialPerActuation": 0,
+            "maxInitial": 0,
+            "timeBeforeReduction": 0,
+            "timeToReduce": 0,
+            "minGap": 0
+          },
+          "recall": "none",
+          "pedestrian": {
+            "enabled": true,
+            "walk": 70,
+            "clearance": 160,
+            "recall": false,
+            "restInWalk": false
+          },
+          "lockingDetector": false,
+          "dualEntry": false,
+          "conditionalService": false
+        },
+        {
+          "number": 4,
+          "label": "SB",
+          "enabled": true,
+          "movement": {
+            "approach": "N",
+            "kind": "through"
+          },
+          "minGreen": 100,
+          "passage": 30,
+          "maxGreen1": 250,
+          "maxGreen2": 0,
+          "yellow": 40,
+          "redClear": 20,
+          "volumeDensity": {
+            "addedInitialPerActuation": 0,
+            "maxInitial": 0,
+            "timeBeforeReduction": 0,
+            "timeToReduce": 0,
+            "minGap": 0
+          },
+          "recall": "none",
+          "pedestrian": {
+            "enabled": true,
+            "walk": 70,
+            "clearance": 120,
+            "recall": false,
+            "restInWalk": false
+          },
+          "lockingDetector": false,
+          "dualEntry": false,
+          "conditionalService": false
+        },
+        {
+          "number": 6,
+          "label": "WB",
+          "enabled": true,
+          "movement": {
+            "approach": "E",
+            "kind": "through"
+          },
+          "minGreen": 100,
+          "passage": 30,
+          "maxGreen1": 350,
+          "maxGreen2": 0,
+          "yellow": 40,
+          "redClear": 20,
+          "volumeDensity": {
+            "addedInitialPerActuation": 0,
+            "maxInitial": 0,
+            "timeBeforeReduction": 0,
+            "timeToReduce": 0,
+            "minGap": 0
+          },
+          "recall": "none",
+          "pedestrian": {
+            "enabled": true,
+            "walk": 70,
+            "clearance": 160,
+            "recall": false,
+            "restInWalk": false
+          },
+          "lockingDetector": false,
+          "dualEntry": false,
+          "conditionalService": false
+        },
+        {
+          "number": 8,
+          "label": "NB",
+          "enabled": true,
+          "movement": {
+            "approach": "S",
+            "kind": "through"
+          },
+          "minGreen": 100,
+          "passage": 30,
+          "maxGreen1": 250,
+          "maxGreen2": 0,
+          "yellow": 40,
+          "redClear": 20,
+          "volumeDensity": {
+            "addedInitialPerActuation": 0,
+            "maxInitial": 0,
+            "timeBeforeReduction": 0,
+            "timeToReduce": 0,
+            "minGap": 0
+          },
+          "recall": "none",
+          "pedestrian": {
+            "enabled": true,
+            "walk": 70,
+            "clearance": 120,
+            "recall": false,
+            "restInWalk": false
+          },
+          "lockingDetector": false,
+          "dualEntry": false,
+          "conditionalService": false
+        }
+      ],
+      "rings": [
+        {
+          "groups": [
+            [
+              2
+            ],
+            [
+              4
+            ]
+          ]
+        },
+        {
+          "groups": [
+            [
+              6
+            ],
+            [
+              8
+            ]
+          ]
+        }
+      ],
+      "overlaps": [],
+      "preempts": [],
+      "patterns": [
+        {
+          "id": "all-day",
+          "name": "All Day",
+          "mode": "coordinated",
+          "cycle": 700,
+          "offset": 0,
+          "offsetReference": "beginCoordGreen",
+          "coordinatedPhases": [
+            2,
+            6
+          ],
+          "splits": {
+            "2": 400,
+            "4": 300,
+            "6": 400,
+            "8": 300
+          },
+          "sequence": null,
+          "maxGreen": "max1",
+          "forceOffMode": "fixed"
+        }
+      ],
+      "schedule": [
+        {
+          "startMinute": 360,
+          "patternId": "all-day"
+        },
+        {
+          "startMinute": 1320,
+          "patternId": null
+        }
+      ]
+    }
+  ],
+  "corridors": [],
+  "createdAt": "2026-09-13T00:00:00.000Z",
+  "updatedAt": "2026-09-13T00:00:00.000Z"
+}
