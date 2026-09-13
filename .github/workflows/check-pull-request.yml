@@ -1,0 +1,83 @@
+name: Check (Pull Request)
+
+# Required checks for every pull request, and the same checks on pushes to working branches.
+# No path filters: a required check with a path filter never reports on some PRs, which then
+# can never merge.
+on:
+  pull_request:
+  push:
+    branches-ignore: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Web (typecheck, lint, test, build)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test
+
+      - name: Build web UI
+        run: npm run build
+
+  rust:
+    name: Rust (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      # Every desktop OS compiles on every PR, so platform-specific code cannot rot unseen.
+      matrix:
+        os: [ ubuntu-22.04, windows-latest, macos-latest ]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        if: runner.os == 'Linux'
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Tests
+        run: cargo test --workspace

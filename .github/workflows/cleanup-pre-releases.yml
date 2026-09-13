@@ -1,0 +1,27 @@
+name: Cleanup Old/Outdated Pre-Release(s)
+
+on:
+  workflow_run:
+    workflows: [ "Build Release/Pre-Release (Main Branch)" ]
+    types:
+      - completed
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup_pre_release:
+    name: Delete old pre-releases
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete old pre-releases
+        uses: dev-drprasad/delete-older-releases@v0.3.4
+        with:
+          delete_expired_data: '90'
+          delete_prerelease_only: 'true'
+          delete_tags: 'true'
+          keep_latest: '3'
+          keep_min_download_counts: '5'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

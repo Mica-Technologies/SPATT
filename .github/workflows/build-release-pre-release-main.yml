@@ -1,0 +1,234 @@
+name: Build Release/Pre-Release (Main Branch)
+
+# Every push to main publishes a pre-release. A manual run with `release: true` publishes a full
+# release of the chosen ref. Versions come from scripts/version.mjs (see its header for the
+# tag and installer version schemes).
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      release:
+        description: 'Create a full release (otherwise a pre-release)'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write
+
+# Releases run one at a time and are never cancelled half-published; two back-to-back pushes
+# produce two pre-releases in order.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  version:
+    name: Compute version
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      semver: ${{ steps.version.outputs.semver }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+      json: ${{ steps.version.outputs.json }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      - name: Compute version numbers
+        id: version
+        run: |
+          git fetch --tags --quiet origin || true
+          node scripts/version.mjs \
+            ${{ inputs.release && '--release' || '' }} \
+            --sha "$(git rev-parse --short=9 "$GITHUB_SHA")" \
+            --github-output
+
+  build:
+    name: Build ${{ matrix.label }}
+    needs: version
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Windows x64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bundles: nsis,msi
+          # ubuntu-22.04 keeps the glibc floor low enough for current LTS distributions.
+          - label: Linux x86_64
+            os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            bundles: deb,rpm,appimage
+          - label: macOS arm64
+            os: macos-latest
+            target: aarch64-apple-darwin
+            bundles: dmg
+          # Cross-compiled on the Apple Silicon runner: it does not depend on GitHub's Intel
+          # macOS runners, which are being retired.
+          - label: macOS x64
+            os: macos-latest
+            target: x86_64-apple-darwin
+            bundles: dmg
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Stamp version
+        shell: bash
+        env:
+          VERSIONS: ${{ needs.version.outputs.json }}
+        run: node scripts/version.mjs --versions "$VERSIONS" --apply
+
+      # tauri build runs `npm run build` first, so dist/ exists before spatt-server embeds it.
+      - name: Build desktop app and installers
+        run: npx tauri build --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
+
+      - name: Build headless server
+        run: cargo build --release -p spatt-server --target ${{ matrix.target }}
+
+      - name: Collect release assets
+        run: node scripts/collect-release-assets.mjs --target ${{ matrix.target }} --version ${{ needs.version.outputs.semver }}
+
+      - name: Upload release assets
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ matrix.target }}
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish GitHub release
+    needs: [ version, build ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@v8
+        with:
+          pattern: release-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Hash release assets
+        working-directory: release-assets
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=( * )
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No release assets were downloaded" >&2
+            exit 1
+          fi
+          : > SHA256SUMS.txt
+          {
+            printf '| File | Size | SHA-256 | SHA-1 | MD5 |\n'
+            printf '|---|---:|---|---|---|\n'
+          } > ../release-asset-table.md
+          for file in "${files[@]}"; do
+            [ "$file" = "SHA256SUMS.txt" ] && continue
+            size=$(numfmt --to=iec-i --suffix=B --format='%.1f' "$(stat -c %s "$file")")
+            sha256=$(sha256sum "$file" | awk '{print $1}')
+            sha1=$(sha1sum "$file" | awk '{print $1}')
+            md5=$(md5sum "$file" | awk '{print $1}')
+            printf '%s  %s\n' "$sha256" "$file" >> SHA256SUMS.txt
+            printf '| `%s` | %s | `%s` | `%s` | `%s` |\n' "$file" "$size" "$sha256" "$sha1" "$md5" >> ../release-asset-table.md
+          done
+          cat ../release-asset-table.md
+
+      - name: Write release description
+        env:
+          TAG: ${{ needs.version.outputs.tag }}
+          SEMVER: ${{ needs.version.outputs.semver }}
+          PRERELEASE: ${{ needs.version.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          short_sha="${GITHUB_SHA::9}"
+          {
+            if [ "$PRERELEASE" = "true" ]; then
+              echo "Pre-release of SPATT, the Signal Programming and Timing Tool."
+            else
+              echo "Release of SPATT, the Signal Programming and Timing Tool."
+            fi
+            echo
+            echo "- **Version:** \`$SEMVER\` (tag \`$TAG\`)"
+            echo "- **Commit:** [\`$short_sha\`]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/$GITHUB_SHA)"
+            echo
+            echo "## Downloads"
+            echo
+            echo "| Platform | Installer |"
+            echo "|---|---|"
+            echo "| Windows x64 | \`-windows-x64-setup.exe\` (per-user installer) or \`-windows-x64.msi\` |"
+            echo "| macOS Apple Silicon | \`-macos-arm64.dmg\` |"
+            echo "| macOS Intel | \`-macos-x64.dmg\` |"
+            echo "| Linux x86_64 | \`.deb\` (Debian, Ubuntu), \`.rpm\` (Fedora, openSUSE) or \`.AppImage\` (any distribution) |"
+            echo
+            echo "\`spatt-server-*\` is the headless server on its own, for machines without a desktop."
+            echo
+            echo "The installers are not code-signed yet. Windows SmartScreen asks for confirmation, and"
+            echo "macOS may report the app as damaged; \`xattr -cr /Applications/SPATT.app\` clears the"
+            echo "download quarantine."
+            echo
+            echo "## Checksums"
+            echo
+            cat release-asset-table.md
+            echo
+            echo "\`SHA256SUMS.txt\` is attached in \`sha256sum\` format, so \`sha256sum -c SHA256SUMS.txt\`"
+            echo "checks a download."
+            echo
+            echo "SPATT is not certified traffic engineering software. Timing plans it produces are for"
+            echo "study, simulation and games, not for deployment on public roads."
+            if [ "$PRERELEASE" = "true" ]; then
+              echo
+              echo "NOTICE: This is a pre-release. It is not guaranteed to be stable, and pre-releases may"
+              echo "be removed 90 days after publication."
+            fi
+          } > release-body.md
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: ${{ needs.version.outputs.prerelease == 'true' && 'Pre-Release' || 'Release' }} ${{ needs.version.outputs.tag }}
+          body_path: release-body.md
+          prerelease: ${{ needs.version.outputs.prerelease == 'true' }}
+          make_latest: ${{ needs.version.outputs.prerelease != 'true' }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: release-assets/*
