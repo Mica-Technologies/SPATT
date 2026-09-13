@@ -30,16 +30,46 @@ the system reference (cycle zero of the common clock) to a chosen point in the l
 Controllers disagree about *which* point in the local cycle the offset locates, and the choice
 changes the number:
 
-| Reference | The offset is measured to |
-|---|---|
-| Begin of coordinated green | The start of the first coordinated phase's green |
-| End of coordinated green | The start of the coordinated phase's yellow |
-| Yield | The yield point of the coordinated phase |
-| Start of the first phase | The start of the ring sequence (the CSM ASC-3 controller's reference) |
+| Reference | Also called | The offset is measured to |
+|---|---|---|
+| Begin of coordinated green | Lead | The start of the first coordinated phase's green |
+| End of coordinated green | Lag, yield point | The start of the first coordinated phase's yellow |
+| Start of the first phase | — | The start of the ring sequence (the CSM ASC-3 controller's reference) |
+
+When the coordinated phases in the two rings start or end at different times (with a lagging
+left turn, say), "first" means whichever comes first in the cycle.
 
 Two plans with the same offset number but different references are different plans. SPATT stores
 the reference with every pattern and converts between references when it exports to a
 controller that uses a different one.
+
+### A worked example
+
+Take the standard eight-phase intersection with a 90 s cycle and ring 1 splits of 15, 35, 12 and
+28 s (phases 1, 2, 3, 4), coordinated on phases 2 and 6. Phase 2's green starts 15 s into the ring
+sequence and its yellow 44 s in. An offset of 30 s measured to the begin of coordinated green is
+the same timing as:
+
+| Reference | Offset |
+|---|---|
+| Begin of coordinated green | 30 s |
+| End of coordinated green | 30 + (44 − 15) = 59 s |
+| Start of the first phase | 30 − 15 = 15 s |
+
+## Force-offs and latest start points
+
+In local time, with local zero at the begin of coordinated green (15 s sequence time), the
+example's force-offs are:
+
+| Phase | Force-off (sequence) | Force-off (local) |
+|---|---|---|
+| 3 | 57 s | 42 s |
+| 4 | 84 s | 69 s |
+| 1 | 10 s | 85 s (it wraps past the end of the cycle) |
+
+A phase called too late cannot fit its minimum green before its force-off. Phase 4's latest
+start is 84 − 10 = 74 s sequence time for vehicles, and 84 − (7 + 14) = 63 s if it must also
+serve its walk and pedestrian clearance.
 
 ## Progression and the time-space diagram
 

@@ -8,7 +8,7 @@ SPATT is built in stages. Each stage ends with something usable.
       pipeline, this wiki
 - [x] Timing model: phases, rings, barriers, sequences, overlaps, pedestrian settings, patterns,
       time-of-day schedule, with validation ([file format](developer/project-format.md))
-- [ ] Cycle engine: split windows, force-offs, offset references, clearance calculators
+- [x] Cycle engine: split windows, force-offs, offset references, clearance calculators
 - [ ] Intersection editor
 - [ ] Ring-barrier diagram and printable timing sheets
 - [ ] Network server with shared project storage, manager controls, background modes

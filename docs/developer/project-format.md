@@ -26,7 +26,9 @@ Project
 │   ├── phases[]        number, label, enabled, movement { approach, kind },
 │   │                   minGreen, passage, maxGreen1, maxGreen2, yellow, redClear,
 │   │                   volumeDensity { … }, recall, pedestrian { enabled, walk, clearance,
-│   │                   recall, restInWalk }, lockingDetector, dualEntry, conditionalService
+│   │                   recall, restInWalk }, lockingDetector, dualEntry, conditionalService,
+│   │                   clearanceBasis? { approachSpeed, gradePercent, intersectionWidth,
+│   │                   vehicleLength, crossingDistance, walkingSpeed }
 │   ├── rings[]         { groups: [[phase, …], …] }   one list per barrier group
 │   ├── overlaps[]      id, type, includedPhases, modifierPhases, trail timing
 │   ├── preempts[]      track clearance, dwell and exit phases
