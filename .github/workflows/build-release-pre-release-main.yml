@@ -122,6 +122,12 @@ jobs:
       - name: Build headless server
         run: cargo build --release -p spatt-server --target ${{ matrix.target }}
 
+      # Cross-compiled binaries (macOS x64 on arm64) cannot run on the build runner.
+      - name: Smoke-test headless server
+        if: ${{ matrix.target != 'x86_64-apple-darwin' }}
+        shell: bash
+        run: node scripts/smoke-server.mjs "target/${{ matrix.target }}/release/spatt-server$([ "$RUNNER_OS" = Windows ] && echo .exe)"
+
       - name: Collect release assets
         run: node scripts/collect-release-assets.mjs --target ${{ matrix.target }} --version ${{ needs.version.outputs.semver }}
 

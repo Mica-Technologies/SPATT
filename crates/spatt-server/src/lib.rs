@@ -19,8 +19,12 @@ use tower_http::services::{ServeDir, ServeFile};
 
 /// The built web UI. `allow_missing` lets `cargo check` and `cargo test` run before
 /// `npm run build` has produced `dist/`; such a binary answers the API and 404s the UI.
+///
+/// The folder is relative to this crate's manifest. Do not write `$CARGO_MANIFEST_DIR` here:
+/// without rust-embed's `interpolate-folder-path` feature it is taken literally, and
+/// `allow_missing` then silently embeds nothing. `embeds_the_built_ui` guards against that.
 #[derive(RustEmbed)]
-#[folder = "$CARGO_MANIFEST_DIR/../../dist"]
+#[folder = "../../dist"]
 #[allow_missing = true]
 struct EmbeddedUi;
 
@@ -163,6 +167,19 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    /// When a web build exists, the embed must find it. Skipped (passes) without `dist/`.
+    #[test]
+    fn embeds_the_built_ui() {
+        let dist_index =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../dist/index.html");
+        if dist_index.exists() {
+            assert!(
+                EmbeddedUi::get("index.html").is_some(),
+                "dist/index.html exists but the embedded UI does not contain it"
+            );
+        }
     }
 
     #[test]
