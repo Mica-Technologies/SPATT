@@ -1,0 +1,24 @@
+# Agent working plans — disposable, never committed
+docs/agent-plans/
+
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Test artifacts
+playwright-report/
+test-results/
+
+# Editors and OS
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.log
+.DS_Store
+Thumbs.db
+
+# Local env
+.env
+.env.*
