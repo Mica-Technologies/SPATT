@@ -17,6 +17,7 @@ import Typography from '@mui/material/Typography';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { downloadProject } from '../../io/files';
 import AppHeader from '../components/AppHeader';
+import ClearanceDialog from '../dialogs/ClearanceDialog';
 import { findFieldElement } from '../fields/paths';
 import { useAutosave, type SaveStatus } from '../state/useAutosave';
 import { useIntersectionIssues } from '../state/useIssues';
@@ -61,6 +62,7 @@ export default function Workspace() {
   const [diagramOpen, setDiagramOpen] = useState(true);
   const intersectionIndex = project.intersections.findIndex((i) => i.id === intersection?.id);
   const issues = useIntersectionIssues(intersectionIndex);
+  const [clearancePhase, setClearancePhase] = useState<number | null>(null);
 
   // Ctrl/Cmd+Z and Ctrl+Y / Ctrl+Shift+Z, except while typing in a field (its own undo applies).
   useEffect(() => {
@@ -160,7 +162,14 @@ export default function Workspace() {
                 </Tabs>
               </Box>
               <Box sx={{ flexGrow: 1, overflow: 'auto', minHeight: 0 }}>
-                {tab === 'phases' ? <PhasesTab intersection={intersection} intersectionIndex={intersectionIndex} issues={issues} /> : null}
+                {tab === 'phases' ? (
+                  <PhasesTab
+                    intersection={intersection}
+                    intersectionIndex={intersectionIndex}
+                    issues={issues}
+                    phaseActions={[{ label: 'Calculate clearances…', onSelect: (phase) => setClearancePhase(phase.number) }]}
+                  />
+                ) : null}
                 {tab === 'rings' ? <RingsTab intersection={intersection} intersectionIndex={intersectionIndex} issues={issues} /> : null}
                 {tab === 'patterns' ? <PatternsTab intersection={intersection} intersectionIndex={intersectionIndex} issues={issues} /> : null}
                 {tab === 'schedule' ? <ScheduleTab intersection={intersection} intersectionIndex={intersectionIndex} issues={issues} /> : null}
@@ -177,6 +186,13 @@ export default function Workspace() {
         </Box>
         {showDiagram ? <DiagramPanel intersection={intersection} patternId={patternId} /> : null}
       </Box>
+      <ClearanceDialog
+        open={clearancePhase !== null}
+        onClose={() => setClearancePhase(null)}
+        intersectionIndex={intersectionIndex}
+        phase={intersection?.phases.find((p) => p.number === clearancePhase) ?? null}
+        units={project.units}
+      />
     </Box>
   );
 }
