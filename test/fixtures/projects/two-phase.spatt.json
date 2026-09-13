@@ -19,7 +19,7 @@
           "label": "EB",
           "enabled": true,
           "movement": {
-            "approach": "W",
+            "approach": "E",
             "kind": "through"
           },
           "minGreen": 100,
@@ -52,7 +52,7 @@
           "label": "SB",
           "enabled": true,
           "movement": {
-            "approach": "N",
+            "approach": "S",
             "kind": "through"
           },
           "minGreen": 100,
@@ -85,7 +85,7 @@
           "label": "WB",
           "enabled": true,
           "movement": {
-            "approach": "E",
+            "approach": "W",
             "kind": "through"
           },
           "minGreen": 100,
@@ -118,7 +118,7 @@
           "label": "NB",
           "enabled": true,
           "movement": {
-            "approach": "S",
+            "approach": "N",
             "kind": "through"
           },
           "minGreen": 100,

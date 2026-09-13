@@ -28,6 +28,7 @@ const idSchema = z.string().min(1).max(64);
  */
 export const extensionsSchema = z.record(z.string(), z.unknown());
 
+/** Direction of travel: `E` is eastbound (traffic heading east, arriving from the west). */
 export const approachSchema = z.enum(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']);
 export type Approach = z.infer<typeof approachSchema>;
 

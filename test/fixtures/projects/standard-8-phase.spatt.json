@@ -19,7 +19,7 @@
           "label": "WB Left",
           "enabled": true,
           "movement": {
-            "approach": "E",
+            "approach": "W",
             "kind": "left"
           },
           "minGreen": 50,
@@ -49,10 +49,10 @@
         },
         {
           "number": 2,
-          "label": "EB Through",
+          "label": "EB Thru",
           "enabled": true,
           "movement": {
-            "approach": "W",
+            "approach": "E",
             "kind": "through"
           },
           "minGreen": 100,
@@ -85,7 +85,7 @@
           "label": "NB Left",
           "enabled": true,
           "movement": {
-            "approach": "S",
+            "approach": "N",
             "kind": "left"
           },
           "minGreen": 50,
@@ -115,10 +115,10 @@
         },
         {
           "number": 4,
-          "label": "SB Through",
+          "label": "SB Thru",
           "enabled": true,
           "movement": {
-            "approach": "N",
+            "approach": "S",
             "kind": "through"
           },
           "minGreen": 100,
@@ -151,7 +151,7 @@
           "label": "EB Left",
           "enabled": true,
           "movement": {
-            "approach": "W",
+            "approach": "E",
             "kind": "left"
           },
           "minGreen": 50,
@@ -181,10 +181,10 @@
         },
         {
           "number": 6,
-          "label": "WB Through",
+          "label": "WB Thru",
           "enabled": true,
           "movement": {
-            "approach": "E",
+            "approach": "W",
             "kind": "through"
           },
           "minGreen": 100,
@@ -217,7 +217,7 @@
           "label": "SB Left",
           "enabled": true,
           "movement": {
-            "approach": "N",
+            "approach": "S",
             "kind": "left"
           },
           "minGreen": 50,
@@ -247,10 +247,10 @@
         },
         {
           "number": 8,
-          "label": "NB Through",
+          "label": "NB Thru",
           "enabled": true,
           "movement": {
-            "approach": "S",
+            "approach": "N",
             "kind": "through"
           },
           "minGreen": 100,

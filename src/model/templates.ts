@@ -101,14 +101,14 @@ function intersection(id: string, name: string, phases: Phase[], rings: Ring[], 
  */
 export function standardEightPhase(id = 'standard-8-phase'): Intersection {
   const phases = [
-    makePhase(1, left('WB Left', 'E')),
-    makePhase(2, through('EB Through', 'W', 180, 400)),
-    makePhase(3, left('NB Left', 'S')),
-    makePhase(4, through('SB Through', 'N', 140, 300)),
-    makePhase(5, left('EB Left', 'W')),
-    makePhase(6, through('WB Through', 'E', 180, 400)),
-    makePhase(7, left('SB Left', 'N')),
-    makePhase(8, through('NB Through', 'S', 140, 300)),
+    makePhase(1, left('WB Left', 'W')),
+    makePhase(2, through('EB Thru', 'E', 180, 400)),
+    makePhase(3, left('NB Left', 'N')),
+    makePhase(4, through('SB Thru', 'S', 140, 300)),
+    makePhase(5, left('EB Left', 'E')),
+    makePhase(6, through('WB Thru', 'W', 180, 400)),
+    makePhase(7, left('SB Left', 'S')),
+    makePhase(8, through('NB Thru', 'N', 140, 300)),
   ];
   const rings: Ring[] = [
     { groups: [[1, 2], [3, 4]] },
@@ -139,12 +139,12 @@ export function leadLagEightPhase(id = 'lead-lag-8-phase'): Intersection {
  */
 export function splitPhaseSideStreet(id = 'split-phase-side-street'): Intersection {
   const phases = [
-    makePhase(1, left('WB Left', 'E')),
-    makePhase(2, through('EB Through', 'W', 180, 400)),
-    makePhase(4, { ...through('SB All Movements', 'N', 140, 250), label: 'SB All Movements' }),
-    makePhase(5, left('EB Left', 'W')),
-    makePhase(6, through('WB Through', 'E', 180, 400)),
-    makePhase(8, { ...through('NB All Movements', 'S', 140, 250), label: 'NB All Movements' }),
+    makePhase(1, left('WB Left', 'W')),
+    makePhase(2, through('EB Thru', 'E', 180, 400)),
+    makePhase(4, { ...through('SB All', 'S', 140, 250), label: 'SB All' }),
+    makePhase(5, left('EB Left', 'E')),
+    makePhase(6, through('WB Thru', 'W', 180, 400)),
+    makePhase(8, { ...through('NB All', 'N', 140, 250), label: 'NB All' }),
   ];
   const rings: Ring[] = [
     { groups: [[1, 2], [4], [8]] },
@@ -157,10 +157,10 @@ export function splitPhaseSideStreet(id = 'split-phase-side-street'): Intersecti
 /** Two phases per ring, no protected lefts: 2+6 main street, 4+8 side street. */
 export function twoPhase(id = 'two-phase'): Intersection {
   const phases = [
-    makePhase(2, through('EB', 'W', 160, 350)),
-    makePhase(4, through('SB', 'N', 120, 250)),
-    makePhase(6, through('WB', 'E', 160, 350)),
-    makePhase(8, through('NB', 'S', 120, 250)),
+    makePhase(2, through('EB', 'E', 160, 350)),
+    makePhase(4, through('SB', 'S', 120, 250)),
+    makePhase(6, through('WB', 'W', 160, 350)),
+    makePhase(8, through('NB', 'N', 120, 250)),
   ];
   const rings: Ring[] = [
     { groups: [[2], [4]] },
