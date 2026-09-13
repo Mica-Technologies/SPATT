@@ -41,6 +41,13 @@ installed on the Windows dev machine; check a docs change with
   `src/ui`, `src/io` or `src/manager` imports. `test/boundaries.test.ts` enforces it.
 - **All durations are integer tenths of a second** (`src/model/units.ts`). Never float seconds in
   the model. One tenth = 2 CSM ticks.
+- `src/model/schema.ts` is the project file format (Zod, shape only); `validate.ts` holds the
+  semantic rules, which return `Issue`s with stable codes and paths and never throw. Every rule
+  is listed in `docs/developer/project-format.md` and has a test in `validate.test.ts`; keep all
+  three in step. Rings are `groups` per barrier: `rings[r].groups[g]` = ordered phases.
+- `test/fixtures/projects/*.spatt.json` are generated from `src/model/templates.ts` and pin the
+  format; after a deliberate format change run `UPDATE_FIXTURES=1 npx vitest run test/fixtures.test.ts`
+  and review the diff. A `schemaVersion` bump needs a step in `migrateProject`.
 - `src/io/host.ts` detects the host (`tauri` | `server` | `browser`); host-specific behaviour
   (storage, native dialogs) goes through `src/io`, nowhere else.
 - `crates/spatt-server` embeds `dist/` with rust-embed (`allow_missing`, so `cargo test` works

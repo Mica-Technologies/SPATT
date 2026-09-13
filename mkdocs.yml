@@ -114,5 +114,6 @@ nav:
       - developer/index.md
       - Building from Source: developer/building.md
       - Architecture: developer/architecture.md
+      - Project File Format: developer/project-format.md
       - Releases and Versioning: developer/releases.md
   - Roadmap: roadmap.md
