@@ -1,27 +1,27 @@
 /**
- * Project library in the desktop app's data folder. Placeholder until the Rust commands exist:
- * it delegates to browser storage inside the webview so the desktop app is usable meanwhile.
+ * Project library in the desktop app's data folder (`<app data>/projects/<id>.spatt.json`).
+ * The files are managed by the Rust commands in `src-tauri/src/projects.rs`; keep the command
+ * and argument names in step with them.
  */
-import { BrowserStore } from './browser-store';
+import { invoke } from '@tauri-apps/api/core';
 import type { ProjectStore, ProjectSummary } from './store';
 
 export class TauriStore implements ProjectStore {
   readonly kind = 'tauri' as const;
-  private readonly fallback = new BrowserStore();
 
   list(): Promise<ProjectSummary[]> {
-    return this.fallback.list();
+    return invoke<ProjectSummary[]>('projects_list');
   }
 
   read(id: string): Promise<string | null> {
-    return this.fallback.read(id);
+    return invoke<string | null>('projects_read', { id });
   }
 
   write(id: string, text: string): Promise<void> {
-    return this.fallback.write(id, text);
+    return invoke<void>('projects_write', { id, text });
   }
 
   remove(id: string): Promise<void> {
-    return this.fallback.remove(id);
+    return invoke<void>('projects_remove', { id });
   }
 }
