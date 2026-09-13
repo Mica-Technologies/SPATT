@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="SPATT">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1A8CFF"/>
+      <stop offset="1" stop-color="#0059B3"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="56" fill="url(#g)"/>
+  <!-- Ring 1 and ring 2 split bars, a barrier line through the middle -->
+  <rect x="40" y="76" width="52" height="36" rx="8" fill="#fff"/>
+  <rect x="100" y="76" width="20" height="36" rx="8" fill="#fff" fill-opacity="0.55"/>
+  <rect x="136" y="76" width="80" height="36" rx="8" fill="#fff"/>
+  <rect x="40" y="144" width="28" height="36" rx="8" fill="#fff" fill-opacity="0.55"/>
+  <rect x="76" y="144" width="44" height="36" rx="8" fill="#fff"/>
+  <rect x="136" y="144" width="48" height="36" rx="8" fill="#fff"/>
+  <rect x="192" y="144" width="24" height="36" rx="8" fill="#fff" fill-opacity="0.55"/>
+  <rect x="124" y="56" width="8" height="144" rx="4" fill="#fff"/>
+</svg>
