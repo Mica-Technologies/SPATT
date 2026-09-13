@@ -1,0 +1,118 @@
+site_name: SPATT
+site_description: >-
+  SPATT, the Signal Programming and Timing Tool — NEMA ring-barrier timing plans, timing sheets
+  and coordinated corridor timing, for study, simulation and games.
+site_url: https://mica-technologies.github.io/SPATT/
+repo_url: https://github.com/Mica-Technologies/SPATT
+repo_name: Mica-Technologies/SPATT
+edit_uri: edit/main/docs/
+copyright: >-
+  Copyright &copy; 2026 Mica Technologies. SPATT is open source under the MIT License.
+
+# Working plans are gitignored and absent from a CI checkout anyway. This stops a LOCAL
+# `mkdocs serve` from finding them and quietly publishing one on the next deploy.
+exclude_docs: |
+  agent-plans/
+
+theme:
+  name: material
+  language: en
+  logo: assets/spatt-mark.svg
+  favicon: assets/spatt-mark.svg
+  font:
+    text: Roboto
+    code: Roboto Mono
+  icon:
+    repo: fontawesome/brands/github
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.top
+    - navigation.indexes
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+    - content.tooltips
+    - toc.follow
+  palette:
+    # Mica Design Guidelines brand blue and gray ramps; the exact values live in
+    # assets/spatt.css. Both modes are first-class, so neither is a recolour of the other.
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  # Material renders ```mermaid fences as diagrams when superfences hands them over untouched.
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+plugins:
+  - search
+
+extra_css:
+  - assets/spatt.css
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/Mica-Technologies/SPATT
+      name: SPATT on GitHub
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - getting-started/index.md
+      - Installation: getting-started/installation.md
+      - Desktop, Network and Headless: getting-started/hosts.md
+  - Concepts:
+      - concepts/index.md
+      - Rings, Barriers and Phases: concepts/ring-barrier.md
+      - Timing Parameters: concepts/timing-parameters.md
+      - Coordination and Offsets: concepts/coordination.md
+  - Controller Profiles:
+      - profiles/index.md
+      - CSM ASC-3: profiles/csm-asc3.md
+  - Developer:
+      - developer/index.md
+      - Building from Source: developer/building.md
+      - Architecture: developer/architecture.md
+      - Releases and Versioning: developer/releases.md
+  - Roadmap: roadmap.md

@@ -1,0 +1,5 @@
+# Documentation toolchain for the SPATT wiki, pinned so a CI build and a local `mkdocs serve`
+# render the same site. Same versions as the City Super Mod guidebook.
+mkdocs==1.6.1
+mkdocs-material==9.7.7
+pymdown-extensions==11.0.1

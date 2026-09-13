@@ -1,0 +1,91 @@
+/* ============================================================================
+   SPATT wiki — Mica Technologies design system
+   ----------------------------------------------------------------------------
+   Brand blue and gray ramps copied from the Mica Design Guidelines theme
+   (website-micatechnologies-com `shared-theme/themePrimitives.ts`), kept as HSL
+   in the same steps so a guideline change can be carried across by reading.
+   Roboto, the 8px spacing base and light/dark as equals follow
+   https://micatechnologies.com/design. The app itself uses the same values.
+   ============================================================================ */
+
+:root {
+  --spatt-brand-50:  hsl(210, 100%, 95%);
+  --spatt-brand-100: hsl(210, 100%, 92%);
+  --spatt-brand-200: hsl(210, 100%, 80%);
+  --spatt-brand-300: hsl(210, 100%, 65%);
+  --spatt-brand-400: hsl(210, 98%, 48%);
+  --spatt-brand-500: hsl(210, 98%, 42%);
+  --spatt-brand-600: hsl(210, 98%, 55%);
+  --spatt-brand-700: hsl(210, 100%, 35%);
+  --spatt-brand-800: hsl(210, 100%, 16%);
+  --spatt-brand-900: hsl(210, 100%, 21%);
+
+  --spatt-gray-50:  hsl(220, 35%, 97%);
+  --spatt-gray-100: hsl(220, 30%, 94%);
+  --spatt-gray-200: hsl(220, 20%, 88%);
+  --spatt-gray-300: hsl(220, 20%, 80%);
+  --spatt-gray-400: hsl(220, 20%, 65%);
+  --spatt-gray-500: hsl(220, 20%, 42%);
+  --spatt-gray-600: hsl(220, 20%, 35%);
+  --spatt-gray-700: hsl(220, 20%, 25%);
+  --spatt-gray-800: hsl(220, 30%, 6%);
+  --spatt-gray-900: hsl(220, 35%, 3%);
+
+  --spatt-radius-1: 8px;
+  --spatt-radius-2: 10px;
+}
+
+/* ---------------------------------------------------------------- light mode */
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color:          var(--spatt-gray-800);
+  --md-primary-fg-color--light:   var(--spatt-gray-700);
+  --md-primary-fg-color--dark:    var(--spatt-gray-900);
+  --md-primary-bg-color:          var(--spatt-gray-50);
+  --md-primary-bg-color--light:   var(--spatt-gray-100);
+
+  /* 700 for links: brand 400 on white falls short of AA for body text. */
+  --md-accent-fg-color:           var(--spatt-brand-500);
+  --md-accent-fg-color--transparent: hsla(210, 98%, 42%, 0.1);
+  --md-typeset-a-color:           var(--spatt-brand-700);
+
+  --md-default-bg-color:          hsl(0, 0%, 99%);
+  --md-code-bg-color:             var(--spatt-gray-50);
+}
+
+/* ----------------------------------------------------------------- dark mode */
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color:          var(--spatt-gray-900);
+  --md-primary-fg-color--light:   var(--spatt-gray-800);
+  --md-primary-fg-color--dark:    var(--spatt-gray-900);
+  --md-primary-bg-color:          var(--spatt-gray-50);
+
+  --md-accent-fg-color:           var(--spatt-brand-300);
+  --md-accent-fg-color--transparent: hsla(210, 100%, 65%, 0.1);
+  --md-typeset-a-color:           var(--spatt-brand-300);
+
+  --md-default-bg-color:          var(--spatt-gray-900);
+  --md-code-bg-color:             hsl(220, 30%, 7%);
+  --md-hue:                       220;
+}
+
+/* ------------------------------------------------------------------- shapes */
+.md-typeset .admonition,
+.md-typeset details,
+.md-typeset pre > code,
+.md-typeset table:not([class]) {
+  border-radius: var(--spatt-radius-1);
+}
+
+.md-typeset .admonition,
+.md-typeset details {
+  border-radius: var(--spatt-radius-2);
+}
+
+/* Timing tables read down columns: fixed-width digits. */
+.md-typeset table:not([class]) td {
+  font-variant-numeric: tabular-nums;
+}
+
+.md-header__button.md-logo img {
+  height: 1.6rem;
+}
