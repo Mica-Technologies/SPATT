@@ -50,6 +50,14 @@ installed on the Windows dev machine; check a docs change with
   and review the diff. A `schemaVersion` bump needs a step in `migrateProject`.
 - `src/io/host.ts` detects the host (`tauri` | `server` | `browser`); host-specific behaviour
   (storage, native dialogs) goes through `src/io`, nowhere else.
+- UI state lives in `src/ui/state/workspace.ts` (zustand). **Every project change goes through
+  `edit(label, recipe)` / `editIntersection(label, recipe)`**: it clones, the recipe mutates the
+  clone, and it becomes one undo step. Autosave (`useAutosave.ts`) writes through the
+  `ProjectStore` for the host (`BrowserStore` IndexedDB, `TauriStore` → Rust `projects_*`
+  commands over `crates/spatt-server/src/store.rs`).
+- Editor controls take `fieldId(path)` ids where `path` equals the validation issue path, so the
+  problems panel can focus them (`src/ui/fields/paths.ts`, `src/ui/workspace/navigation.ts`).
+  Dense grid inputs are in `src/ui/fields/GridInputs.tsx` (commit on blur/Enter).
 - `crates/spatt-server` embeds `dist/` with rust-embed (`allow_missing`, so `cargo test` works
   without a web build). It serves `/api/health` → `{"app":"spatt","version":…}`. Binds
   localhost by default; network exposure is always explicit.

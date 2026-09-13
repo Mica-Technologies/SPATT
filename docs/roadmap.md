@@ -9,7 +9,9 @@ SPATT is built in stages. Each stage ends with something usable.
 - [x] Timing model: phases, rings, barriers, sequences, overlaps, pedestrian settings, patterns,
       time-of-day schedule, with validation ([file format](developer/project-format.md))
 - [x] Cycle engine: split windows, force-offs, offset references, clearance calculators
-- [ ] Intersection editor
+- [ ] Intersection editor (built: project library, phase grid, rings and barriers, patterns
+      with split balancing, schedule, clearance calculator, live ring-barrier diagram; final
+      verification pending)
 - [ ] Ring-barrier diagram and printable timing sheets
 - [ ] Network server with shared project storage, manager controls, background modes
       (start at login, system service) with tray icon
