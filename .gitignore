@@ -1,24 +1,56 @@
 # Agent working plans — disposable, never committed
 docs/agent-plans/
 
-# Dependencies and build output
+# Dependencies
 node_modules/
+
+# Build output
 dist/
-coverage/
+dist-ssr/
+build/
+out/
+.cache/
 *.tsbuildinfo
 
-# Test artifacts
+# Rust / Tauri
+target/
+src-tauri/gen/schemas/
+
+# Release staging (workflows and local scripts)
+release-assets/
+
+# Test output
+coverage/
 playwright-report/
 test-results/
 
-# Editors and OS
+# Tool logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# IDE
 .idea/
 .vscode/*
 !.vscode/extensions.json
-*.log
-.DS_Store
-Thumbs.db
 
-# Local env
-.env
+# OS cruft
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Logs and temp
+*.log
+*.tmp
+*~
+*.local
+
+# Secrets
+*.env
 .env.*
+*credentials*
+*secret*
+
+# Local-only Claude Code state
+.claude/settings.local.json
