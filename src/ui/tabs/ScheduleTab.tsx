@@ -29,10 +29,13 @@ import { useWorkspace } from '../state/workspace';
 import { fontFamilyMono } from '../theme/themePrimitives';
 import type { TabProps } from './types';
 
-type PaletteKey = 'primary' | 'success' | 'warning' | 'secondary' | 'info' | 'error';
+type PaletteKey = 'primary' | 'success' | 'warning' | 'secondary' | 'info';
 
-/** Pattern colours, in the order of the intersection's patterns; repeats after six. */
-const PATTERN_PALETTE: readonly PaletteKey[] = ['primary', 'success', 'warning', 'secondary', 'info', 'error'];
+/**
+ * Pattern colours, in the order of the intersection's patterns; repeats after five. Red is left
+ * out: everywhere else in SPATT it means an error.
+ */
+const PATTERN_PALETTE: readonly PaletteKey[] = ['primary', 'success', 'warning', 'secondary', 'info'];
 
 /** A translucent tint of a palette colour that follows the active colour scheme. */
 function tint(theme: Theme, key: PaletteKey, opacity: number): string {

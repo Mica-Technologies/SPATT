@@ -5,6 +5,7 @@
  * values worth a second look. Every rule has a stable code and a test in validate.test.ts.
  */
 import { error, warning, type Issue } from './issues';
+import { formatClock } from './schedule';
 import type { Intersection, Pattern, Phase, Ring } from './schema';
 import { formatSeconds, type Tenths } from './units';
 
@@ -308,10 +309,6 @@ function sameMembership(a: Ring[], b: Ring[]): boolean {
       return group.length === otherGroup.length && [...group].sort((x, y) => x - y).join() === [...otherGroup].sort((x, y) => x - y).join();
     });
   });
-}
-
-function formatClock(minute: number): string {
-  return `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
 }
 
 function capitalize(text: string): string {
