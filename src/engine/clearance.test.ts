@@ -4,7 +4,9 @@ import { ceilTenths, pedestrianClearance, pedestrianTotalMinimum, redClearance, 
 describe('ceilTenths', () => {
   it('rounds up to the next tenth but not on floating-point noise', () => {
     expect(ceilTenths(3.5667)).toBe(36);
-    expect(ceilTenths(3.2000000000000003)).toBe(32);
+    const noisy = 0.1 + 0.2; // 0.30000000000000004
+    expect(Math.ceil(noisy * 10)).toBe(4); // what a naive ceil gives
+    expect(ceilTenths(noisy)).toBe(3);
     expect(ceilTenths(3.21)).toBe(33);
   });
 });
