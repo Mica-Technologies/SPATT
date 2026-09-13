@@ -4,6 +4,8 @@
 //! same router in-process. The web UI (`dist/`) is embedded into the binary at compile time, so
 //! a release is a single file; `--dist` serves a directory from disk instead during development.
 
+pub mod store;
+
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
