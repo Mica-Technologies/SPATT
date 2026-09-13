@@ -1,6 +1,7 @@
 export * from './edits';
 export * from './issues';
 export * from './project';
+export * from './ring-edits';
 export * from './schema';
 export * from './templates';
 export * from './units';
