@@ -56,6 +56,23 @@ export const pedestrianSchema = z.object({
 });
 export type Pedestrian = z.infer<typeof pedestrianSchema>;
 
+/**
+ * The inputs a phase's clearance times were calculated from (engine/clearance.ts), kept so a
+ * timing sheet can show where a yellow or pedestrian clearance came from. Lengths and speeds
+ * are in the project's units. Optional: hand-entered times have none.
+ */
+export const clearanceBasisSchema = z.object({
+  approachSpeed: z.number().positive().optional(),
+  /** Percent; uphill positive. */
+  gradePercent: z.number().min(-15).max(15).optional(),
+  /** Stop line to the far side of the last conflicting lane. */
+  intersectionWidth: z.number().nonnegative().optional(),
+  vehicleLength: z.number().nonnegative().optional(),
+  crossingDistance: z.number().nonnegative().optional(),
+  walkingSpeed: z.number().positive().optional(),
+});
+export type ClearanceBasis = z.infer<typeof clearanceBasisSchema>;
+
 export const phaseSchema = z.object({
   number: phaseNumberSchema,
   label: z.string().max(80),
@@ -78,6 +95,7 @@ export const phaseSchema = z.object({
   lockingDetector: z.boolean(),
   dualEntry: z.boolean(),
   conditionalService: z.boolean(),
+  clearanceBasis: clearanceBasisSchema.optional(),
   extensions: extensionsSchema.optional(),
 });
 export type Phase = z.infer<typeof phaseSchema>;
@@ -126,12 +144,12 @@ export type Preempt = z.infer<typeof preemptSchema>;
 
 /**
  * What a pattern's offset is measured to, in the local cycle.
- * - `beginCoordGreen`: start of the first coordinated phase's green
- * - `beginCoordYellow`: start of the coordinated phase's yellow (end of green)
- * - `yield`: the coordinated phase's yield point
- * - `firstPhaseStart`: start of each ring's first active phase (the CSM ASC-3 reference)
+ * - `beginCoordGreen`: start of the first coordinated phase's green ("lead" reference)
+ * - `beginCoordYellow`: start of the first coordinated phase's yellow, i.e. the end of
+ *   coordinated green, which controllers also call the yield point ("lag" reference)
+ * - `firstPhaseStart`: start of the ring sequence, barrier group 1 (the CSM ASC-3 reference)
  */
-export const offsetReferenceSchema = z.enum(['beginCoordGreen', 'beginCoordYellow', 'yield', 'firstPhaseStart']);
+export const offsetReferenceSchema = z.enum(['beginCoordGreen', 'beginCoordYellow', 'firstPhaseStart']);
 export type OffsetReference = z.infer<typeof offsetReferenceSchema>;
 
 export const patternSchema = z.object({
