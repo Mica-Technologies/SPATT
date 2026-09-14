@@ -59,6 +59,15 @@ To change an offset, type it in the table below the diagram, or drag an intersec
 the diagram. A drag moves the offset in whole seconds, and the bands update as you move. Each
 change is one undo step.
 
+To change splits, hold **Alt** (Option on a Mac) and drag an intersection sideways. This moves the
+end of its coordinated green in whole seconds. When the coordinated phases get longer, the time
+comes from the other barrier groups: the group after the coordinated phases first, the same amount
+in every ring, each ring's last phase first, and never below a phase's minimum split. When they
+get shorter, the time goes to the last phase of each ring in the next group. The cycle stays the
+same and coordinated green still starts at the same moment. An offset measured to the end of
+coordinated green is converted to match. The label on the diagram shows the change, marked
+**(limit)** when minimums stop it.
+
 Offsets are measured to each pattern's own reference point (see
 [Offset reference point](../concepts/coordination.md#offset-reference-point)). The table shows
 which reference each one uses.

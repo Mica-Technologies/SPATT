@@ -1,6 +1,7 @@
 /**
  * The time-space tab: a timing plan's diagram, its bands, and each intersection's offset, which
- * can be typed or changed by dragging the intersection on the diagram.
+ * can be typed or changed by dragging the intersection on the diagram; Alt-dragging moves the end
+ * of its coordinated green.
  */
 import { useMemo, useState } from 'react';
 import AutoGraphRoundedIcon from '@mui/icons-material/AutoGraphRounded';
@@ -11,7 +12,7 @@ import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { analyzeProgression, mod, type Direction, type OffsetOverrides } from '../../engine';
+import { analyzeProgression, mod, shiftCoordinatedGreen, type Direction, type OffsetOverrides } from '../../engine';
 import { formatSeconds, oppositeDirection, type Corridor, type Project } from '../../model';
 import { REFERENCE_LABEL } from '../diagram/diagramText';
 import { SecondsInput } from '../fields/GridInputs';
@@ -26,9 +27,11 @@ export default function CorridorProgression({ project, corridor }: { project: Pr
   const selectPlan = useWorkspace((s) => s.selectPlan);
   const [cycles, setCycles] = useState(2);
   const [preview, setPreview] = useState<OffsetOverrides>({});
+  /** The project with a split drag in progress applied, while Alt-dragging. */
+  const [splitPreview, setSplitPreview] = useState<Project | null>(null);
   const [optimizing, setOptimizing] = useState(false);
   const plan = corridor.plans.find((p) => p.id === selectedPlanId) ?? corridor.plans[0] ?? null;
-  const progression = useMemo(() => (plan ? analyzeProgression(project, corridor, plan, preview) : null), [project, corridor, plan, preview]);
+  const progression = useMemo(() => (plan ? analyzeProgression(splitPreview ?? project, corridor, plan, preview) : null), [project, splitPreview, corridor, plan, preview]);
   const labels: Record<Direction, string> = { outbound: `${corridor.outbound}B`, inbound: `${oppositeDirection(corridor.outbound)}B` };
   const intersections = new Map(project.intersections.map((i) => [i.id, i]));
 
@@ -118,10 +121,33 @@ export default function CorridorProgression({ project, corridor }: { project: Pr
               setPreview({ [id]: mod(found.pattern.offset + delta, found.pattern.cycle) });
             }
           }}
+          onSplitDrag={(id, delta, done) => {
+            const found = patternOf(id);
+            if (!found) return undefined;
+            const shift = shiftCoordinatedGreen(found.intersection, found.pattern.id, delta);
+            if (done) {
+              setSplitPreview(null);
+              if (shift && shift.applied !== 0) {
+                edit(`${found.intersection.name} coordinated green ${shift.applied > 0 ? '+' : ''}${formatSeconds(shift.applied)} s`, (p) => {
+                  const pattern = p.intersections[found.intersectionIndex]?.patterns.find((x) => x.id === found.pattern.id);
+                  if (pattern) Object.assign(pattern, { splits: shift.splits, offset: shift.offset });
+                });
+              }
+              return shift?.applied;
+            }
+            if (!shift) return 0;
+            setSplitPreview({
+              ...project,
+              intersections: project.intersections.map((i, k) =>
+                k === found.intersectionIndex ? { ...i, patterns: i.patterns.map((x) => (x.id === found.pattern.id ? { ...x, splits: shift.splits, offset: shift.offset } : x)) } : i,
+              ),
+            });
+            return shift.applied;
+          }}
         />
       </Box>
       <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-        Green and red bars show when each intersection&apos;s through phases are green ({labels.outbound} above the line, {labels.inbound} below). The shaded bands are the vehicles that meet green at every intersection at the progression speed. Drag an intersection sideways to move its offset in whole seconds.
+        Green and red bars show when each intersection&apos;s through phases are green ({labels.outbound} above the line, {labels.inbound} below). The shaded bands are the vehicles that meet green at every intersection at the progression speed. Drag an intersection sideways to move its offset in whole seconds; hold Alt while dragging to move the end of its coordinated green instead, trading time with its other phases.
       </Typography>
 
       <OptimizeDialog open={optimizing} onClose={() => setOptimizing(false)} project={project} corridor={corridor} plan={plan} labels={labels} />

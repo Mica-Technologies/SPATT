@@ -71,6 +71,24 @@ test('shows progression bands on the time-space diagram and moves offsets by typ
   await page.getByRole('button', { name: 'Undo' }).click();
   await expect(offsetB).toHaveValue('30.0');
 
+  // Alt-drag B 5 s to the right: its coordinated green ends 5 s later (the side street gives the
+  // time), the offset stays, and WB, which leaves B at the end of its green, gains 5 s.
+  const at = (await diagram.boundingBox())!;
+  const atY = at.y + at.height * (24 / 440);
+  const secondsToPixels = (seconds: number) => (at.width * (((seconds * 10) / 1400) * 814)) / 1000;
+  await page.keyboard.down('Alt');
+  await page.mouse.move(at.x + at.width * 0.6, atY);
+  await page.mouse.down();
+  await page.mouse.move(at.x + at.width * 0.6 + secondsToPixels(5), atY, { steps: 8 });
+  await expect(diagram.locator('text', { hasText: 'coordinated green +5.0 s' })).toHaveCount(1);
+  await page.mouse.up();
+  await page.keyboard.up('Alt');
+  await expect(inbound).toContainText('29.0 s');
+  await expect(outbound).toContainText('34.0 s');
+  await expect(offsetB).toHaveValue('30.0');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(inbound).toContainText('24.0 s');
+
   // The time-space sheet: the plan's bands, diagram, offsets and links, on Legal paper too.
   await page.getByRole('button', { name: 'Time-space sheet' }).click();
   const sheet = page.getByRole('article', { name: /^Time-space sheet, / });

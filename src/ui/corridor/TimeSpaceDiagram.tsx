@@ -2,7 +2,8 @@
  * The time-space diagram: distance along the corridor up the side, system time across over a few
  * cycles. Each intersection shows when its through phases are green in each direction, and the
  * progression bands show the vehicles that ride green through every signal at the progression
- * speed. Dragging an intersection's bars sideways moves its offset (snapped to whole seconds).
+ * speed. Dragging an intersection's bars sideways moves its offset (snapped to whole seconds);
+ * Alt-dragging moves the end of its coordinated green instead.
  */
 import { useRef, useState, type PointerEvent } from 'react';
 import Box from '@mui/material/Box';
@@ -27,13 +28,18 @@ export interface TimeSpaceDiagramProps {
   labels: Record<Direction, string>;
   /** Called while dragging a stop, with the offset change in tenths (whole seconds), and on release. */
   onDrag?: (intersectionId: string, delta: number, done: boolean) => void;
+  /**
+   * Called while Alt-dragging a stop (the end of coordinated green, tenths) and on release. Returns
+   * the change that can actually be made, for the drag label.
+   */
+  onSplitDrag?: (intersectionId: string, delta: number, done: boolean) => number | undefined;
 }
 
-export default function TimeSpaceDiagram({ progression, cycles, labels, onDrag }: TimeSpaceDiagramProps) {
+export default function TimeSpaceDiagram({ progression, cycles, labels, onDrag, onSplitDrag }: TimeSpaceDiagramProps) {
   const theme = useTheme();
   const palette = (theme.vars || theme).palette;
   const svgRef = useRef<SVGSVGElement | null>(null);
-  const [drag, setDrag] = useState<{ id: string; x: number; delta: number } | null>(null);
+  const [drag, setDrag] = useState<{ id: string; x: number; delta: number; mode: 'offset' | 'split'; applied: number } | null>(null);
 
   const timed = progression.stops.filter((s) => s.projection);
   const cycle = progression.cycle ?? Math.max(1, ...timed.map((s) => s.projection!.cycle));
@@ -70,21 +76,28 @@ export default function TimeSpaceDiagram({ progression, cycles, labels, onDrag }
   };
 
   const onPointerDown = (id: string) => (event: PointerEvent<SVGRectElement>) => {
-    if (!onDrag) return;
+    const mode = event.altKey && onSplitDrag ? 'split' : 'offset';
+    if (mode === 'offset' && !onDrag) return;
+    event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
-    setDrag({ id, x: event.clientX, delta: 0 });
+    setDrag({ id, x: event.clientX, delta: 0, mode, applied: 0 });
   };
   const onPointerMove = (event: PointerEvent<SVGRectElement>) => {
     if (!drag) return;
     const delta = Math.round(((event.clientX - drag.x) * tenthsPerPixel()) / 10) * 10;
     if (delta !== drag.delta) {
-      setDrag({ ...drag, delta });
-      onDrag?.(drag.id, delta, false);
+      if (drag.mode === 'split') {
+        setDrag({ ...drag, delta, applied: onSplitDrag?.(drag.id, delta, false) ?? delta });
+      } else {
+        setDrag({ ...drag, delta, applied: delta });
+        onDrag?.(drag.id, delta, false);
+      }
     }
   };
   const onPointerUp = () => {
     if (!drag) return;
-    onDrag?.(drag.id, drag.delta, true);
+    if (drag.mode === 'split') onSplitDrag?.(drag.id, drag.delta, true);
+    else onDrag?.(drag.id, drag.delta, true);
     setDrag(null);
   };
 
@@ -154,25 +167,26 @@ export default function TimeSpaceDiagram({ progression, cycles, labels, onDrag }
               {bar('outbound', cy - BAR - 1)}
               {bar('inbound', cy + 1)}
             </g>
-            {stop.projection && onDrag ? (
+            {stop.projection && (onDrag || onSplitDrag) ? (
               <rect
                 x={LEFT}
                 y={cy - BAR - 6}
                 width={plot}
                 height={2 * BAR + 12}
                 fill="transparent"
+                data-drag-target={stop.intersectionId}
                 style={{ cursor: dragging ? 'grabbing' : 'ew-resize' }}
                 onPointerDown={onPointerDown(stop.intersectionId)}
                 onPointerMove={onPointerMove}
                 onPointerUp={onPointerUp}
                 onPointerCancel={onPointerUp}
               >
-                <title>{`${stop.name}: drag sideways to change the offset${dragging ? ` (${drag.delta >= 0 ? '+' : ''}${formatSeconds(drag.delta)} s)` : ''}`}</title>
+                <title>{`${stop.name}: drag sideways to change the offset${onSplitDrag ? '; Alt-drag to move the end of coordinated green' : ''}`}</title>
               </rect>
             ) : null}
             {dragging ? (
               <text x={LEFT + 4} y={cy - BAR - 8} fontSize={10} fill={palette.primary.main}>
-                {`offset ${drag.delta >= 0 ? '+' : ''}${formatSeconds(drag.delta)} s`}
+                {`${drag.mode === 'split' ? 'coordinated green' : 'offset'} ${drag.applied >= 0 ? '+' : ''}${formatSeconds(drag.applied)} s${drag.mode === 'split' && drag.applied !== drag.delta ? ' (limit)' : ''}`}
               </text>
             ) : null}
           </g>
