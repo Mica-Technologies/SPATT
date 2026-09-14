@@ -28,8 +28,9 @@ in version control. The format is documented in [Project File Format](../develop
 
 - **Sidebar.** The project's intersections. **Add intersection** starts from a template: a
   standard eight-phase intersection, eight-phase with a lagging left, a split-phased side street,
-  two-phase, or the CSM ASC-3 controller's defaults. Each intersection's menu renames,
-  duplicates or deletes it.
+  two-phase, or the CSM ASC-3 controller's defaults, or imports a plan from that controller.
+  Each intersection's menu renames, duplicates, exports for the controller, or deletes it (see
+  [CSM ASC-3](../profiles/csm-asc3.md)).
 - **Tabs.** Phases, Rings & Barriers, Patterns and Schedule, described below.
 - **Ring-barrier diagram.** Docked on the right on wide windows (toggle it from the header). See
   [The ring-barrier diagram](#the-ring-barrier-diagram) below.
