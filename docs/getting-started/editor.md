@@ -31,9 +31,8 @@ in version control. The format is documented in [Project File Format](../develop
   two-phase, or the CSM ASC-3 controller's defaults. Each intersection's menu renames,
   duplicates or deletes it.
 - **Tabs.** Phases, Rings & Barriers, Patterns and Schedule, described below.
-- **Ring-barrier diagram.** Docked on the right on wide windows (toggle it from the header). It
-  shows the selected pattern's split windows per ring, the barriers, the coordinated phases and
-  the offset reference, and lists force-offs and the minimum and maximum cycle.
+- **Ring-barrier diagram.** Docked on the right on wide windows (toggle it from the header). See
+  [The ring-barrier diagram](#the-ring-barrier-diagram) below.
 - **Problems.** Every validation error and warning in the project. Click one to jump to the field
   it is about. A plan with errors still opens and saves, so it can be fixed.
 - **Undo and redo.** Every edit is one step: the header buttons, or ++ctrl+z++ and ++ctrl+y++ when
@@ -114,6 +113,46 @@ The timeline above the list shows the whole day.
 
 Validation runs after every change. Here, raising phase 4's minimum green to 24 s left its 28 s
 split shorter than green plus clearances: the intersection shows the error in the sidebar, the
-diagram waits for the pattern to be fixed, and clicking the problem opens the Patterns tab with
-the split selected. **Balance** or a longer split clears it. Every rule and its code is listed in
+diagram outlines phase 4 in red, and clicking the problem opens the Patterns tab with the split
+selected. **Balance** or a longer split clears it. Every rule and its code is listed in
 [Project File Format](../developer/project-format.md).
+
+## The ring-barrier diagram
+
+The diagram draws the selected pattern across one cycle:
+
+- one lane per ring, each split coloured green, yellow and red clearance, with the walk and
+  pedestrian clearance intervals as a thin strip underneath;
+- heavy vertical lines at the barriers, and a heavy outline around the coordinated phases;
+- a small triangle under each non-coordinated phase at its force-off;
+- a blue marker and dashed line at local zero, the point the offset is measured to.
+
+The scale runs from the start of barrier group 1. Hover over a phase for its split, its green
+start and force-off (or yield point) in local time, and its pedestrian times.
+
+The **cycle clock** underneath shows the same cycle on the shared system clock: local zero sits at
+the offset, and the coordinated phases' green is shaded where it falls. Two intersections on the
+same cycle whose coordinated greens line up on this strip turn green together.
+
+A pattern with timing errors, such as a split shorter than minimum green, is still drawn with the
+affected phases outlined in red. When the layout itself is undefined (rings that would miss a
+barrier, splits that do not add up to the cycle, no coordinated phase, a split too short for its
+own yellow and red clearance) the panel asks you to fix those problems first.
+
+## Timing sheets
+
+![A timing sheet in the print preview](../assets/screenshots/timing-sheet.png)
+
+The print button in the header opens the timing sheet preview. Choose **This intersection** or
+**All**, and **Letter** or **A4**, then **Print** to use the system print dialog, which can also
+save a PDF. Each sheet has:
+
+- the phase timing table, with the same fields as the Phases tab;
+- the ring and barrier structure;
+- each pattern's cycle, offset and its reference, coordinated phases, splits, green starts and
+  force-offs in local time, its ring-barrier diagram with a legend, and its cycle clock;
+- the daily schedule with end times and durations;
+- any unresolved problems, and the intersection's notes.
+
+Sheets always print in light colours, and every intersection starts on a new page. **Back to
+editor** returns to where you were.

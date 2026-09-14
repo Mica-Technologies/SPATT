@@ -30,9 +30,9 @@ so plans move straight into and out of that controller.
 > deployment on public roads.
 
 > [!NOTE]
-> **Status: early development.** The timing model and the intersection editor work in the
-> desktop app and the browser. Printable timing sheets, the network server and the CSM bridge
-> are next; see the [roadmap](https://mica-technologies.github.io/SPATT/roadmap/).
+> **Status: early development.** The timing model, the intersection editor, ring-barrier
+> diagrams and printable timing sheets work in the desktop app and the browser. The network
+> server and the CSM bridge are next; see the [roadmap](https://mica-technologies.github.io/SPATT/roadmap/).
 
 ![SPATT's pattern editor: split grid with barrier groups, and the ring-barrier diagram](docs/assets/screenshots/editor-patterns.png)
 

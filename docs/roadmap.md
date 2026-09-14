@@ -12,7 +12,7 @@ SPATT is built in stages. Each stage ends with something usable.
 - [x] Intersection editor: project library, phase grid, rings and barriers, patterns with
       split balancing, schedule, clearance calculator, live ring-barrier diagram
       ([guide](getting-started/editor.md))
-- [ ] Ring-barrier diagram and printable timing sheets
+- [x] Ring-barrier diagram, cycle clock and printable timing sheets
 - [ ] Network server with shared project storage, manager controls, background modes
       (start at login, system service) with tray icon
 - [ ] CSM ASC-3 profile, and timing-plan import/export in the City Super Mod

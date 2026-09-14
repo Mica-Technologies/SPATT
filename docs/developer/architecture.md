@@ -36,6 +36,16 @@ affordances depend on the host; nothing else may.
 behind shared functions and traits. Paths come from platform directory APIs, never hard-coded.
 Scripts are Node or Rust, never shell-specific, so every command works on every OS.
 
+**Diagrams draw projections, never raw splits.** `projectCycle` (`src/engine/projection.ts`)
+turns a pattern into interval times; the ring-barrier diagram, the cycle clock and the timing
+sheet (`src/ui/diagram`, `src/ui/sheet`) only draw what it returns. It refuses layouts it cannot
+draw honestly and passes the remaining errors along, so every view agrees on what is drawable.
+
+**Printing is the browser's.** The timing sheet is ordinary HTML with print CSS (`@page` size,
+page breaks, a forced light colour scheme) and `window.print()`. That opens the print dialog in a
+browser and in the Windows desktop app (WebView2); the macOS and Linux webviews are not verified
+yet.
+
 ## Design
 
 The interface follows the [Mica Design Guidelines](https://micatechnologies.com/design): the MUI
