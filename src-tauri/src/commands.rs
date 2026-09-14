@@ -41,8 +41,11 @@ pub fn server_status() -> ServerStatus {
 }
 
 /// Focuses the SPATT window, creating it on first use.
+///
+/// `async` on purpose: building a webview window inside a synchronous command deadlocks on
+/// Windows, leaving a window stuck on `about:blank`.
 #[tauri::command]
-pub fn open_spatt_window(app: AppHandle) -> Result<(), String> {
+pub async fn open_spatt_window(app: AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window(SPATT_WINDOW) {
         let _ = window.unminimize();
         return window.set_focus().map_err(|e| e.to_string());

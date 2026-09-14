@@ -100,7 +100,7 @@ export default function LibraryScreen({ hostLabel }: { hostLabel: string }) {
                 Projects
               </Typography>
               <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                Saved automatically in {hostLabel}.
+                Saved automatically {hostLabel}.
               </Typography>
             </Box>
             <Stack direction="row" spacing={1}>

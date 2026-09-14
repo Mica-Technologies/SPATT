@@ -10,9 +10,9 @@ import { useWorkspace } from './state/workspace';
 import Workspace from './workspace/Workspace';
 
 const HOST_STORAGE_LABEL: Record<Host, string> = {
-  browser: 'this browser',
-  tauri: 'this computer',
-  server: 'the SPATT server',
+  browser: 'in this browser',
+  tauri: 'on this computer',
+  server: 'on the SPATT server',
 };
 
 /** Picks the project library for the host. The desktop and server stores join as they are built. */
