@@ -5,3 +5,4 @@
    [Desktop, Network and Headless](hosts.md).
 3. Read the [Concepts](../concepts/index.md) section if ring-barrier timing is new to you. SPATT
    uses controller terminology throughout, and the concepts pages define every term it uses.
+4. Time your first intersection with [Using the Editor](editor.md).
