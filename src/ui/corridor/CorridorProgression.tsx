@@ -3,8 +3,10 @@
  * can be typed or changed by dragging the intersection on the diagram.
  */
 import { useMemo, useState } from 'react';
+import AutoGraphRoundedIcon from '@mui/icons-material/AutoGraphRounded';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
@@ -15,6 +17,7 @@ import { REFERENCE_LABEL } from '../diagram/diagramText';
 import { SecondsInput } from '../fields/GridInputs';
 import { useWorkspace } from '../state/workspace';
 import { fontFamilyMono } from '../theme/themePrimitives';
+import OptimizeDialog from './OptimizeDialog';
 import TimeSpaceDiagram from './TimeSpaceDiagram';
 
 export default function CorridorProgression({ project, corridor }: { project: Project; corridor: Corridor }) {
@@ -23,6 +26,7 @@ export default function CorridorProgression({ project, corridor }: { project: Pr
   const selectPlan = useWorkspace((s) => s.selectPlan);
   const [cycles, setCycles] = useState(2);
   const [preview, setPreview] = useState<OffsetOverrides>({});
+  const [optimizing, setOptimizing] = useState(false);
   const plan = corridor.plans.find((p) => p.id === selectedPlanId) ?? corridor.plans[0] ?? null;
   const progression = useMemo(() => (plan ? analyzeProgression(project, corridor, plan, preview) : null), [project, corridor, plan, preview]);
   const labels: Record<Direction, string> = { outbound: `${corridor.outbound}B`, inbound: `${oppositeDirection(corridor.outbound)}B` };
@@ -90,6 +94,9 @@ export default function CorridorProgression({ project, corridor }: { project: Pr
         {stat('outbound')}
         {stat('inbound')}
         <Box sx={{ flexGrow: 1 }} />
+        <Button variant="contained" startIcon={<AutoGraphRoundedIcon />} onClick={() => setOptimizing(true)}>
+          Optimize offsets…
+        </Button>
       </Stack>
 
       {progression.cycle === null ? (
@@ -116,6 +123,8 @@ export default function CorridorProgression({ project, corridor }: { project: Pr
       <Typography variant="caption" sx={{ color: 'text.secondary' }}>
         Green and red bars show when each intersection&apos;s through phases are green ({labels.outbound} above the line, {labels.inbound} below). The shaded bands are the vehicles that meet green at every intersection at the progression speed. Drag an intersection sideways to move its offset in whole seconds.
       </Typography>
+
+      <OptimizeDialog open={optimizing} onClose={() => setOptimizing(false)} project={project} corridor={corridor} plan={plan} labels={labels} />
 
       <Box sx={{ overflowX: 'auto', border: 1, borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper' }}>
         <Box component="table" sx={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%', fontSize: 13 }}>

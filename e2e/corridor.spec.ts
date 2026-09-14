@@ -54,6 +54,22 @@ test('shows progression bands on the time-space diagram and moves offsets by typ
   expect(Number.isInteger(moved)).toBe(true);
   await page.getByRole('button', { name: 'Undo' }).click();
   await expect(offsetB).toHaveValue('30.0');
+
+  // Optimize, balanced: 29 s each way at B = 35 s, run in the worker and applied as one undo step.
+  await page.getByRole('button', { name: 'Optimize offsets…' }).click();
+  const optimize = page.getByRole('dialog', { name: /^Optimize offsets/ });
+  await optimize.getByRole('radio', { name: /^Balanced/ }).check();
+  await optimize.getByRole('button', { name: 'Optimize', exact: true }).click();
+  const results = optimize.getByRole('table', { name: 'Optimization results' });
+  await expect(results.getByRole('row', { name: /^Elm St & 3rd Ave \(2\)/ })).toContainText('30.0 s35.0 s');
+  await expect(results.getByRole('row', { name: /^EB band/ })).toContainText('34.0 s29.0 s');
+  await optimize.getByRole('button', { name: 'Apply offsets' }).click();
+  await expect(optimize).toBeHidden();
+  await expect(offsetB).toHaveValue('35.0');
+  await expect(outbound).toContainText('29.0 s');
+  await expect(inbound).toContainText('29.0 s');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(offsetB).toHaveValue('30.0');
 });
 
 test('builds a corridor: stops, links in project units, through phases and a timing plan', async ({ page }) => {
