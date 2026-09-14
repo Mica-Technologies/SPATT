@@ -31,9 +31,10 @@ SPATT is built in stages. Each stage ends with something usable.
 
 ## v3 — demand
 
-- [ ] Volumes and lane groups, saturation flow
-- [ ] Webster cycle length and volume-based splits
-- [ ] HCM-style delay, v/c and level of service
+- [x] Volumes and lane groups, saturation flow ([capacity](concepts/capacity.md))
+- [x] Webster cycle length and volume-based splits (Suggest timing)
+- [x] HCM-style delay, v/c and level of service
+- [ ] Checked against published worked examples; volumes and analysis on the timing sheet
 
 ## Later
 

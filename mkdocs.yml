@@ -109,6 +109,7 @@ nav:
       - Rings, Barriers and Phases: concepts/ring-barrier.md
       - Timing Parameters: concepts/timing-parameters.md
       - Coordination and Offsets: concepts/coordination.md
+      - Capacity, Cycle Length and Delay: concepts/capacity.md
   - Controller Profiles:
       - profiles/index.md
       - CSM ASC-3: profiles/csm-asc3.md

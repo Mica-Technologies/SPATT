@@ -31,7 +31,7 @@ in version control. The format is documented in [Project File Format](../develop
   two-phase, or the CSM ASC-3 controller's defaults, or imports a plan from that controller.
   Each intersection's menu renames, duplicates, exports for the controller, or deletes it (see
   [CSM ASC-3](../profiles/csm-asc3.md)).
-- **Tabs.** Phases, Rings & Barriers, Patterns and Schedule, described below.
+- **Tabs.** Phases, Rings & Barriers, Patterns, Schedule and Volumes, described below.
 - **Ring-barrier diagram.** Docked on the right on wide windows (toggle it from the header). See
   [The ring-barrier diagram](#the-ring-barrier-diagram) below.
 - **Problems.** Every validation error and warning in the project. Click one to jump to the field
@@ -107,6 +107,25 @@ lead/lag order.
 The daily schedule picks a pattern (or free operation) by time of day. Each entry runs from its
 start time until the next entry starts, and the last one runs past midnight until the first.
 The timeline above the list shows the whole day.
+
+## Volumes
+
+The Volumes tab holds what the intersection's timing is designed for:
+
+- **Saturation flow.** The base flow per lane (1900 pc/h/g/ln by default) and whether the
+  intersection is in a central business district.
+- **Lane groups.** One row per set of lanes a phase serves: the phase, the movements it carries,
+  the number of lanes, lane width (in the project's units), heavy vehicles and grade. **Add for N
+  phases** makes one per phase that has none. The saturation flow column shows the calculated
+  value; type a number to override it, and clear it to calculate again.
+- **Counts.** Named sets of hourly volumes per lane group and movement (AM peak, PM peak), each with
+  a peak hour factor. The first count you add is linked to the intersection's patterns. A pattern's
+  count can be changed on the Patterns tab or here.
+- **Analysis.** For the selected pattern and its count: v/c, delay and level of service per lane
+  group, intersection delay, the critical flow ratio Y, lost time and Webster's cycle.
+  **Suggest timing** adds a new pattern with a cycle and splits from the count.
+
+The formulas and their limits are in [Capacity, Cycle Length and Delay](../concepts/capacity.md).
 
 ## Problems
 
