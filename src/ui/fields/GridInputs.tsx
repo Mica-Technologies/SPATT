@@ -5,7 +5,7 @@
 import { useState, type CSSProperties, type KeyboardEvent, type ReactElement } from 'react';
 import Tooltip from '@mui/material/Tooltip';
 import { styled } from '@mui/material/styles';
-import { formatSeconds, type Issue, type Tenths } from '../../model';
+import { formatMeasure, formatSeconds, type Issue, type Tenths } from '../../model';
 import { fontFamilyMono } from '../theme/themePrimitives';
 import { cellInputStyles } from './cellInputStyles';
 import { parseSeconds } from './parseSeconds';
@@ -95,6 +95,66 @@ export function SecondsInput({ path, label, value, onCommit, issues = [], disabl
       }}
       onBlur={commit}
       onKeyDown={onKeyDown}
+    />,
+  );
+}
+
+interface MeasureInputProps extends BaseProps {
+  /** The stored value (metres or metres per second). */
+  value: number | null;
+  /** Stored value → the number shown in the project's units. */
+  toDisplay: (stored: number) => number;
+  /** Shown number → stored value. */
+  fromDisplay: (shown: number) => number;
+  onCommit: (value: number | null) => void;
+  /** Allow an empty field, committed as `null`. */
+  optional?: boolean;
+}
+
+/** A distance or speed, shown in the project's units and stored in SI units. */
+export function MeasureInput({ path, label, value, toDisplay, fromDisplay, onCommit, optional, issues = [], disabled, style }: MeasureInputProps) {
+  const display = value === null ? '' : formatMeasure(toDisplay(value));
+  const [draft, setDraft] = useState(display);
+  const [shown, setShown] = useState(display);
+  if (shown !== display) {
+    setShown(display);
+    setDraft(display);
+  }
+  const parse = (text: string): number | null | undefined => {
+    const trimmed = text.trim().replace(',', '.');
+    if (trimmed === '') return optional ? null : undefined;
+    const number = Number(trimmed);
+    return Number.isFinite(number) && number >= 0 ? number : undefined;
+  };
+  const commit = () => {
+    const parsed = parse(draft);
+    if (parsed === undefined || draft.trim() === display) {
+      setDraft(display);
+      return;
+    }
+    onCommit(parsed === null ? null : fromDisplay(parsed));
+  };
+  return withIssues(
+    issues,
+    <Input
+      id={fieldId(path)}
+      aria-label={label}
+      inputMode="decimal"
+      value={draft}
+      disabled={disabled}
+      placeholder={optional ? '—' : undefined}
+      data-severity={worstSeverity(issues) ?? undefined}
+      data-invalid={parse(draft) === undefined || undefined}
+      style={{ textAlign: 'right', fontFamily: fontFamilyMono, ...style }}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') event.currentTarget.blur();
+        if (event.key === 'Escape') {
+          setDraft(display);
+          event.currentTarget.blur();
+        }
+      }}
     />,
   );
 }

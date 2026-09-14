@@ -6,6 +6,7 @@ import FolderOpenRoundedIcon from '@mui/icons-material/FolderOpenRounded';
 import PrintRoundedIcon from '@mui/icons-material/PrintRounded';
 import RedoRoundedIcon from '@mui/icons-material/RedoRounded';
 import SyncRoundedIcon from '@mui/icons-material/SyncRounded';
+import TuneRoundedIcon from '@mui/icons-material/TuneRounded';
 import UndoRoundedIcon from '@mui/icons-material/UndoRounded';
 import ViewSidebarRoundedIcon from '@mui/icons-material/ViewSidebarRounded';
 import Alert from '@mui/material/Alert';
@@ -21,12 +22,14 @@ import Typography from '@mui/material/Typography';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { downloadProject } from '../../io/files';
 import AppHeader from '../components/AppHeader';
+import CorridorEditor from '../corridor/CorridorEditor';
 import ClearanceDialog from '../dialogs/ClearanceDialog';
+import ProjectSettingsDialog from '../dialogs/ProjectSettingsDialog';
 import SheetScreen from '../sheet/SheetScreen';
 import { findFieldElement } from '../fields/paths';
 import { useAutosave, type ConflictChoice, type SaveStatus } from '../state/useAutosave';
 import { useIntersectionIssues } from '../state/useIssues';
-import { redoLabel, selectIntersection, undoLabel, useWorkspace, type WorkspaceTab } from '../state/workspace';
+import { redoLabel, selectCorridor, selectIntersection, undoLabel, useWorkspace, type WorkspaceTab } from '../state/workspace';
 import PatternsTab from '../tabs/PatternsTab';
 import PhasesTab from '../tabs/PhasesTab';
 import RingsTab from '../tabs/RingsTab';
@@ -57,6 +60,8 @@ function isEditable(target: EventTarget | null): boolean {
 export default function Workspace() {
   const project = useWorkspace((s) => s.project)!;
   const intersection = useWorkspace(selectIntersection);
+  const corridor = useWorkspace(selectCorridor);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const tab = useWorkspace((s) => s.tab);
   const patternId = useWorkspace((s) => s.selectedPatternId);
   const focusRequest = useWorkspace((s) => s.focusRequest);
@@ -107,7 +112,7 @@ export default function Workspace() {
   }, [focusRequest]);
 
   const saveIcon = status === 'error' || status === 'conflict' ? <ErrorOutlineRoundedIcon fontSize="small" color="error" /> : status === 'saved' ? <CloudDoneRoundedIcon fontSize="small" /> : <SyncRoundedIcon fontSize="small" />;
-  const showDiagram = wide && diagramOpen && intersection !== null;
+  const showDiagram = wide && diagramOpen && intersection !== null && corridor === null;
 
   if (view === 'sheet') {
     return <SheetScreen project={project} selectedIntersectionId={intersection?.id ?? null} onBack={() => setView('editor')} />;
@@ -161,6 +166,11 @@ export default function Workspace() {
                 </IconButton>
               </Tooltip>
             ) : null}
+            <Tooltip title="Project settings">
+              <IconButton size="small" aria-label="Project settings" onClick={() => setSettingsOpen(true)}>
+                <TuneRoundedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
             <Tooltip title="All projects">
               <IconButton size="small" aria-label="All projects" onClick={close}>
                 <FolderOpenRoundedIcon fontSize="small" />
@@ -195,7 +205,9 @@ export default function Workspace() {
       <Box sx={{ flexGrow: 1, minHeight: 0, display: 'grid', gridTemplateColumns: showDiagram ? '240px minmax(0, 1fr) 380px' : '240px minmax(0, 1fr)' }}>
         <Sidebar />
         <Box component="main" sx={{ display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
-          {intersection ? (
+          {corridor ? (
+            <CorridorEditor project={project} corridor={corridor} />
+          ) : intersection ? (
             <>
               <Box sx={{ px: 2, pt: 1.5, borderBottom: 1, borderColor: 'divider', bgcolor: 'background.paper' }}>
                 <Typography variant="h6" component="h2" noWrap>
@@ -232,6 +244,7 @@ export default function Workspace() {
         </Box>
         {showDiagram ? <DiagramPanel intersection={intersection} patternId={patternId} /> : null}
       </Box>
+      <ProjectSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} project={project} />
       <ClearanceDialog
         open={clearancePhase !== null}
         onClose={() => setClearancePhase(null)}

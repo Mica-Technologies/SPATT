@@ -30,6 +30,10 @@ export default function ProblemsPanel() {
   const warnings = issues.length - errors;
 
   const location = (issue: Issue): string => {
+    if (issue.path[0] === 'corridors' && typeof issue.path[1] === 'number') {
+      const corridor = project?.corridors[issue.path[1]];
+      return [corridor?.name, issue.path[2] === 'plans' ? 'Timing plans' : 'Corridor layout'].filter(Boolean).join(' · ');
+    }
     const intersection = typeof issue.path[1] === 'number' ? project?.intersections[issue.path[1]] : undefined;
     const section = SECTION_LABEL[String(issue.path[2])] ?? '';
     return [intersection?.name, section].filter(Boolean).join(' · ');

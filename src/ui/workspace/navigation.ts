@@ -14,7 +14,22 @@ const TAB_FOR_SECTION: Record<string, WorkspaceTab> = {
 export function navigateTo(path: FieldPath): void {
   const state = useWorkspace.getState();
   const project = state.project;
-  if (!project || path[0] !== 'intersections' || typeof path[1] !== 'number') {
+  if (!project || typeof path[1] !== 'number') {
+    return;
+  }
+  if (path[0] === 'corridors') {
+    const corridor = project.corridors[path[1]];
+    if (!corridor) return;
+    state.selectCorridor(corridor.id);
+    state.setCorridorTab(path[2] === 'plans' ? 'plans' : 'layout');
+    if (path[2] === 'plans' && typeof path[3] === 'number') {
+      const plan = corridor.plans[path[3]];
+      if (plan) state.selectPlan(plan.id);
+    }
+    state.requestFocus(path);
+    return;
+  }
+  if (path[0] !== 'intersections') {
     return;
   }
   const intersection = project.intersections[path[1]];

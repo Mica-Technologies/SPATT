@@ -6,12 +6,14 @@
  * so whole-project snapshots are simpler and safer than diffs.
  */
 import { create } from 'zustand';
-import type { Intersection, Project } from '../../model';
+import type { Corridor, Intersection, Project } from '../../model';
 
 export type WorkspaceTab = 'phases' | 'rings' | 'patterns' | 'schedule';
 
 /** The editor, or the printable timing sheet preview. */
 export type WorkspaceView = 'editor' | 'sheet';
+
+export type CorridorTab = 'layout' | 'plans';
 
 export const HISTORY_LIMIT = 200;
 
@@ -28,6 +30,10 @@ export interface WorkspaceState {
   tab: WorkspaceTab;
   view: WorkspaceView;
   selectedPatternId: string | null;
+  /** When set, the main area edits this corridor instead of the selected intersection. */
+  selectedCorridorId: string | null;
+  corridorTab: CorridorTab;
+  selectedPlanId: string | null;
   past: HistoryEntry[];
   future: HistoryEntry[];
   /**
@@ -42,9 +48,13 @@ export interface WorkspaceState {
   close(): void;
   edit(label: string, recipe: (project: Project) => void): void;
   editIntersection(label: string, recipe: (intersection: Intersection, project: Project) => void): void;
+  editCorridor(label: string, recipe: (corridor: Corridor, project: Project) => void): void;
   undo(): void;
   redo(): void;
   selectIntersection(id: string | null): void;
+  selectCorridor(id: string | null): void;
+  setCorridorTab(tab: CorridorTab): void;
+  selectPlan(id: string | null): void;
   setTab(tab: WorkspaceTab): void;
   setView(view: WorkspaceView): void;
   selectPattern(id: string | null): void;
@@ -63,6 +73,9 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
   tab: 'phases',
   view: 'editor',
   selectedPatternId: null,
+  selectedCorridorId: null,
+  corridorTab: 'layout',
+  selectedPlanId: null,
   past: [],
   future: [],
   storeVersion: undefined,
@@ -77,6 +90,9 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
       selectedPatternId: first?.patterns[0]?.id ?? null,
       tab: 'phases',
       view: 'editor',
+      selectedCorridorId: null,
+      corridorTab: 'layout',
+      selectedPlanId: null,
       past: [],
       future: [],
       storeVersion,
@@ -85,7 +101,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
   },
 
   close() {
-    set({ storeVersion: undefined, project: null, selectedIntersectionId: null, selectedPatternId: null, past: [], future: [], focusRequest: null });
+    set({ storeVersion: undefined, project: null, selectedIntersectionId: null, selectedPatternId: null, selectedCorridorId: null, selectedPlanId: null, past: [], future: [], focusRequest: null });
   },
 
   edit(label, recipe) {
@@ -114,6 +130,16 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
     });
   },
 
+  editCorridor(label, recipe) {
+    const id = get().selectedCorridorId;
+    get().edit(label, (project) => {
+      const corridor = project.corridors.find((c) => c.id === id);
+      if (corridor) {
+        recipe(corridor, project);
+      }
+    });
+  },
+
   undo() {
     const { project, past, future, revision } = get();
     const previous = past.at(-1);
@@ -126,7 +152,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
       past: past.slice(0, -1),
       future: [{ label: previous.label, project }, ...future],
     });
-    get().selectIntersection(get().selectedIntersectionId);
+    reconcileSelection();
   },
 
   redo() {
@@ -141,11 +167,12 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
       past: [...past, { label: next.label, project }],
       future: future.slice(1),
     });
-    get().selectIntersection(get().selectedIntersectionId);
+    reconcileSelection();
   },
 
-  /** Selects an intersection, falling back to the first one if the id no longer exists. */
+  /** Selects an intersection (leaving any corridor), falling back to the first one if the id no longer exists. */
   selectIntersection(id) {
+    set({ selectedCorridorId: null });
     const project = get().project;
     const intersection = project?.intersections.find((i) => i.id === id) ?? project?.intersections[0];
     const patternId = get().selectedPatternId;
@@ -153,6 +180,23 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
       selectedIntersectionId: intersection?.id ?? null,
       selectedPatternId: intersection?.patterns.some((p) => p.id === patternId) ? patternId : (intersection?.patterns[0]?.id ?? null),
     });
+  },
+
+  selectCorridor(id) {
+    const corridor = get().project?.corridors.find((c) => c.id === id) ?? null;
+    const planId = get().selectedPlanId;
+    set({
+      selectedCorridorId: corridor?.id ?? null,
+      selectedPlanId: corridor?.plans.some((p) => p.id === planId) ? planId : (corridor?.plans[0]?.id ?? null),
+    });
+  },
+
+  setCorridorTab(tab) {
+    set({ corridorTab: tab });
+  },
+
+  selectPlan(id) {
+    set({ selectedPlanId: id });
   },
 
   setTab(tab) {
@@ -175,6 +219,20 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
     set({ focusRequest: { path, nonce: (get().focusRequest?.nonce ?? 0) + 1 } });
   },
 }));
+
+/** After undo or redo: keep the selections that still exist, fall back where they do not. */
+function reconcileSelection(): void {
+  const { selectedIntersectionId, selectedCorridorId, selectIntersection, selectCorridor } = useWorkspace.getState();
+  selectIntersection(selectedIntersectionId);
+  if (selectedCorridorId !== null) {
+    selectCorridor(selectedCorridorId);
+  }
+}
+
+/** The selected corridor of the open project, if any. */
+export function selectCorridor(state: WorkspaceState): Corridor | null {
+  return state.project?.corridors.find((c) => c.id === state.selectedCorridorId) ?? null;
+}
 
 /** The selected intersection of the open project, if any. */
 export function selectIntersection(state: WorkspaceState): Intersection | null {
