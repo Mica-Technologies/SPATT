@@ -1,11 +1,15 @@
 #!/usr/bin/env node
 /**
  * Starts a built spatt-server binary and checks it serves the API and the embedded web UI.
- * A server whose UI failed to embed still answers /api/health, so both are checked.
+ * A server whose UI failed to embed still answers /api/health, so both are checked, and a project
+ * is written and read back through the API in a temporary data folder.
  *
  * Usage: node scripts/smoke-server.mjs <path to spatt-server binary> [port]
  */
 import { spawn } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const [binary, portArg] = process.argv.slice(2);
 if (!binary) {
@@ -15,7 +19,8 @@ if (!binary) {
 const port = Number(portArg ?? 18787);
 const base = `http://127.0.0.1:${port}`;
 
-const server = spawn(binary, ['--bind', '127.0.0.1', '--port', String(port)], { stdio: 'inherit' });
+const data = mkdtempSync(join(tmpdir(), 'spatt-smoke-'));
+const server = spawn(binary, ['--bind', '127.0.0.1', '--port', String(port), '--data', data], { stdio: 'inherit' });
 let exited = false;
 server.on('exit', () => {
   exited = true;
@@ -48,6 +53,18 @@ async function expectPage(path, needle) {
   console.log(`${path}: OK`);
 }
 
+async function expectProjectRoundTrip() {
+  const text = JSON.stringify({ name: 'Smoke', updatedAt: '2026-01-01T00:00:00.000Z', intersections: [] });
+  const put = await fetch(`${base}/api/projects/p-smoke`, { method: 'PUT', headers: { 'if-none-match': '*' }, body: text });
+  const etag = put.headers.get('etag');
+  const read = await fetch(`${base}/api/projects/p-smoke`);
+  const list = await (await fetch(`${base}/api/projects`)).json();
+  if (!put.ok || !etag || (await read.text()) !== text || read.headers.get('etag') !== etag || list[0]?.name !== 'Smoke') {
+    throw new Error(`project API: PUT ${put.status}, ETag ${etag}, list ${JSON.stringify(list)}`);
+  }
+  console.log('/api/projects: OK');
+}
+
 try {
   const health = await waitForHealth();
   if (health.app !== 'spatt') {
@@ -57,10 +74,12 @@ try {
   await expectPage('/', '<div id="root">');
   await expectPage('/manager.html', 'SPATT Manager');
   await expectPage('/some/client/route', '<div id="root">');
+  await expectProjectRoundTrip();
   console.log('spatt-server smoke test passed');
 } catch (error) {
   console.error(`spatt-server smoke test FAILED: ${error.message}`);
   process.exitCode = 1;
 } finally {
   server.kill();
+  server.on('exit', () => rmSync(data, { recursive: true, force: true }));
 }

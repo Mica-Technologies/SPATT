@@ -8,6 +8,7 @@ use std::fmt;
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
 
@@ -34,6 +35,11 @@ pub struct ProjectSummary {
 pub enum StoreError {
     /// The id does not match `PROJECT_ID_PATTERN`, so it cannot safely become a file name.
     InvalidId(String),
+    /// A conditional write or remove found the project in another state than expected: changed
+    /// since it was read (`current` is its version now), deleted (`None`), or already present.
+    Conflict {
+        current: Option<String>,
+    },
     Io(io::Error),
 }
 
@@ -41,6 +47,7 @@ impl fmt::Display for StoreError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             StoreError::InvalidId(id) => write!(f, "project id \"{id}\" cannot be stored"),
+            StoreError::Conflict { .. } => write!(f, "the project was changed elsewhere"),
             StoreError::Io(error) => write!(f, "project store: {error}"),
         }
     }
@@ -49,10 +56,33 @@ impl fmt::Display for StoreError {
 impl std::error::Error for StoreError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            StoreError::InvalidId(_) => None,
+            StoreError::InvalidId(_) | StoreError::Conflict { .. } => None,
             StoreError::Io(error) => Some(error),
         }
     }
+}
+
+/// What a conditional write or remove expects to find.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Expected<'a> {
+    /// No condition: last write wins.
+    Any,
+    /// The project must not exist yet.
+    Absent,
+    /// The project must exist with this version.
+    Version(&'a str),
+}
+
+/// A project's version: a hash of its file text (FNV-1a, 64 bits, as 16 hex digits). Stable
+/// across restarts and platforms, so a client's version survives a server restart. It detects
+/// concurrent edits; it is not a security measure.
+pub fn version_of(text: &str) -> String {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for byte in text.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    format!("{hash:016x}")
 }
 
 impl From<io::Error> for StoreError {
@@ -75,15 +105,22 @@ pub fn is_valid_project_id(id: &str) -> bool {
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || *b == b'-')
 }
 
+/// Clones share one lock, so every clone handed to the desktop app's commands and to the server's
+/// API checks and writes a project as one step. (Two processes on one folder are kept apart by
+/// the app's single-instance lock, not here.)
 #[derive(Clone, Debug)]
 pub struct FileProjectStore {
     dir: PathBuf,
+    lock: Arc<Mutex<()>>,
 }
 
 impl FileProjectStore {
     /// A store in `dir`. Nothing touches the disk until the first write creates the directory.
     pub fn new(dir: impl Into<PathBuf>) -> Self {
-        Self { dir: dir.into() }
+        Self {
+            dir: dir.into(),
+            lock: Arc::new(Mutex::new(())),
+        }
     }
 
     pub fn dir(&self) -> &Path {
@@ -138,11 +175,34 @@ impl FileProjectStore {
         }
     }
 
+    /// The project's file text and version, or `None` if there is no such project.
+    pub fn read_versioned(&self, id: &str) -> Result<Option<(String, String)>, StoreError> {
+        Ok(self.read(id)?.map(|text| {
+            let version = version_of(&text);
+            (text, version)
+        }))
+    }
+
     /// Replaces the project atomically: the text goes to a temporary file in the same directory,
     /// is flushed to disk, and is then renamed over the project file, so a crash leaves either
     /// the old file or the new one, never a torn one.
     pub fn write(&self, id: &str, text: &str) -> Result<(), StoreError> {
+        self.write_if(id, text, Expected::Any).map(|_| ())
+    }
+
+    /// Writes the project if it is in the `expected` state, resolving with its new version.
+    pub fn write_if(
+        &self,
+        id: &str,
+        text: &str,
+        expected: Expected<'_>,
+    ) -> Result<String, StoreError> {
         let path = self.path_of(id)?;
+        let _guard = self
+            .lock
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        self.check(id, expected)?;
         fs::create_dir_all(&self.dir)?;
         let temp = self
             .dir
@@ -151,16 +211,44 @@ impl FileProjectStore {
         if result.is_err() {
             let _ = fs::remove_file(&temp);
         }
-        result.map_err(StoreError::from)
+        result.map_err(StoreError::from)?;
+        Ok(version_of(text))
     }
 
     /// Deletes the project. Removing a project that does not exist is not an error.
     pub fn remove(&self, id: &str) -> Result<(), StoreError> {
+        self.remove_if(id, Expected::Any)
+    }
+
+    /// Deletes the project if it is in the `expected` state (`Expected::Absent` is a no-op check).
+    pub fn remove_if(&self, id: &str, expected: Expected<'_>) -> Result<(), StoreError> {
         let path = self.path_of(id)?;
+        let _guard = self
+            .lock
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        self.check(id, expected)?;
         match fs::remove_file(path) {
             Ok(()) => Ok(()),
             Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
             Err(error) => Err(error.into()),
+        }
+    }
+
+    fn check(&self, id: &str, expected: Expected<'_>) -> Result<(), StoreError> {
+        if expected == Expected::Any {
+            return Ok(());
+        }
+        let current = self.read(id)?.map(|text| version_of(&text));
+        let matches = match expected {
+            Expected::Any => true,
+            Expected::Absent => current.is_none(),
+            Expected::Version(version) => current.as_deref() == Some(version),
+        };
+        if matches {
+            Ok(())
+        } else {
+            Err(StoreError::Conflict { current })
         }
     }
 
@@ -419,6 +507,91 @@ mod tests {
         }
         assert!(!store.dir().exists());
         assert!(temp.path().join("secret.spatt.json").exists());
+    }
+
+    #[test]
+    fn version_is_a_stable_content_hash() {
+        // FNV-1a 64 test vectors: "" and "a".
+        assert_eq!(version_of(""), "cbf29ce484222325");
+        assert_eq!(version_of("a"), "af63dc4c8601ec8c");
+        assert_ne!(version_of("{}"), version_of("{ }"));
+    }
+
+    #[test]
+    fn conditional_writes_check_the_current_version() {
+        let (_temp, store) = store();
+        let v1 = store.write_if("p-one", "one", Expected::Absent).unwrap();
+        assert_eq!(v1, version_of("one"));
+        assert!(matches!(
+            store.write_if("p-one", "again", Expected::Absent),
+            Err(StoreError::Conflict { current: Some(ref v) }) if *v == v1
+        ));
+
+        let v2 = store
+            .write_if("p-one", "two", Expected::Version(&v1))
+            .unwrap();
+        // A second device still holding v1 is refused and told the version it missed.
+        assert!(matches!(
+            store.write_if("p-one", "stale", Expected::Version(&v1)),
+            Err(StoreError::Conflict { current: Some(ref v) }) if *v == v2
+        ));
+        assert_eq!(
+            store.read_versioned("p-one").unwrap(),
+            Some(("two".to_owned(), v2.clone()))
+        );
+
+        store.write_if("p-one", "forced", Expected::Any).unwrap();
+        assert_eq!(store.read("p-one").unwrap().as_deref(), Some("forced"));
+    }
+
+    #[test]
+    fn conditional_write_to_a_deleted_project_conflicts() {
+        let (_temp, store) = store();
+        let v1 = store.write_if("p-one", "one", Expected::Absent).unwrap();
+        store.remove("p-one").unwrap();
+        assert!(matches!(
+            store.write_if("p-one", "mine", Expected::Version(&v1)),
+            Err(StoreError::Conflict { current: None })
+        ));
+        assert_eq!(store.read("p-one").unwrap(), None);
+    }
+
+    #[test]
+    fn conditional_remove() {
+        let (_temp, store) = store();
+        let v1 = store.write_if("p-one", "one", Expected::Absent).unwrap();
+        assert!(matches!(
+            store.remove_if("p-one", Expected::Version("0000000000000000")),
+            Err(StoreError::Conflict { .. })
+        ));
+        store.remove_if("p-one", Expected::Version(&v1)).unwrap();
+        assert_eq!(store.read("p-one").unwrap(), None);
+    }
+
+    /// Clones share the lock, so concurrent check-and-write from many threads never loses an
+    /// update: exactly one writer per version wins.
+    #[test]
+    fn clones_serialise_conditional_writes() {
+        let (_temp, store) = store();
+        let v0 = store.write_if("p-one", "0", Expected::Absent).unwrap();
+        let winners: usize = std::thread::scope(|scope| {
+            let handles: Vec<_> = (0..8)
+                .map(|n| {
+                    let store = store.clone();
+                    let v0 = v0.clone();
+                    scope.spawn(move || {
+                        store
+                            .write_if("p-one", &format!("writer {n}"), Expected::Version(&v0))
+                            .is_ok()
+                    })
+                })
+                .collect();
+            handles
+                .into_iter()
+                .map(|h| usize::from(h.join().unwrap()))
+                .sum()
+        });
+        assert_eq!(winners, 1);
     }
 
     #[test]

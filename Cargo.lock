@@ -931,6 +931,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "directories"
+version = "6.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16f5094c54661b38d03bd7e50df373292118db60b585c08a411c6d840017fe7d"
+dependencies = [
+ "dirs-sys",
+]
+
+[[package]]
 name = "dirs"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3603,6 +3612,8 @@ dependencies = [
  "anyhow",
  "axum",
  "clap",
+ "directories",
+ "getrandom 0.4.3",
  "http-body-util",
  "mime_guess",
  "rust-embed",
@@ -3610,6 +3621,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
+ "toml 1.1.6+spec-1.1.0",
  "tower",
  "tower-http 0.7.1",
  "tracing",
