@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { csmDefault, leadLagEightPhase, splitPhaseSideStreet, standardEightPhase, type Intersection } from '../model';
-import { convertOffset, projectCycle, toLocal, toSystem, type CycleProjection, type PhaseInterval } from './projection';
+import { convertOffset, projectCycle, systemSpans, toLocal, toSystem, type CycleProjection, type PhaseInterval } from './projection';
 
 function projected(intersection: Intersection, patternId = intersection.patterns[0]!.id): CycleProjection {
   const result = projectCycle(intersection, patternId);
@@ -94,6 +94,16 @@ describe('offsets', () => {
     }
   });
 
+  it('places a span in system time, splitting it where it wraps past the cycle', () => {
+    const intersection = standardEightPhase();
+    intersection.patterns[0]!.offset = 700; // coordinated green (15–44 s sequence) begins at 70 s system time
+    const p = projected(intersection);
+    const phase2 = interval(p, 2);
+    expect(systemSpans(p, phase2.greenStart, phase2.yellowStart)).toEqual([[700, 900], [0, 90]]); // 70–90, 0–9
+    expect(systemSpans(p, interval(p, 3).greenStart, interval(p, 3).yellowStart)).toEqual([[150, 220]]); // green 50–57: 50 − 15 + 70 = 105 → 15 s, 7 s long
+    expect(systemSpans(p, 100, 100)).toEqual([]);
+  });
+
   it('wraps a converted offset into the cycle', () => {
     const p = projected(standardEightPhase()); // offset 0 to begin of coord green
     expect(convertOffset(p, 'firstPhaseStart')).toBe(750); // 0 − 15 → 75
@@ -166,6 +176,27 @@ describe('projectCycle — refusals', () => {
     intersection.patterns[0]!.splits['4'] = 270;
     const result = projectCycle(intersection, 'am-peak');
     expect(!result.ok && result.issues.map((i) => i.code)).toContain('pattern.barrier-misaligned');
+  });
+
+  it('draws a split shorter than its minimum green, reporting the error alongside', () => {
+    // Phase 4: min green 10 + 4 + 2 = 16 s minimum; a 14 s split still holds its 6 s clearance.
+    // Phase 3 takes 26 s so ring 1 still reaches the barrier at 40 s (50 + 26 = 76 = phase 4 start).
+    const intersection = standardEightPhase();
+    Object.assign(intersection.patterns[0]!.splits, { 3: 260, 4: 140 });
+    const result = projectCycle(intersection, 'am-peak');
+    expect(result.ok).toBe(true);
+    expect(result.issues.map((i) => i.code)).toEqual(['pattern.split-below-minimum']);
+    const phase4 = result.ok ? result.projection.rings[0]!.find((i) => i.phase === 4)! : null;
+    expect(phase4).toMatchObject({ splitStart: 760, yellowStart: 840, splitEnd: 900 });
+  });
+
+  it('refuses a split that cannot hold yellow and red clearance', () => {
+    // Phase 4 at 5 s against 4 + 2 = 6 s of clearance; phase 3 takes the rest of the 40 s group.
+    const intersection = standardEightPhase();
+    Object.assign(intersection.patterns[0]!.splits, { 3: 350, 4: 50 });
+    const result = projectCycle(intersection, 'am-peak');
+    expect(result.ok).toBe(false);
+    expect(result.issues.map((i) => [i.code, i.path.join('.')])).toEqual([['projection.split-below-clearance', 'patterns.0.splits.4']]);
   });
 
   it('is not blocked by errors in other patterns, schedules or warnings', () => {

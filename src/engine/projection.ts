@@ -11,6 +11,7 @@
  */
 import {
   effectiveSequence,
+  formatSeconds,
   validateIntersection,
   type Intersection,
   type Issue,
@@ -64,7 +65,29 @@ export interface CycleProjection {
   localZero: Tenths;
 }
 
-export type ProjectionResult = { ok: true; projection: CycleProjection } | { ok: false; issues: Issue[] };
+/**
+ * `ok` with the projection and the errors that did not stop it (a split shorter than minimum
+ * green still has a well-defined window), or not `ok` with the errors that did.
+ */
+export type ProjectionResult = { ok: true; projection: CycleProjection; issues: Issue[] } | { ok: false; issues: Issue[] };
+
+/**
+ * Pattern errors that leave the layout undefined or ambiguous: no cycle, rings that miss a
+ * barrier or do not fill the cycle, a missing split, or no single coordinated group to measure
+ * the offset from. Every ring structure error blocks as well. Other errors (short splits, timing
+ * limits, the offset range) are drawn and reported.
+ */
+const BLOCKING_PATTERN_CODES = new Set([
+  'pattern.sequence-membership',
+  'pattern.cycle-missing',
+  'pattern.coord-missing',
+  'pattern.coord-invalid',
+  'pattern.coord-same-ring',
+  'pattern.coord-different-barriers',
+  'pattern.split-missing',
+  'pattern.barrier-misaligned',
+  'pattern.cycle-sum',
+]);
 
 export const mod = (value: number, cycle: number): number => ((value % cycle) + cycle) % cycle;
 
@@ -77,8 +100,24 @@ export const toSystem = (projection: CycleProjection, sequenceTime: Tenths): Ten
   mod(sequenceTime - projection.localZero + projection.offset, projection.cycle);
 
 /**
- * Projects one coordinated pattern. Fails with the blocking issues if the ring structure or the
- * pattern has errors, since a projection of an invalid plan would be misleading.
+ * The system-time spans (mod cycle) covered by the sequence-time span `start → end`: one span, or
+ * two when it runs past the end of the cycle. Each is `[from, to)` with `0 ≤ from < to ≤ cycle`.
+ */
+export function systemSpans(projection: CycleProjection, start: Tenths, end: Tenths): [Tenths, Tenths][] {
+  const length = Math.min(end - start, projection.cycle);
+  if (length <= 0) {
+    return [];
+  }
+  const from = toSystem(projection, start);
+  const to = from + length;
+  return to <= projection.cycle ? [[from, to]] : [[from, projection.cycle], [0, to - projection.cycle]];
+}
+
+/**
+ * Projects one coordinated pattern. Fails with the blocking issues when the ring structure or the
+ * pattern's layout is broken (see `BLOCKING_PATTERN_CODES`) or a split cannot hold its phase's
+ * yellow and red clearance, since no honest drawing exists; otherwise projects and returns the
+ * remaining errors for the phases and this pattern alongside.
  */
 export function projectCycle(intersection: Intersection, patternId: string): ProjectionResult {
   const patternIndex = intersection.patterns.findIndex((p) => p.id === patternId);
@@ -92,14 +131,28 @@ export function projectCycle(intersection: Intersection, patternId: string): Pro
       issues: [{ severity: 'error', code: 'projection.free-pattern', message: `Pattern "${pattern.name}" runs free, so it has no fixed cycle to project`, path: ['patterns', patternIndex, 'mode'] }],
     };
   }
-  const blocking = validateIntersection(intersection).filter((issue) => issue.severity === 'error' && blocksProjection(issue, patternIndex));
+  const relevant = validateIntersection(intersection).filter((issue) => issue.severity === 'error' && concernsProjection(issue, patternIndex));
+  const blocking = relevant.filter((issue) => issue.path[0] === 'rings' || BLOCKING_PATTERN_CODES.has(issue.code));
   if (blocking.length > 0) {
     return { ok: false, issues: blocking };
   }
-  return { ok: true, projection: project(intersection, pattern) };
+  const projection = project(intersection, pattern);
+  const cramped = projection.rings.flat().filter((interval) => interval.yellowStart < interval.splitStart);
+  if (cramped.length > 0) {
+    return {
+      ok: false,
+      issues: cramped.map((interval) => ({
+        severity: 'error' as const,
+        code: 'projection.split-below-clearance',
+        message: `Pattern "${pattern.name}": phase ${interval.phase} split of ${formatSeconds(interval.splitEnd - interval.splitStart)} s cannot hold its yellow and red clearance`,
+        path: ['patterns', patternIndex, 'splits', String(interval.phase)],
+      })),
+    };
+  }
+  return { ok: true, projection, issues: relevant };
 }
 
-function blocksProjection(issue: Issue, patternIndex: number): boolean {
+function concernsProjection(issue: Issue, patternIndex: number): boolean {
   const [root, index] = issue.path;
   if (root === 'patterns') {
     return index === patternIndex;
