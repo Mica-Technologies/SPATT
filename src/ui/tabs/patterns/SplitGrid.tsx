@@ -54,6 +54,10 @@ export default function SplitGrid({ intersection, pattern, path, issues }: Split
     const totals = rows.map((row, r) => (row[g]!.length > 0 ? ringGroupTotal(r, g) : null)).filter((t): t is number => t !== null);
     return totals.length > 0 ? Math.max(...totals) - Math.min(...totals) : 0;
   });
+  // A ring that serves no phase in a group waits at the barrier for that group's length, so its
+  // total compares with the cycle like every other ring's.
+  const ringWait = (r: number) => rows[r]!.reduce((sum, list, g) => sum + (list.length === 0 ? groupTotals[g]! : 0), 0);
+  const ringTotal = (r: number) => rows[r]!.reduce((sum, _, g) => sum + ringGroupTotal(r, g), 0) + ringWait(r);
   const splitsTotal = groupTotals.reduce((sum, t) => sum + t, 0);
   const remainder = pattern.cycle - splitsTotal;
   const aligned = groupSpread.every((spread) => spread === 0);
@@ -106,7 +110,7 @@ export default function SplitGrid({ intersection, pattern, path, issues }: Split
       title="Splits"
       actions={
         <>
-          <Tooltip title="Line the rings up at each barrier, then fit the groups to the cycle on the coordinated phases">
+          <Tooltip title={free ? 'A free pattern does not use splits' : 'Raise splits below their minimum, line the rings up at each barrier, then fit the groups to the cycle on the coordinated phases'}>
             <span>
               <Button size="small" variant="outlined" startIcon={<BalanceRoundedIcon />} disabled={free} onClick={() => editIntersection('Balance splits', (i) => applyBalance(i, pattern.id))}>
                 Balance
@@ -192,7 +196,10 @@ export default function SplitGrid({ intersection, pattern, path, issues }: Split
                   );
                 })}
                 <Box component="td" sx={{ ...totalCell, ...barrierEdge }}>
-                  {s(row.reduce((sum, list) => sum + list.reduce((acc, n) => acc + split(n), 0), 0))}
+                  <div>{s(ringTotal(r))}</div>
+                  {ringWait(r) > 0 ? (
+                    <Box sx={{ color: 'text.secondary', fontSize: 11 }}>incl. {s(ringWait(r))} s wait</Box>
+                  ) : null}
                 </Box>
               </Box>
             ))}

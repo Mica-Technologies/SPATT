@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { emptyProject, standardEightPhase } from '../../model';
+import { emptyProject, splitPhaseSideStreet, standardEightPhase } from '../../model';
 import { useIntersectionIssues } from '../state/useIssues';
 import { selectIntersection, useWorkspace } from '../state/workspace';
 import PatternsTab from './PatternsTab';
@@ -52,6 +52,23 @@ describe('PatternsTab', () => {
     expect(pattern().splits['6']).toBe(350);
     state().undo();
     expect(pattern().splits['6']).toBe(300);
+  });
+
+  it('raises a split below its minimum when balancing', () => {
+    state().editIntersection('Zero split', (i) => (i.patterns[0]!.splits['1'] = 0));
+    render(<Harness />);
+    fireEvent.click(screen.getByRole('button', { name: 'Balance' }));
+    expect(pattern().splits).toMatchObject({ 1: 100, 2: 400 });
+  });
+
+  it('counts the barrier wait in a split-phased ring total', () => {
+    const project = emptyProject('Split', 'p-split', new Date('2026-09-01T00:00:00.000Z'));
+    project.intersections.push(splitPhaseSideStreet('split'));
+    state().open(project);
+    render(<Harness />);
+    // Cycle 120: ring 2 serves nothing in groups 2 and 3 (30 + 30 s) and waits there.
+    expect(screen.getAllByText('120.0')).toHaveLength(2);
+    expect(screen.getByText('incl. 60.0 s wait')).toBeTruthy();
   });
 
   it('converts the offset when the reference changes', () => {

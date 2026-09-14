@@ -86,6 +86,16 @@ describe('balanceSplits', () => {
     expect(splits).toMatchObject({ 2: 310, 6: 310 });
   });
 
+  it('raises splits below their minimum before lining the rings up', () => {
+    // Left turns: min green 5 + yellow 3.5 + red clear 1.5 = 10 s floor. Phase 1 (0) and phase 3
+    // (8 s) rise to 10 s. Group 1: ring 1 = 10 + 35 = 45, ring 2 = 15 + 35 = 50 → phase 2 +5.
+    // Group 2: ring 1 = 10 + 28 = 38, ring 2 = 12 + 28 = 40 → phase 4 +2. 50 + 40 = 90 = cycle.
+    const intersection = standardEightPhase();
+    const splits = balanced(intersection, (p) => Object.assign(p.splits, { 1: 0, 3: 80 }));
+    expect(splits).toEqual({ 1: 100, 2: 400, 3: 100, 4: 300, 5: 150, 6: 350, 7: 120, 8: 280 });
+    expect(patternErrors(intersection)).toEqual([]);
+  });
+
   it('follows a lead-lag sequence', () => {
     // Ring 1 runs 2 then 1; phase 2 is still the coordinated phase that takes the difference.
     const intersection = leadLagEightPhase();

@@ -69,6 +69,8 @@ export function apportion(total: number, weights: readonly number[]): number[] {
 /**
  * Brings a pattern's splits into line, returning the new split map (the pattern is not changed):
  *
+ * 0. Every enabled phase in the ring structure whose split is below its
+ *    `splitMinimums().floor` (a missing split counts as 0) is raised to that floor.
  * 1. In each barrier group, every ring with enabled phases there is raised to the group's
  *    longest ring total. The difference goes to that ring's coordinated phase in the group, or
  *    to its last enabled phase in the group.
@@ -94,6 +96,15 @@ export function balanceSplits(intersection: Intersection, patternId: string): Re
   const coordinated = new Set(pattern.coordinatedPhases.filter(enabled));
   const groupCount = sequence[0]?.groups.length ?? 0;
   const target = (entry: GroupRing): number => entry.phases.find((n) => coordinated.has(n)) ?? entry.phases.at(-1)!;
+
+  for (const ring of sequence) {
+    for (const n of ring.groups.flat().filter(enabled)) {
+      const floor = splitMinimums(phases.get(n)!).floor;
+      if (get(n) < floor) {
+        splits[String(n)] = floor;
+      }
+    }
+  }
 
   const groupTotals: Tenths[] = [];
   for (let g = 0; g < groupCount; g++) {
