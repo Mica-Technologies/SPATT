@@ -1,3 +1,4 @@
+export * from './capacity';
 export * from './circular';
 export * from './clearance';
 export * from './cycle-bounds';
