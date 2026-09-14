@@ -6,4 +6,5 @@ export * from './green-shift';
 export * from './optimize';
 export * from './progression';
 export * from './projection';
+export * from './sim';
 export * from './splits';
