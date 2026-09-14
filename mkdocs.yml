@@ -103,6 +103,7 @@ nav:
       - Installation: getting-started/installation.md
       - Desktop, Network and Headless: getting-started/hosts.md
       - Using the Editor: getting-started/editor.md
+      - Corridors and Green Waves: getting-started/corridors.md
   - Concepts:
       - concepts/index.md
       - Rings, Barriers and Phases: concepts/ring-barrier.md

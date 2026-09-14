@@ -22,9 +22,11 @@ SPATT is built in stages. Each stage ends with something usable.
 
 ## v2 — corridors
 
-- [ ] Corridors: intersection order, distances, speeds
-- [ ] Time-space diagram with progression bands, drag-to-adjust offsets
-- [ ] Offset optimization (bandwidth)
+- [x] Corridors: intersection order, distances, speeds, through phases and timing plans
+      ([guide](getting-started/corridors.md))
+- [x] Time-space diagram with progression bands, drag-to-adjust offsets
+- [x] Offset optimization (bandwidth)
+- [ ] Printable time-space diagram; lead/lag sequence search
 - [ ] Verified green wave in game
 
 ## v3 — demand

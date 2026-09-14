@@ -76,5 +76,5 @@ serve its walk and pedestrian clearance.
 A **time-space diagram** plots distance along a corridor against time, with each signal's green
 drawn as bands. A line sloped at the progression speed through consecutive greens is a vehicle
 travelling without stopping; the widest such band is the **bandwidth**. Choosing offsets that
-maximise bandwidth in both directions is the classic offset optimization problem, and one SPATT
-will solve for corridors.
+maximise bandwidth in both directions is the classic offset optimization problem; SPATT solves it
+for [corridors](../getting-started/corridors.md).
