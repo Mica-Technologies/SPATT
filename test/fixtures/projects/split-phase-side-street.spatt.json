@@ -1,6 +1,6 @@
 {
   "app": "spatt",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "split-phase-side-street",
   "name": "Harbor Rd & Split Ave",
   "notes": "",

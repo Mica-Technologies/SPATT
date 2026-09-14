@@ -21,6 +21,7 @@ import {
   csmDefault,
   leadLagEightPhase,
   randomId,
+  removeIntersectionFromCorridors,
   splitPhaseSideStreet,
   standardEightPhase,
   twoPhase,
@@ -228,7 +229,7 @@ export default function Sidebar() {
               const target = deleting!;
               edit(`Delete ${target.name}`, (p) => {
                 p.intersections = p.intersections.filter((i) => i.id !== target.id);
-                p.corridors.forEach((c) => (c.intersectionIds = c.intersectionIds.filter((id) => id !== target.id)));
+                removeIntersectionFromCorridors(p, target.id);
               });
               selectIntersection(selectedId === target.id ? null : selectedId);
               setDeleting(null);

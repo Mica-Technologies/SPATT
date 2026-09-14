@@ -16,7 +16,7 @@ import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import { formatSeconds, type Intersection, type Issue, type Pattern } from '../../../model';
+import { formatSeconds, removePatternFromCorridors, type Intersection, type Issue, type Pattern } from '../../../model';
 import { useWorkspace } from '../../state/workspace';
 import { createPattern, deletePattern, duplicatePattern, scheduleUses } from './patternEdits';
 import { Section } from './Section';
@@ -149,7 +149,8 @@ export default function PatternList({ intersection, intersectionIndex, selectedI
             onClick={() => {
               const target = deleting!;
               let next: string | null = selectedId;
-              editIntersection(`Delete ${target.name}`, (i) => {
+              editIntersection(`Delete ${target.name}`, (i, project) => {
+                removePatternFromCorridors(project, i.id, target.id);
                 const replacement = deletePattern(i, target.id);
                 if (selectedId === target.id) next = replacement;
               });

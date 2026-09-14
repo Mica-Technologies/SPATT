@@ -19,8 +19,8 @@ in `src/model/schema.ts`; this page explains it. Example files for every templat
 
 ```text
 Project
-├── app: "spatt", schemaVersion: 1, id, name, notes
-├── units: { length: ft | m, speed: mph | km/h }
+├── app: "spatt", schemaVersion: 2, id, name, notes
+├── units: { length: ft | m | block, speed: mph | km/h | block/s }
 ├── intersections[]
 │   ├── id, name, notes
 │   ├── phases[]        number, label, enabled, movement { approach, kind },
@@ -35,9 +35,25 @@ Project
 │   ├── patterns[]      id, name, mode, cycle, offset, offsetReference, coordinatedPhases,
 │   │                   splits { "phase": tenths }, sequence, maxGreen, forceOffMode
 │   └── schedule[]      { startMinute, patternId | null }   null runs free
-├── corridors[]         id, name, intersectionIds   (placeholder until corridors are built)
+├── corridors[]
+│   ├── id, name, outbound (direction of travel from the first stop to the last)
+│   ├── stops[]         intersectionId, distance (m), speed { outbound, inbound } (m/s),
+│   │                   speedLimit (m/s | null), outboundPhases, inboundPhases
+│   └── plans[]         id, name, patterns { intersectionId: patternId | null },
+│                       weights { outbound, inbound }
 └── createdAt, updatedAt
 ```
+
+### Corridors
+
+A corridor lists its intersections in travel order. Each stop's `distance` and `speed` describe
+the link from the previous stop (the first stop's are ignored). Distances are stored in metres and
+speeds in metres per second whatever the project's units, which only change how they are shown;
+CSM units treat one block as one metre. `outboundPhases` and `inboundPhases` are the phases that
+carry through traffic in each direction.
+
+A corridor **plan** picks the pattern each intersection runs together, so a time-space diagram or
+offset optimization works on one plan and writes offsets back to those patterns.
 
 ### Rings and barriers
 
@@ -68,6 +84,11 @@ group, which is how lead-lag is expressed, but may not move a phase to another r
 
 `schemaVersion` is the format version. SPATT migrates older files forward when it loads them,
 and refuses a file with a newer version rather than misreading it.
+
+| Version | Change |
+|---|---|
+| 1 | First format; corridors were a placeholder list of intersection ids |
+| 2 | Corridors gain stops (distance, speeds, through phases), an outbound direction and timing plans; CSM units. Version 1 corridors load as stops with 300 m links at 13.4 m/s and no plans |
 
 ## Validation rules
 
@@ -112,6 +133,18 @@ reject or run incorrectly; **warnings** are legal but unusual.
 | `schedule.duplicate-start` | error | Schedule entries start at different times |
 | `schedule.unknown-pattern` | error | Schedule entries use existing patterns |
 | `project.duplicate-intersection-id` | error | Each intersection id is used once |
+| `project.duplicate-corridor-id` | error | Each corridor id is used once |
+| `corridor.too-few-stops` | warning | A corridor has at least two intersections |
 | `corridor.unknown-intersection` | error | Corridors only list existing intersections |
+| `corridor.repeated-intersection` | error | An intersection appears once in a corridor |
+| `corridor.distance-missing` | error | Every link after the first stop has a distance |
+| `corridor.speed-missing` | error | Every link after the first stop has a speed in both directions |
+| `corridor.unknown-phase` | error | Through phases are defined at their intersection |
+| `corridor.no-through-phases` | warning | Each stop has a through phase in at least one direction |
+| `corridor.plan-duplicate-id` | error | Each plan id is used once in its corridor |
+| `corridor.plan-unknown-pattern` | error | A plan only uses patterns its intersections have |
+| `corridor.plan-missing-intersection` | warning | A plan gives every stop a pattern |
+| `corridor.plan-free-pattern` | warning | A plan's patterns are coordinated |
+| `corridor.plan-cycle-mismatch` | warning | A plan's patterns share one cycle length |
 
 Split rules apply to coordinated patterns only; a free pattern's splits are not used.

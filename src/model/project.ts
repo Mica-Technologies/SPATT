@@ -1,6 +1,7 @@
 /**
  * Loading, migrating, validating and saving `*.spatt.json` project files.
  */
+import { DEFAULT_LINK, validateCorridor } from './corridor';
 import { error, type Issue } from './issues';
 import { PROJECT_SCHEMA_VERSION, projectSchema, type Project } from './schema';
 import { validateIntersection } from './validate';
@@ -29,8 +30,41 @@ export function migrateProject(raw: unknown): { value: unknown; issues: Issue[] 
       issues: [error('file.newer-version', `The file was saved by a newer SPATT (format ${version}); this version reads format ${PROJECT_SCHEMA_VERSION}`, ['schemaVersion'])],
     };
   }
-  // Version 1 is current: nothing to migrate yet.
-  return { value: raw, issues: [] };
+  let value: Record<string, unknown> = record;
+  if (version < 2) {
+    value = migrateV1(value);
+  }
+  return { value, issues: [] };
+}
+
+/**
+ * v1 → v2: corridors were a placeholder (`intersectionIds`); they become stops with default links
+ * and no through phases or plans, for the user to fill in.
+ */
+function migrateV1(v1: Record<string, unknown>): Record<string, unknown> {
+  const corridors = Array.isArray(v1.corridors) ? v1.corridors : [];
+  return {
+    ...v1,
+    schemaVersion: 2,
+    corridors: corridors.map((corridor) => {
+      const old = corridor as { id?: unknown; name?: unknown; intersectionIds?: unknown };
+      const ids = Array.isArray(old.intersectionIds) ? old.intersectionIds : [];
+      return {
+        id: old.id,
+        name: old.name,
+        outbound: 'E',
+        stops: ids.map((intersectionId, k) => ({
+          intersectionId,
+          distance: k === 0 ? 0 : DEFAULT_LINK.distance,
+          speed: { outbound: DEFAULT_LINK.speed, inbound: DEFAULT_LINK.speed },
+          speedLimit: null,
+          outboundPhases: [],
+          inboundPhases: [],
+        })),
+        plans: [],
+      };
+    }),
+  };
 }
 
 export type LoadResult = { ok: true; project: Project; issues: Issue[] } | { ok: false; issues: Issue[] };
@@ -72,12 +106,13 @@ export function validateProject(project: Project): Issue[] {
       issues.push({ ...issue, path: ['intersections', index, ...issue.path] });
     }
   });
+  const corridorIds = new Set<string>();
   project.corridors.forEach((corridor, index) => {
-    corridor.intersectionIds.forEach((id, position) => {
-      if (!ids.has(id)) {
-        issues.push(error('corridor.unknown-intersection', `Corridor "${corridor.name}" refers to an intersection that does not exist`, ['corridors', index, 'intersectionIds', position]));
-      }
-    });
+    if (corridorIds.has(corridor.id)) {
+      issues.push(error('project.duplicate-corridor-id', `Corridor id "${corridor.id}" is used more than once`, ['corridors', index, 'id']));
+    }
+    corridorIds.add(corridor.id);
+    issues.push(...validateCorridor(corridor, project, ['corridors', index]));
   });
   return issues;
 }

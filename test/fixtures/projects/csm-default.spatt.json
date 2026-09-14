@@ -1,6 +1,6 @@
 {
   "app": "spatt",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "csm-default",
   "name": "CSM ASC-3 default",
   "notes": "",

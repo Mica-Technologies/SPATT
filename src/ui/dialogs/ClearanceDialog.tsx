@@ -19,7 +19,7 @@ import InputAdornment from '@mui/material/InputAdornment';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { CLEARANCE_DEFAULTS, pedestrianClearance, pedestrianTotalMinimum, redClearance, yellowChange, type UnitSystem } from '../../engine/clearance';
-import { formatSeconds, type ClearanceBasis, type Intersection, type Phase, type Project, type Tenths } from '../../model';
+import { formatSeconds, LENGTH_LABEL, SPEED_LABEL, type ClearanceBasis, type Intersection, type Phase, type Project, type Tenths } from '../../model';
 import { useWorkspace } from '../state/workspace';
 import { fontFamilyMono } from '../theme/themePrimitives';
 
@@ -46,13 +46,12 @@ const KMH_PER_MPH = 1.609344;
 const GRADE_LIMIT = 15;
 
 /** The engine works in one system; lengths decide it, and a mismatched speed is converted. */
-const unitSystem = (units: Project['units']): UnitSystem => (units.length === 'm' ? 'metric' : 'us');
+const unitSystem = (units: Project['units']): UnitSystem => (units.length === 'ft' ? 'us' : 'metric');
 
+/** The engine takes mph (US) or km/h (metric); CSM blocks are metres, so blocks/s × 3.6 is km/h. */
 function engineSpeed(speed: number, units: Project['units']): number {
-  const system = unitSystem(units);
-  if (system === 'us' && units.speed === 'km/h') return speed / KMH_PER_MPH;
-  if (system === 'metric' && units.speed === 'mph') return speed * KMH_PER_MPH;
-  return speed;
+  const kmh = units.speed === 'mph' ? speed * KMH_PER_MPH : units.speed === 'block/s' ? speed * 3.6 : speed;
+  return unitSystem(units) === 'us' ? kmh / KMH_PER_MPH : kmh;
 }
 
 const show = (value: number | undefined, fallback: number | '' = ''): string => String(value ?? fallback);
@@ -154,7 +153,7 @@ export default function ClearanceDialog({ open, onClose, intersectionIndex, phas
     }
   }
 
-  const lengthUnit = units.length;
+  const lengthUnit = LENGTH_LABEL[units.length];
   const labels: Record<FieldKey, string> = {
     approachSpeed: 'Approach speed',
     gradePercent: 'Grade',
@@ -164,7 +163,7 @@ export default function ClearanceDialog({ open, onClose, intersectionIndex, phas
     walkingSpeed: 'Walking speed',
   };
   const adornments: Record<FieldKey, string> = {
-    approachSpeed: units.speed,
+    approachSpeed: SPEED_LABEL[units.speed],
     gradePercent: '%',
     intersectionWidth: lengthUnit,
     vehicleLength: lengthUnit,
@@ -365,8 +364,8 @@ interface PushbuttonCheckProps {
 
 /** MUTCD 4I.06: walk + pedestrian clearance must let someone from the pushbutton cross at 3.0 ft/s. */
 function PushbuttonCheck({ phase, pedClearance, minimum, lengthUnit }: PushbuttonCheckProps) {
-  const setback = lengthUnit === 'm' ? '1.8 m' : '6 ft';
-  const speed = lengthUnit === 'm' ? '0.91 m/s' : '3.0 ft/s';
+  const setback = lengthUnit === 'ft' ? '6 ft' : `1.8 ${lengthUnit}`;
+  const speed = lengthUnit === 'ft' ? '3.0 ft/s' : `0.91 ${lengthUnit}/s`;
   let body: ReactNode;
   let met: boolean | null = null;
   if (!phase?.pedestrian.enabled) {

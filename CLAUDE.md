@@ -44,8 +44,9 @@ installed on the Windows dev machine; check a docs change with
   the model. One tenth = 2 CSM ticks.
 - `src/model/schema.ts` is the project file format (Zod, shape only); `validate.ts` holds the
   semantic rules, which return `Issue`s with stable codes and paths and never throw. Every rule
-  is listed in `docs/developer/project-format.md` and has a test in `validate.test.ts`; keep all
-  three in step. Rings are `groups` per barrier: `rings[r].groups[g]` = ordered phases.
+  is listed in `docs/developer/project-format.md` and has a test in `validate.test.ts` (project
+  and corridor rules: `project.ts`/`corridor.ts`, tested in `project.test.ts`); keep all three in
+  step. Corridor distances are metres and speeds m/s (`measures.ts`), whatever the project units. Rings are `groups` per barrier: `rings[r].groups[g]` = ordered phases.
 - `test/fixtures/projects/*.spatt.json` are generated from `src/model/templates.ts` and pin the
   format; after a deliberate format change run `UPDATE_FIXTURES=1 npx vitest run test/fixtures.test.ts`
   and review the diff. A `schemaVersion` bump needs a step in `migrateProject`.

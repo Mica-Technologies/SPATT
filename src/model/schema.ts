@@ -9,7 +9,13 @@
  */
 import { z } from 'zod';
 
-export const PROJECT_SCHEMA_VERSION = 1;
+/** 2: corridors gained stops, directions and timing plans; CSM units. */
+export const PROJECT_SCHEMA_VERSION = 2;
+
+export const lengthUnitSchema = z.enum(['ft', 'm', 'block']);
+export type LengthUnit = z.infer<typeof lengthUnitSchema>;
+export const speedUnitSchema = z.enum(['mph', 'km/h', 'block/s']);
+export type SpeedUnit = z.infer<typeof speedUnitSchema>;
 
 export const MAX_PHASES = 16;
 export const MAX_RINGS = 4;
@@ -192,11 +198,51 @@ export const intersectionSchema = z.object({
 });
 export type Intersection = z.infer<typeof intersectionSchema>;
 
-/** Placeholder until corridors are built; kept in the format so files need no migration then. */
+/** Metres, stored exactly as entered after conversion; distances are never durations. */
+const metresSchema = z.number().min(0).max(100_000);
+/** Metres per second. */
+const speedSchema = z.number().min(0).max(100);
+const directionPhasesSchema = z.array(phaseNumberSchema).max(MAX_PHASES);
+
+/**
+ * One intersection's place in a corridor. Distances and speeds describe the link from the
+ * previous intersection (they are ignored on the first). `outboundPhases` / `inboundPhases` are
+ * the phases carrying through traffic in each direction; either may be empty.
+ */
+export const corridorStopSchema = z.object({
+  intersectionId: idSchema,
+  distance: metresSchema,
+  /** Progression (design) speed on the link, per direction of travel. */
+  speed: z.object({ outbound: speedSchema, inbound: speedSchema }),
+  /** The posted limit, for reference; progression speed is what timing uses. */
+  speedLimit: speedSchema.nullable(),
+  outboundPhases: directionPhasesSchema,
+  inboundPhases: directionPhasesSchema,
+});
+export type CorridorStop = z.infer<typeof corridorStopSchema>;
+
+/**
+ * A corridor timing plan: which pattern each intersection runs together (by intersection id;
+ * `null` leaves the intersection out), and how much each direction's progression band counts.
+ */
+export const corridorPlanSchema = z.object({
+  id: idSchema,
+  name: z.string().max(80),
+  patterns: z.record(idSchema, idSchema.nullable()),
+  weights: z.object({ outbound: z.number().min(0).max(10), inbound: z.number().min(0).max(10) }),
+});
+export type CorridorPlan = z.infer<typeof corridorPlanSchema>;
+
+/**
+ * A coordinated route through several intersections, in travel order. `outbound` is the direction
+ * of travel from the first stop to the last (`E`: eastbound); inbound is the opposite.
+ */
 export const corridorSchema = z.object({
   id: idSchema,
   name: z.string().min(1).max(120),
-  intersectionIds: z.array(idSchema),
+  outbound: approachSchema,
+  stops: z.array(corridorStopSchema),
+  plans: z.array(corridorPlanSchema),
 });
 export type Corridor = z.infer<typeof corridorSchema>;
 
@@ -206,9 +252,10 @@ export const projectSchema = z.object({
   id: idSchema,
   name: z.string().min(1).max(120),
   notes: z.string().max(10_000),
+  /** How lengths and speeds are shown and entered; `block` and `block/s` are CSM units (1 block = 1 m). */
   units: z.object({
-    length: z.enum(['ft', 'm']),
-    speed: z.enum(['mph', 'km/h']),
+    length: lengthUnitSchema,
+    speed: speedUnitSchema,
   }),
   intersections: z.array(intersectionSchema),
   corridors: z.array(corridorSchema),

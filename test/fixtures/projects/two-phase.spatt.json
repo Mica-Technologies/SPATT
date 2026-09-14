@@ -1,6 +1,6 @@
 {
   "app": "spatt",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "two-phase",
   "name": "Elm St & 3rd Ave",
   "notes": "",

@@ -1,6 +1,6 @@
 {
   "app": "spatt",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "lead-lag-8-phase",
   "name": "Main St & Side St",
   "notes": "",
