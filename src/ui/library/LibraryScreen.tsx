@@ -28,6 +28,7 @@ import { useProjectStore } from '../state/storeContextValue';
 import { useWorkspace } from '../state/workspace';
 
 const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+const LIBRARY_POLL_MS = 5000;
 
 export default function LibraryScreen({ hostLabel }: { hostLabel: string }) {
   const store = useProjectStore();
@@ -45,6 +46,19 @@ export default function LibraryScreen({ hostLabel }: { hostLabel: string }) {
   }, [store]);
 
   useEffect(refresh, [refresh]);
+
+  // The desktop app and the server share one library with other devices, so keep the list
+  // current while it is on screen: when the window regains focus, and every few seconds.
+  useEffect(() => {
+    if (store.kind === 'browser') return;
+    const relist = () => void store.list().then(setProjects, () => {});
+    const timer = setInterval(relist, LIBRARY_POLL_MS);
+    window.addEventListener('focus', relist);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('focus', relist);
+    };
+  }, [store]);
 
   const openProject = async (id: string) => {
     const opened = await openFromStore(store, id);

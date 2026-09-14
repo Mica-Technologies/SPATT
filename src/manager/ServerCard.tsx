@@ -157,12 +157,22 @@ export default function ServerCard() {
               value={port}
               onChange={(e) => setPort(e.target.value.replace(/\D/g, ''))}
               error={!portValid}
-              helperText={portValid ? (status.running ? 'Stop to change' : undefined) : '1024 to 65535'}
-              // Applied by Start, so typing a port and clicking Start is one action.
-              disabled={busy || status.running}
+              helperText={portValid ? undefined : '1024 to 65535'}
+              // Applied by Start, or by Apply while running, never on blur: a blur-triggered save
+              // would disable Start before the click that caused the blur lands.
+              disabled={busy}
               sx={{ width: 110 }}
               slotProps={{ htmlInput: { inputMode: 'numeric' } }}
             />
+            {status.running && portValid && portNumber !== status.port ? (
+              <Tooltip title="Restart the server on this port">
+                <span>
+                  <Button disabled={busy} onClick={() => update({ port: portNumber })}>
+                    Apply
+                  </Button>
+                </span>
+              </Tooltip>
+            ) : null}
             <Tooltip title="Open in this computer's browser">
               <span>
                 <IconButton aria-label="Open in browser" disabled={!status.running} onClick={() => void openInBrowser()}>

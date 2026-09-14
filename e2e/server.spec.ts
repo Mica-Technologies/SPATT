@@ -80,3 +80,39 @@ test('two devices share projects and settle a conflicting save', async ({ browse
   await a.close();
   await b.close();
 });
+
+test('the library follows other devices, and an edit to a project deleted elsewhere can be kept', async ({ browser, baseURL }) => {
+  const name = `Deleted ${Date.now()}`;
+  const a = await device(browser, baseURL!);
+  const b = await device(browser, baseURL!);
+
+  await a.page.getByRole('button', { name: 'New project' }).click();
+  await a.page.getByLabel('Project name').fill(name);
+  await a.page.getByRole('button', { name: 'Create' }).click();
+  await addIntersection(a.page, 'Two-phase');
+  await saved(a.page);
+
+  // B's library shows the new project without a reload.
+  const bEntry = b.page.getByRole('button', { name: new RegExp(`^${name}`) });
+  await expect(bEntry).toBeVisible({ timeout: 10_000 });
+  await bEntry.click();
+
+  // A deletes it while B has it open; B's next edit finds it gone.
+  await a.page.getByRole('button', { name: 'All projects' }).click();
+  await a.page.getByRole('button', { name: `Delete ${name}`, exact: true }).click();
+  await a.page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+  await expect(a.page.getByRole('button', { name: new RegExp(`^${name}`) })).toHaveCount(0);
+
+  await commitField(b.page, 'Min green, phase 2', '12');
+  await expect(b.page.getByText('This project was deleted elsewhere')).toBeVisible();
+  await expect(b.page.getByRole('button', { name: 'Load their version' })).toBeDisabled();
+  await b.page.getByRole('button', { name: 'Keep mine' }).click();
+  await saved(b.page);
+
+  // A's library picks it up again.
+  await expect(a.page.getByRole('button', { name: new RegExp(`^${name}`) })).toBeVisible({ timeout: 10_000 });
+
+  expect([...a.errors, ...b.errors].filter((e) => !e.includes('412'))).toEqual([]);
+  await a.close();
+  await b.close();
+});
