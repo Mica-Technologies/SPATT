@@ -1,0 +1,367 @@
+{
+  "$id": "https://mica-technologies.github.io/SPATT/profiles/csm-asc3-plan.schema.json",
+  "title": "CSM ASC-3 timing plan",
+  "description": "A traffic signal timing plan for the City Super Mod ASC-3 controller, in game ticks. Optional fields left out keep the controller’s own values on import.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "format": {
+      "type": "string",
+      "const": "csm-asc3-plan"
+    },
+    "formatVersion": {
+      "type": "number",
+      "const": 1
+    },
+    "generator": {
+      "type": "string",
+      "maxLength": 120
+    },
+    "name": {
+      "type": "string",
+      "maxLength": 120
+    },
+    "phases": {
+      "maxItems": 8,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "barrier": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 7
+          },
+          "minGreen": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 12000
+          },
+          "passage": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 12000
+          },
+          "maxGreen": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 12000
+          },
+          "maxGreen2": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 12000
+          },
+          "yellow": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 12000
+          },
+          "redClear": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 12000
+          },
+          "addedInitial": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 12000
+          },
+          "maxInitial": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 12000
+          },
+          "minGap": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 12000
+          },
+          "timeBeforeReduce": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 12000
+          },
+          "timeToReduce": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 12000
+          },
+          "recall": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "MINIMUM",
+              "MAXIMUM",
+              "PEDESTRIAN",
+              "SOFT"
+            ]
+          },
+          "pedRecall": {
+            "type": "boolean"
+          },
+          "restInWalk": {
+            "type": "boolean"
+          },
+          "dualEntry": {
+            "type": "boolean"
+          },
+          "conditionalService": {
+            "type": "boolean"
+          },
+          "lockCall": {
+            "type": "boolean"
+          },
+          "walk": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 12000
+          },
+          "pedClear": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 12000
+          },
+          "movement": {
+            "type": "string",
+            "enum": [
+              "THROUGH",
+              "LEFT",
+              "PROTECTED_LEFT",
+              "RIGHT",
+              "PED"
+            ]
+          },
+          "circuit": {
+            "type": "integer",
+            "minimum": -1,
+            "maximum": 9007199254740991
+          },
+          "flash": {
+            "type": "string",
+            "enum": [
+              "AUTO",
+              "YELLOW",
+              "RED",
+              "DARK"
+            ]
+          },
+          "delayedGreen": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 12000
+          },
+          "bikeMinGreen": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 12000
+          },
+          "permissivePhase": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 8
+          },
+          "hasPedestrianSignals": {
+            "type": "boolean"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 80
+          }
+        },
+        "required": [
+          "number",
+          "enabled",
+          "barrier",
+          "minGreen",
+          "passage",
+          "maxGreen",
+          "maxGreen2",
+          "yellow",
+          "redClear",
+          "addedInitial",
+          "maxInitial",
+          "minGap",
+          "timeBeforeReduce",
+          "timeToReduce",
+          "recall",
+          "pedRecall",
+          "restInWalk",
+          "dualEntry",
+          "conditionalService",
+          "lockCall"
+        ]
+      }
+    },
+    "rings": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8
+          }
+        }
+      ],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "patterns": {
+      "maxItems": 4,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "slot": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "FREE",
+              "COORDINATED"
+            ]
+          },
+          "cycle": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12000
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 12000
+          },
+          "coordinatedPhases": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            }
+          },
+          "splits": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "pattern": "^[1-8]$"
+            },
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 12000
+            }
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 80
+          }
+        },
+        "required": [
+          "slot",
+          "mode",
+          "cycle",
+          "offset",
+          "coordinatedPhases",
+          "splits"
+        ]
+      }
+    },
+    "schedule": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "startHours": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 23
+            },
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 23
+            },
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 23
+            },
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 23
+            }
+          ],
+          "items": false,
+          "minItems": 4,
+          "maxItems": 4
+        }
+      },
+      "required": [
+        "enabled",
+        "startHours"
+      ]
+    },
+    "overlaps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    "preempts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
+    },
+    "priority": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    }
+  },
+  "required": [
+    "format",
+    "formatVersion",
+    "phases",
+    "rings",
+    "patterns",
+    "schedule"
+  ]
+}

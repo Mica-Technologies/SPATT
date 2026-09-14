@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   csmDefault,
@@ -12,6 +12,7 @@ import {
   twoPhase,
   type Intersection,
 } from '../src/model';
+import { csmPlanJsonSchema, csmPlanSchema, exportCsm } from '../src/profiles/csm';
 
 /**
  * The committed `.spatt.json` fixtures pin the file format: if the model or a template changes
@@ -28,6 +29,35 @@ const FIXTURES: [string, () => Intersection][] = [
 
 const dir = join(import.meta.dirname, 'fixtures', 'projects');
 const update = process.env.UPDATE_FIXTURES === '1';
+
+/** Writes `expected` when regenerating (or when missing), then checks the committed file. */
+function pinned(path: string, expected: string): string {
+  if (update || !existsSync(path)) {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, expected);
+  }
+  const onDisk = readFileSync(path, 'utf8').replace(/\r\n/g, '\n');
+  expect(onDisk).toBe(expected);
+  return onDisk;
+}
+
+/**
+ * The CSM ASC-3 plans exported from the templates, and the format's JSON Schema. These are what
+ * the City Super Mod implements against, so any change to them is a format change.
+ */
+describe('CSM plan fixtures', () => {
+  it.each(FIXTURES)('%s.csm.json matches its export and reads back', (name, build) => {
+    const result = exportCsm(build());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const onDisk = pinned(join(import.meta.dirname, 'fixtures', 'csm', `${name}.csm.json`), result.text);
+    expect(csmPlanSchema.parse(JSON.parse(onDisk))).toEqual(result.plan);
+  });
+
+  it('csm-asc3-plan.schema.json matches the format', () => {
+    pinned(join(import.meta.dirname, '..', 'docs', 'profiles', 'csm-asc3-plan.schema.json'), `${JSON.stringify(csmPlanJsonSchema(), null, 2)}\n`);
+  });
+});
 
 describe('project fixtures', () => {
   it.each(FIXTURES)('%s.spatt.json matches its template and loads cleanly', (name, build) => {
