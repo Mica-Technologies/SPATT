@@ -37,7 +37,7 @@ npm run tauri:dev           # desktop app with hot reload
 npm run server:dev          # spatt-server serving ./dist (run `npm run build` first)
 
 npm run check               # typecheck + lint + unit tests
-npm run e2e                 # Playwright end-to-end specs in e2e/ (starts the dev server)
+npm run e2e                 # builds dist/, then Playwright specs in e2e/ (dev server + spatt-server)
 cargo test --workspace      # Rust tests
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all
@@ -49,11 +49,19 @@ npm run build:linux         # Linux installers + server in Docker, into release-
 
 ## End-to-end tests
 
-2e/ drives the web UI in Chromium through Playwright: templates, editing, problems-panel
-navigation, undo and redo, ring moves, patterns, autosave across a reload, and export/import.
-The first run on a machine needs the browser: `npx playwright install chromium`. A running
-`npm run dev` is reused; otherwise Playwright starts one. Failures leave a trace in
-`test-results/` (`npx playwright show-trace <trace.zip>`).
+`e2e/` drives the web UI in Chromium through Playwright, in two projects:
+
+- `chromium`, against the Vite dev server: templates, editing, problems-panel navigation, undo
+  and redo, ring moves, patterns, autosave across a reload, export/import, the ring-barrier
+  diagram and timing sheets.
+- `server`, against a real `spatt-server` serving `dist/` (data in `target/e2e-server-data`),
+  reached as `http://spatt.test` so the server treats the browser as another device: the access
+  screen, and two devices sharing a project and settling conflicts.
+
+`npm run e2e` builds `dist/` first and `cargo run`s the server, so it needs the Rust toolchain.
+The first run on a machine also needs the browser: `npx playwright install chromium`. Servers
+already running on the two ports are reused locally. Failures leave a trace in `test-results/`
+(`npx playwright show-trace <trace.zip>`).
 
 ## Building Linux packages on Windows or macOS
 

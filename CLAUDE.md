@@ -21,7 +21,7 @@ npm run dev                 # web UI, http://localhost:5173 (index.html = SPATT,
 npm run tauri:dev           # desktop app
 npm run check               # typecheck + oxlint + vitest
 npx vitest run src/model/units.test.ts   # a single test file
-npm run e2e                 # Playwright specs in e2e/ (reuses a running dev server)
+npm run e2e                 # builds dist/, Playwright specs in e2e/ (Vite + cargo-run spatt-server)
 cargo test --workspace
 cargo test -p spatt-server health        # a single Rust test
 cargo clippy --workspace --all-targets -- -D warnings
@@ -55,16 +55,25 @@ installed on the Windows dev machine; check a docs change with
   `edit(label, recipe)` / `editIntersection(label, recipe)`**: it clones, the recipe mutates the
   clone, and it becomes one undo step. Autosave (`useAutosave.ts`) writes through the
   `ProjectStore` for the host (`BrowserStore` IndexedDB, `TauriStore` → Rust `projects_*`
-  commands over `crates/spatt-server/src/store.rs`).
+  commands over `crates/spatt-server/src/store.rs`, `HttpStore` → the server API).
+- **Every store write is versioned** (FNV-1a content hash, identical in `src/io/store.ts` and
+  `store.rs`): pass the expected version, get `ConflictError` on a stale one. The workspace keeps
+  `storeVersion`; a conflict pauses autosave until the user picks theirs / mine / copy. Never add
+  an unconditional write path for the open project.
 - Editor controls take `fieldId(path)` ids where `path` equals the validation issue path, so the
   problems panel can focus them (`src/ui/fields/paths.ts`, `src/ui/workspace/navigation.ts`).
   Dense grid inputs are in `src/ui/fields/GridInputs.tsx` (commit on blur/Enter).
 - `crates/spatt-server` embeds `dist/` with rust-embed (`allow_missing`, so `cargo test` works
-  without a web build). It serves `/api/health` → `{"app":"spatt","version":…}`. Binds
-  localhost by default; network exposure is always explicit.
-- `src-tauri` depends on `spatt-server` and will run it in-process. Manager window = `manager.html`;
-  `open_spatt_window` opens `index.html`. Keep `src-tauri/src/commands.rs` structs in step with
-  `src/manager/bridge.ts`.
+  without a web build). API in `api.rs` (documented in `docs/developer/server-api.md`), access in
+  `auth.rs`: localhost by default with a loopback-`Host` check; a network bind requires a token
+  (`check()` refuses otherwise). Keep the loopback-peer-and-host exemption intact.
+- `src-tauri` runs `spatt-server` in-process (`server.rs`, settings in `<app data>/server.json`)
+  over the same `FileProjectStore` clone as the `projects_*` commands, with a tray (`tray.rs`).
+  Manager window = `manager.html`; `open_spatt_window` must stay `async` (sync window creation
+  deadlocks on Windows). Keep `commands.rs` / `server.rs` structs in step with `src/manager/bridge.ts`.
+- Check the real desktop app by attaching Playwright over CDP
+  (`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222` + `connectOverCDP`), never
+  by screen capture.
 - OS-specific Rust goes in `src-tauri/src/platform/{windows,linux,macos}.rs` only. No hard-coded
   paths, no shell-specific scripts (Node or Rust), LF line endings.
 

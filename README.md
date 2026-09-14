@@ -31,8 +31,8 @@ so plans move straight into and out of that controller.
 
 > [!NOTE]
 > **Status: early development.** The timing model, the intersection editor, ring-barrier
-> diagrams and printable timing sheets work in the desktop app and the browser. The network
-> server and the CSM bridge are next; see the [roadmap](https://mica-technologies.github.io/SPATT/roadmap/).
+> diagrams, printable timing sheets and network sharing work. Background modes and the CSM
+> bridge are next; see the [roadmap](https://mica-technologies.github.io/SPATT/roadmap/).
 
 ![SPATT's pattern editor: split grid with barrier groups, and the ring-barrier diagram](docs/assets/screenshots/editor-patterns.png)
 
@@ -58,7 +58,7 @@ volume-based splits and HCM-style delay.
 | Host | What it is |
 |---|---|
 | **Desktop app** | Installers for Windows, macOS and Linux. Opens a small manager window that launches SPATT and controls its network server. |
-| **Network server** | The same UI served over HTTP, from the desktop app or the standalone `spatt-server`, so any browser on your network can use it. Localhost only unless you opt in. |
+| **Network server** | The same UI served over HTTP, from the desktop app or the standalone `spatt-server`, so any browser on your network works on one shared project library. Localhost only unless you opt in; other devices sign in with an access link or QR code. |
 | **Browser** | The web UI on a development server, for working on SPATT. |
 
 Background modes (start at login, or a system service with a tray icon) are planned; see
