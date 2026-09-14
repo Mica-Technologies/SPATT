@@ -19,6 +19,7 @@ describe('downloadProject on desktop', () => {
     expect(invoke).toHaveBeenCalledWith('project_export', {
       suggestedName: projectFileName(project),
       text: saveProject(project),
+      fileType: 'SPATT project',
     });
   });
 

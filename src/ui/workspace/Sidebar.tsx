@@ -4,6 +4,7 @@ import MoreVertRoundedIcon from '@mui/icons-material/MoreVertRounded';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
+import Divider from '@mui/material/Divider';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -26,6 +27,8 @@ import {
   uniqueName,
   type Intersection,
 } from '../../model';
+import CsmExportDialog from '../dialogs/CsmExportDialog';
+import CsmImportDialog from '../dialogs/CsmImportDialog';
 import { useIssues } from '../state/useIssues';
 import { useWorkspace } from '../state/workspace';
 
@@ -46,14 +49,20 @@ export default function Sidebar() {
   const [itemMenu, setItemMenu] = useState<{ anchor: HTMLElement; intersection: Intersection } | null>(null);
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState<Intersection | null>(null);
+  const [csmExport, setCsmExport] = useState<Intersection | null>(null);
+  const [csmImportId, setCsmImportId] = useState<string | null>(null);
 
   const add = (build: (id: string) => Intersection) => {
     const id = randomId('i');
-    const intersection = build(id);
+    insert(build(id));
+    setAddAnchor(null);
+  };
+
+  const insert = (intersection: Intersection) => {
+    const id = intersection.id;
     intersection.name = uniqueName(intersection.name, project.intersections.map((i) => i.name));
     edit(`Add ${intersection.name}`, (p) => p.intersections.push(intersection));
     selectIntersection(id);
-    setAddAnchor(null);
   };
 
   const duplicate = (source: Intersection) => {
@@ -75,6 +84,9 @@ export default function Sidebar() {
       <List dense subheader={<ListSubheader sx={{ bgcolor: 'background.paper', lineHeight: '40px' }}>Intersections</ListSubheader>}>
         {project.intersections.map((intersection, index) => {
           const errors = errorCount(index);
+          // Controller data from a CSM import (circuits, overlaps...) travels with the intersection.
+          const fromCsm = intersection.extensions?.csm !== undefined || intersection.phases.some((p) => p.extensions?.csm !== undefined);
+          const detail = errors > 0 ? `${errors} error${errors === 1 ? '' : 's'}` : `${intersection.phases.length} phases`;
           return (
             <ListItemButton
               key={intersection.id}
@@ -84,7 +96,7 @@ export default function Sidebar() {
             >
               <ListItemText
                 primary={intersection.name}
-                secondary={errors > 0 ? `${errors} error${errors === 1 ? '' : 's'}` : `${intersection.phases.length} phases`}
+                secondary={fromCsm ? `CSM · ${detail}` : detail}
                 slotProps={{ primary: { noWrap: true }, secondary: { sx: { color: errors > 0 ? 'error.main' : undefined } } }}
               />
               <IconButton
@@ -119,6 +131,15 @@ export default function Sidebar() {
             {template.label}
           </MenuItem>
         ))}
+        <Divider />
+        <MenuItem
+          onClick={() => {
+            setCsmImportId(randomId('i'));
+            setAddAnchor(null);
+          }}
+        >
+          Import from CSM ASC-3…
+        </MenuItem>
       </Menu>
 
       <Menu anchorEl={itemMenu?.anchor} open={itemMenu !== null} onClose={() => setItemMenu(null)}>
@@ -139,6 +160,14 @@ export default function Sidebar() {
           Duplicate
         </MenuItem>
         <MenuItem
+          onClick={() => {
+            setCsmExport(itemMenu!.intersection);
+            setItemMenu(null);
+          }}
+        >
+          Export for CSM ASC-3…
+        </MenuItem>
+        <MenuItem
           sx={{ color: 'error.main' }}
           onClick={() => {
             setDeleting(itemMenu!.intersection);
@@ -148,6 +177,14 @@ export default function Sidebar() {
           Delete…
         </MenuItem>
       </Menu>
+
+      <CsmExportDialog
+        open={csmExport !== null}
+        onClose={() => setCsmExport(null)}
+        intersection={project.intersections.find((i) => i.id === csmExport?.id) ?? null}
+        intersectionIndex={project.intersections.findIndex((i) => i.id === csmExport?.id)}
+      />
+      <CsmImportDialog open={csmImportId !== null} id={csmImportId ?? ''} onClose={() => setCsmImportId(null)} onImport={insert} />
 
       <Dialog open={renaming !== null} onClose={() => setRenaming(null)} fullWidth maxWidth="xs">
         <form

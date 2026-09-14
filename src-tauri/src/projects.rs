@@ -135,16 +135,18 @@ pub async fn projects_remove(
     blocking(move || store.remove(&id)).await
 }
 
-/// Asks where to save the project with the native Save dialog and writes it there. Resolves with
-/// the chosen path, or `None` if the user cancelled.
+/// Asks where to save a JSON file (a project, or a controller plan) with the native Save dialog and
+/// writes it there. Resolves with the chosen path, or `None` if the user cancelled.
 ///
-/// The filter is `*.json`: `.spatt.json` is a double extension, which not every platform's dialog
-/// can filter on, so the suggested file name carries the full extension instead.
+/// The filter is `*.json` under `file_type` (default "SPATT project"): `.spatt.json` and
+/// `.csm.json` are double extensions, which not every platform's dialog can filter on, so the
+/// suggested file name carries the full extension instead.
 #[tauri::command]
 pub async fn project_export(
     window: WebviewWindow,
     suggested_name: String,
     text: String,
+    file_type: Option<String>,
 ) -> Result<Option<String>, String> {
     // The dialog blocks until the user answers, so it waits on the blocking pool too.
     tauri::async_runtime::spawn_blocking(move || -> Result<Option<String>, String> {
@@ -152,9 +154,9 @@ pub async fn project_export(
             .dialog()
             .file()
             .set_parent(&window)
-            .set_title("Export project")
+            .set_title("Export")
             .set_file_name(suggested_name)
-            .add_filter("SPATT project", &["json"])
+            .add_filter(file_type.as_deref().unwrap_or("SPATT project"), &["json"])
             .blocking_save_file();
         let Some(chosen) = chosen else {
             return Ok(None);
