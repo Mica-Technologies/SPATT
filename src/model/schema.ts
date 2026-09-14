@@ -9,8 +9,11 @@
  */
 import { z } from 'zod';
 
-/** 2: corridors gained stops, directions and timing plans; CSM units. */
-export const PROJECT_SCHEMA_VERSION = 2;
+/**
+ * 2: corridors gained stops, directions and timing plans; CSM units.
+ * 3: intersections gained lane groups, capacity settings and volume count sets; patterns link a count.
+ */
+export const PROJECT_SCHEMA_VERSION = 3;
 
 export const lengthUnitSchema = z.enum(['ft', 'm', 'block']);
 export type LengthUnit = z.infer<typeof lengthUnitSchema>;
@@ -173,6 +176,8 @@ export const patternSchema = z.object({
   sequence: z.array(ringSchema).nullable(),
   maxGreen: z.enum(['max1', 'max2']),
   forceOffMode: z.enum(['fixed', 'floating']),
+  /** The volume count set this pattern is timed for and analysed against, if any. */
+  volumeSetId: idSchema.nullable(),
 });
 export type Pattern = z.infer<typeof patternSchema>;
 
@@ -184,6 +189,49 @@ export const scheduleEntrySchema = z.object({
 });
 export type ScheduleEntry = z.infer<typeof scheduleEntrySchema>;
 
+/** Vehicles per hour. */
+const volumeSchema = z.number().int().min(0).max(10_000);
+
+/**
+ * Lanes that share a phase and a saturation flow: an exclusive left-turn bay, the through lanes,
+ * or a shared through-and-right lane. The approach comes from the serving phase.
+ */
+export const laneGroupSchema = z.object({
+  id: idSchema,
+  label: z.string().max(80),
+  /** The phase that serves this lane group; lefts it carries are protected when it is a left-turn phase. */
+  phase: phaseNumberSchema,
+  movements: z.object({ left: z.boolean(), through: z.boolean(), right: z.boolean() }),
+  lanes: z.number().int().min(1).max(8),
+  /** Average lane width, metres. */
+  laneWidth: z.number().min(2).max(6),
+  heavyVehiclesPercent: z.number().min(0).max(100),
+  /** Percent; uphill positive. */
+  gradePercent: z.number().min(-10).max(10),
+  /** Saturation flow for the whole group (veh/h of green) when entered by hand; `null` = calculated. */
+  saturationFlow: z.number().int().min(1).max(20_000).nullable(),
+});
+export type LaneGroup = z.infer<typeof laneGroupSchema>;
+
+export const movementVolumesSchema = z.object({ left: volumeSchema, through: volumeSchema, right: volumeSchema });
+export type MovementVolumes = z.infer<typeof movementVolumesSchema>;
+
+/** One traffic count (an AM peak hour, say): hourly volumes per lane group and movement. */
+export const volumeSetSchema = z.object({
+  id: idSchema,
+  name: z.string().max(80),
+  peakHourFactor: z.number().min(0.5).max(1),
+  volumes: z.record(idSchema, movementVolumesSchema),
+});
+export type VolumeSet = z.infer<typeof volumeSetSchema>;
+
+export const capacitySettingsSchema = z.object({
+  /** Passenger cars per hour of green per lane, before adjustments (1900 in the HCM). */
+  baseSaturationFlow: z.number().int().min(1).max(3000),
+  centralBusinessDistrict: z.boolean(),
+});
+export type CapacitySettings = z.infer<typeof capacitySettingsSchema>;
+
 export const intersectionSchema = z.object({
   id: idSchema,
   name: z.string().min(1).max(120),
@@ -194,6 +242,9 @@ export const intersectionSchema = z.object({
   preempts: z.array(preemptSchema).max(10),
   patterns: z.array(patternSchema),
   schedule: z.array(scheduleEntrySchema),
+  capacity: capacitySettingsSchema,
+  laneGroups: z.array(laneGroupSchema).max(32),
+  volumeSets: z.array(volumeSetSchema).max(32),
   extensions: extensionsSchema.optional(),
 });
 export type Intersection = z.infer<typeof intersectionSchema>;

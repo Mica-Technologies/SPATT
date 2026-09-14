@@ -1,6 +1,7 @@
 /**
  * Loading, migrating, validating and saving `*.spatt.json` project files.
  */
+import { DEFAULT_CAPACITY } from './capacity';
 import { DEFAULT_LINK, validateCorridor } from './corridor';
 import { error, type Issue } from './issues';
 import { PROJECT_SCHEMA_VERSION, projectSchema, type Project } from './schema';
@@ -34,6 +35,9 @@ export function migrateProject(raw: unknown): { value: unknown; issues: Issue[] 
   if (version < 2) {
     value = migrateV1(value);
   }
+  if (version < 3) {
+    value = migrateV2(value);
+  }
   return { value, issues: [] };
 }
 
@@ -62,6 +66,26 @@ function migrateV1(v1: Record<string, unknown>): Record<string, unknown> {
           inboundPhases: [],
         })),
         plans: [],
+      };
+    }),
+  };
+}
+
+/** v2 → v3: intersections gain empty lane groups and counts with HCM default capacity settings. */
+function migrateV2(v2: Record<string, unknown>): Record<string, unknown> {
+  const intersections = Array.isArray(v2.intersections) ? v2.intersections : [];
+  return {
+    ...v2,
+    schemaVersion: 3,
+    intersections: intersections.map((raw) => {
+      const intersection = raw as Record<string, unknown>;
+      const patterns = Array.isArray(intersection.patterns) ? intersection.patterns : [];
+      return {
+        ...intersection,
+        patterns: patterns.map((pattern) => ({ ...(pattern as object), volumeSetId: null })),
+        capacity: { ...DEFAULT_CAPACITY },
+        laneGroups: [],
+        volumeSets: [],
       };
     }),
   };

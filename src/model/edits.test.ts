@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { newLaneGroup } from './capacity';
 import { addPhase, nextPhaseNumber, randomId, removePhase, uniqueName } from './edits';
 import { leadLagEightPhase, standardEightPhase, twoPhase } from './templates';
 import { validateIntersection } from './validate';
@@ -21,6 +22,8 @@ describe('phase edits', () => {
     const intersection = leadLagEightPhase();
     intersection.overlaps.push({ id: 'A', label: '', enabled: true, type: 'normal', includedPhases: [1, 2], modifierPhases: [1], trailGreen: 0, trailYellow: 0, trailRedClear: 0 });
     intersection.preempts.push({ number: 1, label: '', enabled: true, kind: 'railroad', trackClearancePhases: [1], trackClearance: 0, dwellPhases: [1, 2], minDwell: 0, exitPhases: [1] });
+    intersection.laneGroups.push(newLaneGroup('l1', intersection.phases[0]!), newLaneGroup('t2', intersection.phases[1]!));
+    intersection.volumeSets.push({ id: 'am', name: 'AM', peakHourFactor: 1, volumes: { l1: { left: 100, through: 0, right: 0 }, t2: { left: 0, through: 500, right: 0 } } });
     removePhase(intersection, 1);
 
     const pattern = intersection.patterns[0]!;
@@ -30,6 +33,8 @@ describe('phase edits', () => {
     expect(pattern.splits['1']).toBeUndefined();
     expect(intersection.overlaps[0]).toMatchObject({ includedPhases: [2], modifierPhases: [] });
     expect(intersection.preempts[0]).toMatchObject({ trackClearancePhases: [], dwellPhases: [2], exitPhases: [] });
+    expect(intersection.laneGroups.map((g) => g.id)).toEqual(['t2']);
+    expect(Object.keys(intersection.volumeSets[0]!.volumes)).toEqual(['t2']);
     // The only problems left are timing ones (barrier group 1 is now unbalanced), not dangling references.
     expect(validateIntersection(intersection).map((i) => i.code).filter((c) => c.includes('unknown'))).toEqual([]);
   });

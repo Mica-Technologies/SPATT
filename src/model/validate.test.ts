@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { newLaneGroup, newVolumeSet, removeLaneGroup, removeVolumeSet } from './capacity';
 import type { Issue } from './issues';
 import type { Intersection } from './schema';
 import { intersectionSchema } from './schema';
@@ -314,5 +315,51 @@ describe('overlap, preempt and schedule rules', () => {
   it('flags two schedule entries at the same time and unknown patterns', () => {
     expect(codes(issuesAfter((i) => i.schedule.push({ startMinute: 6 * 60, patternId: null })))).toEqual(['error:schedule.duplicate-start']);
     expect(codes(issuesAfter((i) => i.schedule.push({ startMinute: 12 * 60, patternId: 'nope' })))).toEqual(['error:schedule.unknown-pattern']);
+  });
+});
+
+describe('lane group and count rules', () => {
+  /** Lane groups for phases 2 (EB through) and 1 (WB left), and an AM count on both. */
+  const withCounts = (i: Intersection) => {
+    i.laneGroups.push(newLaneGroup('eb-t', phase(i, 2)), newLaneGroup('wb-l', phase(i, 1)));
+    i.volumeSets.push(newVolumeSet('am', 'AM peak', i.laneGroups));
+    pattern(i).volumeSetId = 'am';
+  };
+
+  it('accepts lane groups, a count and a pattern linked to it', () => {
+    expect(issuesAfter(withCounts)).toEqual([]);
+  });
+
+  it('makes a lane group for the serving phase’s own movement', () => {
+    const i = standardEightPhase();
+    expect(newLaneGroup('g', phase(i, 1))).toMatchObject({ label: 'WB Left', phase: 1, movements: { left: true, through: false, right: false }, lanes: 1, laneWidth: 3.6, saturationFlow: null });
+    expect(newLaneGroup('g', phase(i, 2)).movements).toEqual({ left: false, through: true, right: false });
+  });
+
+  it('flags duplicate lane group ids, unknown, pedestrian and disabled phases, no movement and wide lanes', () => {
+    expect(codes(issuesAfter((i) => { withCounts(i); i.laneGroups.push({ ...structuredClone(i.laneGroups[0]!), label: 'Copy' }); }))).toEqual(['error:laneGroup.duplicate-id']);
+    expect(codes(issuesAfter((i) => { withCounts(i); i.laneGroups[0]!.phase = 13; }))).toEqual(['error:laneGroup.unknown-phase']);
+    expect(codes(issuesAfter((i) => { withCounts(i); i.laneGroups[0]!.movements.through = false; }))).toEqual(['error:laneGroup.no-movement']);
+    const issues = issuesAfter((i) => { withCounts(i); i.laneGroups[0]!.laneWidth = 5; });
+    expect(issues).toEqual([expect.objectContaining({ code: 'laneGroup.wide-lanes', severity: 'warning', path: ['laneGroups', 0, 'laneWidth'] })]);
+    expect(codes(issuesAfter((i) => { withCounts(i); phase(i, 2).movement.kind = 'pedestrian'; }).filter((x) => x.code.startsWith('laneGroup')))).toEqual(['error:laneGroup.pedestrian-phase']);
+    expect(codes(issuesAfter((i) => { withCounts(i); phase(i, 1).enabled = false; }).filter((x) => x.code.startsWith('laneGroup')))).toEqual(['warning:laneGroup.phase-disabled']);
+  });
+
+  it('flags duplicate count ids, volumes for missing lane groups or unserved movements, and unknown pattern links', () => {
+    expect(codes(issuesAfter((i) => { withCounts(i); i.volumeSets.push(structuredClone(i.volumeSets[0]!)); }))).toEqual(['error:volumeSet.duplicate-id']);
+    expect(issuesAfter((i) => { withCounts(i); i.volumeSets[0]!.volumes['gone'] = { left: 0, through: 10, right: 0 }; })).toEqual([
+      expect.objectContaining({ code: 'volumeSet.unknown-lane-group', path: ['volumeSets', 0, 'volumes', 'gone'] }),
+    ]);
+    expect(issuesAfter((i) => { withCounts(i); i.volumeSets[0]!.volumes['eb-t']!.right = 50; })).toEqual([
+      expect.objectContaining({ code: 'volumeSet.unserved-movement', severity: 'warning', path: ['volumeSets', 0, 'volumes', 'eb-t', 'right'] }),
+    ]);
+    expect(issuesAfter((i) => { withCounts(i); pattern(i).volumeSetId = 'pm'; })).toEqual([
+      expect.objectContaining({ code: 'pattern.unknown-volume-set', path: ['patterns', 0, 'volumeSetId'] }),
+    ]);
+  });
+
+  it('removes lane groups from counts, and counts from patterns', () => {
+    expect(issuesAfter((i) => { withCounts(i); removeLaneGroup(i, 'eb-t'); expect(Object.keys(i.volumeSets[0]!.volumes)).toEqual(['wb-l']); removeVolumeSet(i, 'am'); expect(pattern(i).volumeSetId).toBeNull(); })).toEqual([]);
   });
 });

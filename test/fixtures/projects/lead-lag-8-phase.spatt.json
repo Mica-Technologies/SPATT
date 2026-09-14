@@ -1,6 +1,6 @@
 {
   "app": "spatt",
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "id": "lead-lag-8-phase",
   "name": "Main St & Side St",
   "notes": "",
@@ -356,7 +356,8 @@
             }
           ],
           "maxGreen": "max1",
-          "forceOffMode": "fixed"
+          "forceOffMode": "fixed",
+          "volumeSetId": null
         }
       ],
       "schedule": [
@@ -364,7 +365,13 @@
           "startMinute": 900,
           "patternId": "pm-peak-lead-lag"
         }
-      ]
+      ],
+      "capacity": {
+        "baseSaturationFlow": 1900,
+        "centralBusinessDistrict": false
+      },
+      "laneGroups": [],
+      "volumeSets": []
     }
   ],
   "corridors": [],

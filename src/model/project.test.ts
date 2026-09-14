@@ -44,7 +44,7 @@ describe('loadProject', () => {
   it('writes stable, diffable text', () => {
     const text = saveProject(sampleProject());
     expect(text.endsWith('}\n')).toBe(true);
-    expect(text).toContain('\n  "schemaVersion": 2,\n');
+    expect(text).toContain('\n  "schemaVersion": 3,\n');
   });
 
   it('rejects text that is not JSON', () => {
@@ -60,7 +60,7 @@ describe('loadProject', () => {
   });
 
   it('refuses files from a newer SPATT instead of misreading them', () => {
-    const result = load({ ...sampleProject(), schemaVersion: 3 });
+    const result = load({ ...sampleProject(), schemaVersion: 4 });
     expect(result.ok).toBe(false);
     expect(result.issues[0]).toMatchObject({ code: 'file.newer-version', path: ['schemaVersion'] });
   });
@@ -71,7 +71,7 @@ describe('loadProject', () => {
     const result = load(v1);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.project.schemaVersion).toBe(2);
+    expect(result.project.schemaVersion).toBe(3);
     expect(result.project.corridors).toEqual([
       {
         id: 'main-st',
@@ -85,6 +85,16 @@ describe('loadProject', () => {
       },
     ]);
     expect(result.issues.map((i) => i.code)).toEqual(['corridor.no-through-phases', 'corridor.no-through-phases']);
+  });
+
+  it('migrates a version 2 file: intersections gain HCM capacity defaults, no lane groups or counts', () => {
+    const v3 = sampleProject();
+    const v2 = {
+      ...v3,
+      schemaVersion: 2,
+      intersections: v3.intersections.map(({ capacity: _c, laneGroups: _l, volumeSets: _v, ...rest }) => ({ ...rest, patterns: rest.patterns.map(({ volumeSetId: _s, ...p }) => p) })),
+    };
+    expect(load(v2)).toEqual({ ok: true, project: v3, issues: [] });
   });
 
   it('reports shape errors with their path', () => {

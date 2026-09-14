@@ -4,6 +4,7 @@
  * Errors are plans a controller would reject or run wrongly. Warnings are legal but unusual
  * values worth a second look. Every rule has a stable code and a test in validate.test.ts.
  */
+import { validateCapacity } from './capacity';
 import { error, warning, type Issue } from './issues';
 import { formatClock } from './schedule';
 import type { Intersection, Pattern, Phase, Ring } from './schema';
@@ -86,6 +87,7 @@ export function validateIntersection(intersection: Intersection): Issue[] {
     }
   });
 
+  issues.push(...validateCapacity(intersection));
   return issues;
 }
 

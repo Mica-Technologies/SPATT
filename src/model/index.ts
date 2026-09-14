@@ -1,3 +1,4 @@
+export * from './capacity';
 export * from './corridor';
 export * from './edits';
 export * from './issues';

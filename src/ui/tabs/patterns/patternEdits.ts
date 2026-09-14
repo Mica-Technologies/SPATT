@@ -59,6 +59,7 @@ export function createPattern(intersection: Intersection): Pattern {
     sequence: null,
     maxGreen: 'max1',
     forceOffMode: 'fixed',
+    volumeSetId: null,
   };
   return pattern;
 }

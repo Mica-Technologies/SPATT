@@ -9,7 +9,7 @@
  * them back.
  */
 import { convertOffset, projectCycle } from '../../engine';
-import { error, ticksToTenths, warning, type Intersection, type Issue, type MovementKind, type OffsetReference, type Pattern, type Phase, type ScheduleEntry, type VehicleRecall } from '../../model';
+import { DEFAULT_CAPACITY, error, ticksToTenths, warning, type Intersection, type Issue, type MovementKind, type OffsetReference, type Pattern, type Phase, type ScheduleEntry, type VehicleRecall } from '../../model';
 import { CSM_SLOT_NAMES, csmPlanSchema, type CsmPhase, type CsmPlan } from './format';
 import type { CsmIntersectionExtension, CsmPhaseExtension } from './export';
 
@@ -151,6 +151,7 @@ function convertPlan(plan: CsmPlan, options: CsmImportOptions): CsmImportResult 
       sequence: null,
       maxGreen: coordinated && hasMax2 ? 'max2' : 'max1',
       forceOffMode: 'fixed',
+      volumeSetId: null,
     };
   };
 
@@ -192,6 +193,9 @@ function convertPlan(plan: CsmPlan, options: CsmImportOptions): CsmImportResult 
     overlaps: [],
     preempts: [],
     patterns,
+    capacity: { ...DEFAULT_CAPACITY },
+    laneGroups: [],
+    volumeSets: [],
     schedule,
     ...(Object.keys(extension).length > 0 ? { extensions: { csm: extension } } : {}),
   };

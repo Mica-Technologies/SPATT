@@ -1,6 +1,6 @@
 {
   "app": "spatt",
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "id": "two-phase",
   "name": "Elm St & 3rd Ave",
   "notes": "",
@@ -191,7 +191,8 @@
           },
           "sequence": null,
           "maxGreen": "max1",
-          "forceOffMode": "fixed"
+          "forceOffMode": "fixed",
+          "volumeSetId": null
         }
       ],
       "schedule": [
@@ -203,7 +204,13 @@
           "startMinute": 1320,
           "patternId": null
         }
-      ]
+      ],
+      "capacity": {
+        "baseSaturationFlow": 1900,
+        "centralBusinessDistrict": false
+      },
+      "laneGroups": [],
+      "volumeSets": []
     }
   ],
   "corridors": [],

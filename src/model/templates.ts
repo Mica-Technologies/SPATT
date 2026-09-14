@@ -4,6 +4,7 @@
  */
 import type { Approach, Intersection, MovementKind, Pattern, Phase, Project, Ring } from './schema';
 import { PROJECT_SCHEMA_VERSION } from './schema';
+import { DEFAULT_CAPACITY } from './capacity';
 
 interface PhaseOptions {
   label: string;
@@ -78,6 +79,7 @@ export function coordinatedPattern(id: string, name: string, cycle: number, spli
     sequence: null,
     maxGreen: 'max1',
     forceOffMode: 'fixed',
+    volumeSetId: null,
   };
 }
 
@@ -92,6 +94,9 @@ function intersection(id: string, name: string, phases: Phase[], rings: Ring[], 
     preempts: [],
     patterns,
     schedule: patterns.length > 0 ? [{ startMinute: 6 * 60, patternId: patterns[0]!.id }, { startMinute: 22 * 60, patternId: null }] : [],
+    capacity: { ...DEFAULT_CAPACITY },
+    laneGroups: [],
+    volumeSets: [],
   };
 }
 

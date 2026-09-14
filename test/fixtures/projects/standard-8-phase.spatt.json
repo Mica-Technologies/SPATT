@@ -1,6 +1,6 @@
 {
   "app": "spatt",
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "id": "standard-8-phase",
   "name": "Main St & Side St",
   "notes": "",
@@ -331,7 +331,8 @@
           },
           "sequence": null,
           "maxGreen": "max1",
-          "forceOffMode": "fixed"
+          "forceOffMode": "fixed",
+          "volumeSetId": null
         }
       ],
       "schedule": [
@@ -343,7 +344,13 @@
           "startMinute": 1320,
           "patternId": null
         }
-      ]
+      ],
+      "capacity": {
+        "baseSaturationFlow": 1900,
+        "centralBusinessDistrict": false
+      },
+      "laneGroups": [],
+      "volumeSets": []
     }
   ],
   "corridors": [],

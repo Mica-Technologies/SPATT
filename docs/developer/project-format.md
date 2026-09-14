@@ -19,7 +19,7 @@ in `src/model/schema.ts`; this page explains it. Example files for every templat
 
 ```text
 Project
-├── app: "spatt", schemaVersion: 2, id, name, notes
+├── app: "spatt", schemaVersion: 3, id, name, notes
 ├── units: { length: ft | m | block, speed: mph | km/h | block/s }
 ├── intersections[]
 │   ├── id, name, notes
@@ -33,8 +33,15 @@ Project
 │   ├── overlaps[]      id, type, includedPhases, modifierPhases, trail timing
 │   ├── preempts[]      track clearance, dwell and exit phases
 │   ├── patterns[]      id, name, mode, cycle, offset, offsetReference, coordinatedPhases,
-│   │                   splits { "phase": tenths }, sequence, maxGreen, forceOffMode
-│   └── schedule[]      { startMinute, patternId | null }   null runs free
+│   │                   splits { "phase": tenths }, sequence, maxGreen, forceOffMode,
+│   │                   volumeSetId | null
+│   ├── schedule[]      { startMinute, patternId | null }   null runs free
+│   ├── capacity        { baseSaturationFlow (pc/h/g/ln), centralBusinessDistrict }
+│   ├── laneGroups[]    id, label, phase, movements { left, through, right }, lanes,
+│   │                   laneWidth (m), heavyVehiclesPercent, gradePercent,
+│   │                   saturationFlow (veh/h of green | null = calculated)
+│   └── volumeSets[]    id, name, peakHourFactor,
+│                       volumes { laneGroupId: { left, through, right } } (veh/h)
 ├── corridors[]
 │   ├── id, name, outbound (direction of travel from the first stop to the last)
 │   ├── stops[]         intersectionId, distance (m), speed { outbound, inbound } (m/s),
@@ -54,6 +61,14 @@ carry through traffic in each direction.
 
 A corridor **plan** picks the pattern each intersection runs together, so a time-space diagram or
 offset optimization works on one plan and writes offsets back to those patterns.
+
+### Lane groups and counts
+
+A **lane group** is a set of lanes served by one phase with one saturation flow: a left-turn bay,
+the through lanes, or a shared through-and-right lane. Lefts in a lane group served by a
+left-turn phase are protected; lefts served by a through phase are permitted. A **volume set** is
+one count (an AM peak hour, say) with hourly volumes per lane group and movement. A pattern's
+`volumeSetId` names the count it is timed for and analysed against.
 
 ### Rings and barriers
 
@@ -89,6 +104,7 @@ and refuses a file with a newer version rather than misreading it.
 |---|---|
 | 1 | First format; corridors were a placeholder list of intersection ids |
 | 2 | Corridors gain stops (distance, speeds, through phases), an outbound direction and timing plans; CSM units. Version 1 corridors load as stops with 300 m links at 13.4 m/s and no plans |
+| 3 | Intersections gain capacity settings, lane groups and volume sets; patterns gain `volumeSetId`. Version 2 intersections load with a 1900 pc/h/g/ln base, no lane groups or counts, and unlinked patterns |
 
 ## Validation rules
 
@@ -132,6 +148,16 @@ reject or run incorrectly; **warnings** are legal but unusual.
 | `pattern.cycle-sum` | error | The barrier group totals add up to the cycle |
 | `schedule.duplicate-start` | error | Schedule entries start at different times |
 | `schedule.unknown-pattern` | error | Schedule entries use existing patterns |
+| `laneGroup.duplicate-id` | error | Each lane group id is used once |
+| `laneGroup.unknown-phase` | error | A lane group is served by a defined phase |
+| `laneGroup.pedestrian-phase` | error | A lane group is not served by a pedestrian phase |
+| `laneGroup.phase-disabled` | warning | A lane group's phase is enabled |
+| `laneGroup.no-movement` | error | A lane group carries at least one movement |
+| `laneGroup.wide-lanes` | warning | Lanes are at most 4.8 m wide (wider lanes are better analysed as two) |
+| `volumeSet.duplicate-id` | error | Each count id is used once |
+| `volumeSet.unknown-lane-group` | error | Counts only have volumes for existing lane groups |
+| `volumeSet.unserved-movement` | warning | Counted turns are carried by their lane group |
+| `pattern.unknown-volume-set` | error | A pattern links to an existing count |
 | `project.duplicate-intersection-id` | error | Each intersection id is used once |
 | `project.duplicate-corridor-id` | error | Each corridor id is used once |
 | `corridor.too-few-stops` | warning | A corridor has at least two intersections |

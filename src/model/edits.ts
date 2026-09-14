@@ -4,6 +4,7 @@
  * leaves dangling phase numbers behind. All functions mutate the intersection they are given
  * (the workspace store hands them a clone).
  */
+import { removeLaneGroup } from './capacity';
 import type { Intersection, MovementKind, Phase } from './schema';
 import { MAX_PHASES } from './schema';
 import { makePhase } from './templates';
@@ -62,6 +63,9 @@ export function removePhase(intersection: Intersection, number: number): void {
     preempt.trackClearancePhases = without(preempt.trackClearancePhases);
     preempt.dwellPhases = without(preempt.dwellPhases);
     preempt.exitPhases = without(preempt.exitPhases);
+  }
+  for (const group of intersection.laneGroups.filter((g) => g.phase === number)) {
+    removeLaneGroup(intersection, group.id);
   }
 }
 
