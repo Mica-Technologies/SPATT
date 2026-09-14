@@ -8,7 +8,7 @@
 import { create } from 'zustand';
 import type { Corridor, Intersection, Project } from '../../model';
 
-export type WorkspaceTab = 'phases' | 'rings' | 'patterns' | 'schedule';
+export type WorkspaceTab = 'phases' | 'rings' | 'patterns' | 'schedule' | 'volumes';
 
 /** The editor, or the printable timing sheet preview. */
 export type WorkspaceView = 'editor' | 'sheet';

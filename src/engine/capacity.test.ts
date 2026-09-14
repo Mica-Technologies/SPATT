@@ -130,9 +130,14 @@ describe('analyzePattern', () => {
 });
 
 describe('suggestTiming', () => {
+  const withoutPedestrians = (i: Intersection) => {
+    for (const p of i.phases) p.pedestrian.enabled = false;
+    return i;
+  };
+
   it('gives the Webster cycle with green in proportion to critical flow ratios', () => {
     // 45 s, 33 s of green: 330 × 0.27643/0.48695 = 187.33 → 187, 142.67 → 143 tenths; + 6 s lost each.
-    const i = counted();
+    const i = withoutPedestrians(counted());
     const result = suggestTiming(i, 'all-day');
     if (!result.ok) throw new Error(result.reason);
     expect(result).toMatchObject({ cycle: 450, limitedBy: null, splits: { 2: 247, 4: 203, 6: 247, 8: 203 } });
@@ -140,15 +145,27 @@ describe('suggestTiming', () => {
     expect(validateIntersection(i).filter((x) => x.severity === 'error')).toEqual([]);
   });
 
+  it('makes room for pedestrian intervals, recalled or not', () => {
+    // Walk 7 s + clearance 16 s (EB/WB) or 12 s (NB/SB) + 6 s: minimums of 29 s and 25 s, so 54 s.
+    // 42 s of green: 238.4 → 238 and 181.6 → 182 tenths; SB's 24.2 s rises to 25 s and the 0.8 s comes
+    // off the coordinated EB/WB phases, which are left at their 29 s minimum.
+    const i = counted();
+    const result = suggestTiming(i, 'all-day');
+    expect(result).toMatchObject({ ok: true, cycle: 540, limitedBy: 'phase-minimums', splits: { 2: 290, 4: 250, 6: 290, 8: 250 } });
+    if (!result.ok) return;
+    i.patterns.push(suggestedPattern(i.patterns[0]!, result, 'am-suggested', 'All Day (suggested)'));
+    expect(validateIntersection(i)).toEqual([]);
+  });
+
   it('keeps the cycle within bounds and above the phase minimums', () => {
-    const light = counted();
+    const light = withoutPedestrians(counted());
     for (const v of Object.values(light.volumeSets[0]!.volumes)) v.through = 50;
     // Webster ≈ 25 s, raised to the 40 s default minimum.
     expect(suggestTiming(light, 'all-day')).toMatchObject({ ok: true, cycle: 400, limitedBy: 'minimum' });
     // With a 20 s minimum, the two 16 s split floors (10 s minimum green + 6 s) win: 32 s.
     expect(suggestTiming(light, 'all-day', { minCycle: 200 })).toMatchObject({ ok: true, cycle: 320, limitedBy: 'phase-minimums' });
 
-    const heavy = counted();
+    const heavy = withoutPedestrians(counted());
     heavy.volumeSets[0]!.volumes['sb']!.through = 1500;
     expect(suggestTiming(heavy, 'all-day')).toMatchObject({ ok: true, cycle: 1800, limitedBy: 'oversaturated' });
   });

@@ -159,6 +159,69 @@ export function MeasureInput({ path, label, value, toDisplay, fromDisplay, onCom
   );
 }
 
+interface NumberInputProps extends BaseProps {
+  value: number | null;
+  onCommit: (value: number | null) => void;
+  min: number;
+  max: number;
+  /** Round to whole numbers on commit. */
+  integer?: boolean;
+  /** Allow an empty field, committed as `null`. */
+  optional?: boolean;
+  /** Shown in an empty optional field. */
+  placeholder?: string;
+}
+
+/** A plain number within a range (lanes, percentages, volumes). Out-of-range entries are refused. */
+export function NumberInput({ path, label, value, onCommit, min, max, integer, optional, placeholder, issues = [], disabled, style }: NumberInputProps) {
+  const display = value === null ? '' : String(value);
+  const [draft, setDraft] = useState(display);
+  const [shown, setShown] = useState(display);
+  if (shown !== display) {
+    setShown(display);
+    setDraft(display);
+  }
+  const parse = (text: string): number | null | undefined => {
+    const trimmed = text.trim().replace(',', '.');
+    if (trimmed === '') return optional ? null : undefined;
+    const number = Number(trimmed);
+    if (!Number.isFinite(number)) return undefined;
+    const rounded = integer ? Math.round(number) : number;
+    return rounded >= min && rounded <= max ? rounded : undefined;
+  };
+  const commit = () => {
+    const parsed = parse(draft);
+    if (parsed === undefined || parsed === value) {
+      setDraft(display);
+      return;
+    }
+    onCommit(parsed);
+  };
+  return withIssues(
+    issues,
+    <Input
+      id={fieldId(path)}
+      aria-label={label}
+      inputMode={integer && min >= 0 ? 'numeric' : 'decimal'}
+      value={draft}
+      disabled={disabled}
+      placeholder={placeholder ?? (optional ? '—' : undefined)}
+      data-severity={worstSeverity(issues) ?? undefined}
+      data-invalid={parse(draft) === undefined || undefined}
+      style={{ textAlign: 'right', fontFamily: fontFamilyMono, ...style }}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') event.currentTarget.blur();
+        if (event.key === 'Escape') {
+          setDraft(display);
+          event.currentTarget.blur();
+        }
+      }}
+    />,
+  );
+}
+
 interface TextInputProps extends BaseProps {
   value: string;
   onCommit: (value: string) => void;

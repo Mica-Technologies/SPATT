@@ -298,10 +298,13 @@ export type SuggestedTiming =
 
 /**
  * A cycle and splits for a coordinated pattern from its count: Webster's cycle within
- * [minCycle, maxCycle] and at least the critical path of split floors, then each barrier group's
+ * [minCycle, maxCycle] and at least the critical path of phase minimums, then each barrier group's
  * effective green in proportion to its critical flow ratio, and each ring's time in the group in
- * proportion to its phases' flow ratios. Splits are finally brought to their floors and the cycle by
- * `balanceSplits`, so they satisfy the same rules as hand-entered ones.
+ * proportion to its phases' flow ratios. Splits are finally brought to their minimums and the cycle
+ * by `balanceSplits`, so they satisfy the same rules as hand-entered ones.
+ *
+ * A phase's minimum here includes its pedestrian interval whenever it has pedestrian service, with
+ * or without recall: a suggested plan should be able to serve a pedestrian call in coordination.
  */
 export function suggestTiming(intersection: Intersection, patternId: string, options: SuggestOptions = {}): SuggestedTiming {
   const { minCycle = SUGGEST_MIN_CYCLE, maxCycle = SUGGEST_MAX_CYCLE } = options;
@@ -314,7 +317,9 @@ export function suggestTiming(intersection: Intersection, patternId: string, opt
   const sequence = effectiveSequence(pattern, intersection.rings);
   const critical = criticalAnalysis(intersection, set, sequence);
   if (critical.flowRatio === 0) return { ok: false, reason: 'no-volumes' };
-  const phases = new Map(intersection.phases.map((p) => [p.number, p]));
+  // Balancing treats pedestrian service as recalled, so splits are raised to the pedestrian minimum.
+  const pedestrianFloors = intersection.phases.map((p) => (p.pedestrian.enabled ? { ...p, pedestrian: { ...p.pedestrian, recall: true } } : p));
+  const phases = new Map(pedestrianFloors.map((p) => [p.number, p]));
   const enabled = (n: number) => phases.get(n)?.enabled === true;
 
   const floorCycle = critical.groups.reduce((sum, g) => {
@@ -341,7 +346,7 @@ export function suggestTiming(intersection: Intersection, patternId: string, opt
       inGroup.forEach((n, i) => (splits[String(n)] = shares[i]! + lostTime(phases.get(n)!)));
     }
   });
-  const trial: Intersection = { ...intersection, patterns: [{ ...pattern, cycle, splits }] };
+  const trial: Intersection = { ...intersection, phases: pedestrianFloors, patterns: [{ ...pattern, cycle, splits }] };
   return { ok: true, cycle, splits: balanceSplits(trial, pattern.id), critical, limitedBy };
 }
 

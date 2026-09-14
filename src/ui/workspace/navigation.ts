@@ -8,6 +8,9 @@ const TAB_FOR_SECTION: Record<string, WorkspaceTab> = {
   rings: 'rings',
   patterns: 'patterns',
   schedule: 'schedule',
+  capacity: 'volumes',
+  laneGroups: 'volumes',
+  volumeSets: 'volumes',
 };
 
 /** Opens the editor that owns a project path and asks it to focus the field. */

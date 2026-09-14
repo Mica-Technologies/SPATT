@@ -20,6 +20,9 @@ const SECTION_LABEL: Record<string, string> = {
   rings: 'Rings & Barriers',
   patterns: 'Patterns',
   schedule: 'Schedule',
+  capacity: 'Volumes',
+  laneGroups: 'Volumes · Lane groups',
+  volumeSets: 'Volumes · Counts',
 };
 
 export default function ProblemsPanel() {

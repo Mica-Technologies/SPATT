@@ -128,6 +128,16 @@ export default function PatternSettings({ intersection, pattern, path, issues, p
         <Field label="Max green" path={p('maxGreen')}>
           <SelectInput path={p('maxGreen')} label="Max green" value={pattern.maxGreen} options={MAX_GREENS} issues={issuesFor(issues, p('maxGreen'))} onCommit={(v) => update('Max green selection', (x) => (x.maxGreen = v))} />
         </Field>
+        <Field label="Count" path={p('volumeSetId')}>
+          <SelectInput
+            path={p('volumeSetId')}
+            label="Volume count"
+            value={pattern.volumeSetId ?? ''}
+            options={[{ value: '', label: 'None' }, ...intersection.volumeSets.map((s) => ({ value: s.id, label: s.name || s.id })), ...(pattern.volumeSetId !== null && !intersection.volumeSets.some((s) => s.id === pattern.volumeSetId) ? [{ value: pattern.volumeSetId, label: 'Missing count' }] : [])]}
+            issues={issuesFor(issues, p('volumeSetId'))}
+            onCommit={(v) => update('Pattern count', (x) => (x.volumeSetId = v === '' ? null : v))}
+          />
+        </Field>
         <Field label="Force-off" path={p('forceOffMode')}>
           <SelectInput path={p('forceOffMode')} label="Force-off mode" value={pattern.forceOffMode} options={FORCE_OFF_MODES} disabled={free} issues={issuesFor(issues, p('forceOffMode'))} onCommit={(v) => update('Force-off mode', (x) => (x.forceOffMode = v))} />
         </Field>

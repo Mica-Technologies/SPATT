@@ -34,6 +34,7 @@ import PatternsTab from '../tabs/PatternsTab';
 import PhasesTab from '../tabs/PhasesTab';
 import RingsTab from '../tabs/RingsTab';
 import ScheduleTab from '../tabs/ScheduleTab';
+import VolumesTab from '../tabs/VolumesTab';
 import DiagramPanel from './DiagramPanel';
 import ProblemsPanel from './ProblemsPanel';
 import Sidebar from './Sidebar';
@@ -43,6 +44,7 @@ const TABS: { value: WorkspaceTab; label: string }[] = [
   { value: 'rings', label: 'Rings & Barriers' },
   { value: 'patterns', label: 'Patterns' },
   { value: 'schedule', label: 'Schedule' },
+  { value: 'volumes', label: 'Volumes' },
 ];
 
 const SAVE_LABEL: Record<SaveStatus, string> = {
@@ -231,6 +233,7 @@ export default function Workspace() {
                 {tab === 'rings' ? <RingsTab intersection={intersection} intersectionIndex={intersectionIndex} issues={issues} /> : null}
                 {tab === 'patterns' ? <PatternsTab intersection={intersection} intersectionIndex={intersectionIndex} issues={issues} /> : null}
                 {tab === 'schedule' ? <ScheduleTab intersection={intersection} intersectionIndex={intersectionIndex} issues={issues} /> : null}
+                {tab === 'volumes' ? <VolumesTab intersection={intersection} intersectionIndex={intersectionIndex} issues={issues} /> : null}
               </Box>
             </>
           ) : (
