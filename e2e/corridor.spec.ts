@@ -104,6 +104,40 @@ test('shows progression bands on the time-space diagram and moves offsets by typ
   await expect(page.getByRole('tab', { name: 'Time-space diagram' })).toBeVisible();
 });
 
+test('optimizes offsets together with lead and lag left turns', async ({ page }) => {
+  await createProject(page, 'Lead lag');
+  await addIntersection(page, 'Standard eight-phase');
+  await addIntersection(page, 'Standard eight-phase');
+  await page.getByRole('button', { name: 'Project settings' }).click();
+  await page.getByLabel('Units').click();
+  await page.getByRole('option', { name: 'Metric (m, km/h)' }).click();
+  await page.getByRole('button', { name: 'Save' }).click();
+  await page.getByRole('button', { name: 'Add corridor' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Add corridor' }).click();
+  for (const direction of ['Outbound', 'Inbound']) {
+    const speed = page.getByLabel(`${direction} speed to Main St & Side St (2)`, { exact: true });
+    await speed.fill('36');
+    await speed.press('Enter');
+  }
+  await page.getByRole('tab', { name: 'Time-space diagram' }).click();
+
+  // 29 s of green on 2 and 6 at both, 30 s apart: offsets alone give one full band; swapping a left
+  // turn at each intersection fits both (see optimize.test.ts).
+  await page.getByRole('button', { name: 'Optimize offsets…' }).click();
+  const optimize = page.getByRole('dialog', { name: /^Optimize offsets/ });
+  await optimize.getByRole('checkbox', { name: /leading and lagging/ }).check();
+  await optimize.getByRole('button', { name: 'Optimize', exact: true }).click();
+  const results = optimize.getByRole('table', { name: 'Optimization results' });
+  await expect(results.getByRole('row', { name: /^EB band/ })).toContainText('29.0 s');
+  await expect(results.getByRole('row', { name: /^WB band/ })).toContainText('29.0 s');
+  await expect(results).toContainText('lags');
+  await optimize.getByRole('button', { name: 'Apply offsets' }).click();
+  await expect(page.getByRole('group', { name: 'EB band' })).toContainText('29.0 s');
+  await expect(page.getByRole('group', { name: 'WB band' })).toContainText('29.0 s');
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByRole('group', { name: 'WB band' })).not.toContainText('29.0 s');
+});
+
 test('builds a corridor: stops, links in project units, through phases and a timing plan', async ({ page }) => {
   await createProject(page, 'Corridor');
   await addIntersection(page, 'Standard eight-phase');

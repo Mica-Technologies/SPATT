@@ -1,11 +1,13 @@
 /**
  * Offset optimization for a corridor timing plan: choose the objective, run the search in a
- * worker, compare current and proposed offsets and bands, and apply them as one undo step.
+ * worker (optionally trying lead and lag left turns too), compare current and proposed timing and
+ * bands, and apply them as one undo step.
  */
 import { useEffect, useRef, useState } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Checkbox from '@mui/material/Checkbox';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
@@ -16,7 +18,7 @@ import Radio from '@mui/material/Radio';
 import RadioGroup from '@mui/material/RadioGroup';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { prepareOptimization, type Objective, type OptimizeResult } from '../../engine';
+import { prepareOptimization, type Objective, type OptimizeResult, type PreparedVariant } from '../../engine';
 import { formatSeconds, type Corridor, type CorridorPlan, type Project } from '../../model';
 import { useWorkspace } from '../state/workspace';
 import { fontFamilyMono } from '../theme/themePrimitives';
@@ -40,11 +42,13 @@ const REASONS = {
 export default function OptimizeDialog({ open, onClose, project, corridor, plan, labels }: OptimizeDialogProps) {
   const edit = useWorkspace((s) => s.edit);
   const [objective, setObjective] = useState<Objective>('weighted');
+  const [leadLag, setLeadLag] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
   const [result, setResult] = useState<OptimizeResult | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const worker = useRef<Worker | null>(null);
-  const prepared = open ? prepareOptimization(project, corridor, plan) : null;
+  const prepared = open ? prepareOptimization(project, corridor, plan, { leadLag }) : null;
+  const lefts = (variant: PreparedVariant | undefined) => (variant && variant.lefts.length > 0 ? variant.lefts.map((l) => `${l.phase} ${l.leads ? 'leads' : 'lags'}`).join(', ') : '—');
 
   const stop = () => {
     worker.current?.terminate();
@@ -87,11 +91,13 @@ export default function OptimizeDialog({ open, onClose, project, corridor, plan,
 
   const apply = () => {
     if (!result || !prepared?.ok) return;
-    edit(`Optimize offsets for ${plan.name}`, (p) => {
+    edit(`Optimize ${prepared.leadLag ? 'offsets and lead/lag' : 'offsets'} for ${plan.name}`, (p) => {
       prepared.stops.forEach((stop, k) => {
         const intersection = p.intersections.find((i) => i.id === stop.intersectionId);
         const pattern = intersection?.patterns.find((x) => x.id === plan.patterns[stop.intersectionId]);
-        if (pattern) pattern.offset = result.offsets[k]!;
+        if (!pattern) return;
+        pattern.offset = result.offsets[k]!;
+        if (result.variants[k]! !== 0) pattern.sequence = stop.variants[result.variants[k]!]!.sequence;
       });
     });
     close();
@@ -99,7 +105,7 @@ export default function OptimizeDialog({ open, onClose, project, corridor, plan,
 
   const cell = { px: 1, py: 0.5, borderBottom: 1, borderColor: 'divider', fontSize: 13 } as const;
   const num = { ...cell, textAlign: 'right', fontFamily: fontFamilyMono } as const;
-  const head = { ...cell, fontWeight: 500, fontSize: 12, color: 'text.secondary' } as const;
+  const head = { ...cell, textAlign: 'left', fontWeight: 500, fontSize: 12, color: 'text.secondary' } as const;
 
   return (
     <Dialog open={open} onClose={close} fullWidth maxWidth="sm" aria-labelledby="optimize-title">
@@ -117,6 +123,20 @@ export default function OptimizeDialog({ open, onClose, project, corridor, plan,
               <FormControlLabel value="weighted" control={<Radio size="small" />} label={`Widest bands, weighted ${labels.outbound} ${plan.weights.outbound} : ${labels.inbound} ${plan.weights.inbound}`} />
               <FormControlLabel value="balanced" control={<Radio size="small" />} label="Balanced: widen the narrower direction first" />
             </RadioGroup>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  size="small"
+                  checked={leadLag}
+                  disabled={progress !== null}
+                  onChange={(e) => {
+                    setLeadLag(e.target.checked);
+                    setResult(null);
+                  }}
+                />
+              }
+              label="Also try each left turn beside the coordinated phases leading and lagging (slower)"
+            />
             {progress !== null ? <LinearProgress variant="determinate" value={progress * 100} aria-label="Optimization progress" /> : null}
             {failure ? <Alert severity="error">{failure}</Alert> : null}
             {result ? (
@@ -133,6 +153,16 @@ export default function OptimizeDialog({ open, onClose, project, corridor, plan,
                       <Box component="th" sx={{ ...head, textAlign: 'right' }}>
                         Proposed
                       </Box>
+                      {prepared.leadLag ? (
+                        <>
+                          <Box component="th" sx={head}>
+                            Left turns now
+                          </Box>
+                          <Box component="th" sx={head}>
+                            Proposed
+                          </Box>
+                        </>
+                      ) : null}
                     </tr>
                   </thead>
                   <tbody>
@@ -147,6 +177,16 @@ export default function OptimizeDialog({ open, onClose, project, corridor, plan,
                         <Box component="td" sx={{ ...num, fontWeight: result.offsets[k] !== stop.currentOffset ? 600 : 400 }}>
                           {formatSeconds(result.offsets[k]!)} s
                         </Box>
+                        {prepared.leadLag ? (
+                          <>
+                            <Box component="td" sx={cell}>
+                              {lefts(stop.variants[0])}
+                            </Box>
+                            <Box component="td" sx={{ ...cell, fontWeight: result.variants[k] !== 0 ? 600 : 400 }}>
+                              {lefts(stop.variants[result.variants[k]!])}
+                            </Box>
+                          </>
+                        ) : null}
                       </tr>
                     ))}
                     {(['outbound', 'inbound'] as const).map((direction) => (
@@ -160,12 +200,13 @@ export default function OptimizeDialog({ open, onClose, project, corridor, plan,
                         <Box component="td" sx={{ ...num, fontWeight: 600, color: direction === 'outbound' ? 'primary.main' : 'warning.main' }}>
                           {formatSeconds(result.bandwidth[direction])} s
                         </Box>
+                        {prepared.leadLag ? <Box component="td" colSpan={2} sx={cell} /> : null}
                       </tr>
                     ))}
                   </tbody>
                 </Box>
                 <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.5 }}>
-                  {result.method === 'exhaustive' ? 'Every combination was checked' : 'Best of many starting points'} ({result.evaluations.toLocaleString()} evaluated). Offsets are measured to each pattern&apos;s own reference point.
+                  {result.method === 'exhaustive' ? 'Every combination was checked' : 'Best of many starting points'} ({result.evaluations.toLocaleString()} evaluated). Offsets are measured to each pattern&apos;s own reference point{prepared.leadLag ? ', in its proposed phase order' : ''}.
                 </Typography>
               </Box>
             ) : null}
@@ -175,8 +216,8 @@ export default function OptimizeDialog({ open, onClose, project, corridor, plan,
       <DialogActions>
         <Button onClick={close}>{result ? 'Cancel' : 'Close'}</Button>
         {result ? (
-          <Button variant="contained" onClick={apply} disabled={!prepared?.ok || result.offsets.every((o, k) => o === prepared.stops[k]!.currentOffset)}>
-            Apply offsets
+          <Button variant="contained" onClick={apply} disabled={!prepared?.ok || result.offsets.every((o, k) => o === prepared.stops[k]!.currentOffset && result.variants[k] === 0)}>
+            {prepared?.ok && prepared.leadLag && result.variants.some((v) => v !== 0) ? 'Apply offsets and orders' : 'Apply offsets'}
           </Button>
         ) : (
           <Button variant="contained" onClick={run} disabled={!prepared?.ok || progress !== null}>

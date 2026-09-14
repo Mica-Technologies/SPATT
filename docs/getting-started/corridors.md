@@ -102,7 +102,14 @@ best result. The random starts are seeded, so the same corridor gives the same a
 The dialog lists the current and proposed offsets and bandwidths side by side. **Apply offsets**
 writes the proposed offsets as a single undo step.
 
+Tick **Also try each left turn beside the coordinated phases leading and lagging** to search phase
+order as well. At each intersection, a ring whose coordinated barrier group holds just a left turn
+and a coordinated phase can run the left before (leading) or after (lagging) it. That is up to four
+orders per intersection. The dialog shows each intersection's left turns now and as proposed.
+Applying writes those phase orders to the patterns along with the offsets, in one undo step. The
+search is exhaustive while there are at most 500,000 combinations; beyond that it uses starting
+points. This is slower than an offset-only search.
+
 !!! note "What the search does not change"
-    Only offsets move. Cycles, splits and phase sequences, including lead/lag left-turn order,
-    are left as they are. If the plan's intersections run different cycles, give them a common
-    cycle first.
+    Cycles and splits are left as they are, and so is phase order unless lead and lag are
+    searched. If the plan's intersections run different cycles, give them a common cycle first.
