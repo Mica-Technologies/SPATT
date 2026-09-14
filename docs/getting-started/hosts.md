@@ -141,7 +141,7 @@ The service runs as a low-privilege system account and keeps its own library:
 - **Log:** the service writes `server.log` in its data folder.
 
 !!! note "Where this has been tested"
-    The Windows installers were built and tested on Windows. The Linux (systemd, XDG autostart)
+    Both modes were installed, run and removed on Windows 11. The Linux (systemd, XDG autostart)
     and macOS (launchd) installers follow the same design, but have not yet been tried on those
     systems.
 

@@ -15,7 +15,7 @@ SPATT is built in stages. Each stage ends with something usable.
 - [x] Ring-barrier diagram, cycle clock and printable timing sheets
 - [x] Network server with a shared project library, access links, conflict handling, manager
       controls and tray icon ([sharing on your network](getting-started/hosts.md))
-- [ ] Background modes: start at login, system service
+- [x] Background modes: start at login, system service ([background modes](getting-started/hosts.md#background-modes))
 - [x] CSM ASC-3 profile: capability check, plan export and import ([CSM ASC-3](profiles/csm-asc3.md))
 - [ ] Timing-plan import/export on the controller in the City Super Mod
 - [ ] Verified end to end against the controller in game

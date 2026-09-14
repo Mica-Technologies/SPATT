@@ -86,16 +86,14 @@ impl Drop for DataLock {
     }
 }
 
-/// Whether another process holds `data_dir`, without taking it.
+/// Whether another process holds `data_dir`, without taking it. Works from an account that may only
+/// read the folder (a user looking at the system service's library): a shared lock through a
+/// read-only handle is refused while another process holds the exclusive one.
 pub fn is_held(data_dir: &Path) -> bool {
-    let Ok(file) = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open(data_dir.join(LOCK_FILE))
-    else {
+    let Ok(file) = File::open(data_dir.join(LOCK_FILE)) else {
         return false;
     };
-    match file.try_lock() {
+    match file.try_lock_shared() {
         Ok(()) => {
             let _ = file.unlock();
             false

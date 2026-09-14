@@ -369,6 +369,13 @@ fn elevated_uninstall_service(
         if dir.exists() {
             std::fs::remove_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
         }
+        // The company folder above it (Windows), if SPATT was all it held.
+        if let Some(parent) = dir
+            .parent()
+            .filter(|p| p.file_name().is_some_and(|n| n == "Mica Technologies"))
+        {
+            let _ = std::fs::remove_dir(parent);
+        }
     }
     Ok(())
 }
