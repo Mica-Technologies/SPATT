@@ -47,22 +47,22 @@ export default function LibraryScreen({ hostLabel }: { hostLabel: string }) {
   useEffect(refresh, [refresh]);
 
   const openProject = async (id: string) => {
-    const result = await openFromStore(store, id);
-    if (!result) {
+    const opened = await openFromStore(store, id);
+    if (!opened) {
       refresh();
-    } else if (result.ok) {
-      open(result.project);
+    } else if (opened.result.ok) {
+      open(opened.result.project, opened.version);
     } else {
-      setProblem({ title: 'This project could not be opened.', issues: result.issues });
+      setProblem({ title: 'This project could not be opened.', issues: opened.result.issues });
     }
   };
 
   const create = async () => {
     const project = emptyProject(name.trim() || 'Untitled project', newProjectId());
-    await saveToStore(store, project);
+    const version = await saveToStore(store, project, null);
     setCreating(false);
     setName('');
-    open(project);
+    open(project, version);
   };
 
   const importFile = async () => {
@@ -77,8 +77,7 @@ export default function LibraryScreen({ hostLabel }: { hostLabel: string }) {
     }
     // An imported file gets a fresh id, so importing the same file twice never overwrites.
     const project = { ...result.project, id: newProjectId() };
-    await saveToStore(store, project);
-    open(project);
+    open(project, await saveToStore(store, project, null));
   };
 
   const remove = async () => {

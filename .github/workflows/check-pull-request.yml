@@ -45,6 +45,12 @@ jobs:
       - name: Build web UI
         run: npm run build
 
+      - name: Set up Rust (the server end-to-end spec runs spatt-server)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 

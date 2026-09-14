@@ -190,7 +190,9 @@ impl FileProjectStore {
         self.write_if(id, text, Expected::Any).map(|_| ())
     }
 
-    /// Writes the project if it is in the `expected` state, resolving with its new version.
+    /// Writes the project if it is in the `expected` state, resolving with its new version. A
+    /// conditional write of exactly the text already stored succeeds without writing, whatever
+    /// version it expected: the same save retried, or sent twice from one editor, is not a conflict.
     pub fn write_if(
         &self,
         id: &str,
@@ -202,7 +204,14 @@ impl FileProjectStore {
             .lock
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        self.check(id, expected)?;
+        let version = version_of(text);
+        if expected != Expected::Any {
+            let current = self.read(id)?.map(|stored| version_of(&stored));
+            if current.as_deref() == Some(version.as_str()) {
+                return Ok(version);
+            }
+            check_against(current, expected)?;
+        }
         fs::create_dir_all(&self.dir)?;
         let temp = self
             .dir
@@ -212,7 +221,7 @@ impl FileProjectStore {
             let _ = fs::remove_file(&temp);
         }
         result.map_err(StoreError::from)?;
-        Ok(version_of(text))
+        Ok(version)
     }
 
     /// Deletes the project. Removing a project that does not exist is not an error.
@@ -239,17 +248,7 @@ impl FileProjectStore {
         if expected == Expected::Any {
             return Ok(());
         }
-        let current = self.read(id)?.map(|text| version_of(&text));
-        let matches = match expected {
-            Expected::Any => true,
-            Expected::Absent => current.is_none(),
-            Expected::Version(version) => current.as_deref() == Some(version),
-        };
-        if matches {
-            Ok(())
-        } else {
-            Err(StoreError::Conflict { current })
-        }
+        check_against(self.read(id)?.map(|text| version_of(&text)), expected)
     }
 
     fn path_of(&self, id: &str) -> Result<PathBuf, StoreError> {
@@ -257,6 +256,20 @@ impl FileProjectStore {
             return Err(StoreError::InvalidId(id.to_owned()));
         }
         Ok(self.dir.join(format!("{id}{PROJECT_FILE_EXTENSION}")))
+    }
+}
+
+/// Whether a project at version `current` (`None`: absent) satisfies `expected`.
+fn check_against(current: Option<String>, expected: Expected<'_>) -> Result<(), StoreError> {
+    let matches = match expected {
+        Expected::Any => true,
+        Expected::Absent => current.is_none(),
+        Expected::Version(version) => current.as_deref() == Some(version),
+    };
+    if matches {
+        Ok(())
+    } else {
+        Err(StoreError::Conflict { current })
     }
 }
 
@@ -539,6 +552,13 @@ mod tests {
             store.read_versioned("p-one").unwrap(),
             Some(("two".to_owned(), v2.clone()))
         );
+
+        // The same save sent twice from v1 (or already stored text from any version) succeeds.
+        assert_eq!(
+            store.write_if("p-one", "two", Expected::Version(&v1)).unwrap(),
+            v2
+        );
+        assert_eq!(store.write_if("p-one", "two", Expected::Absent).unwrap(), v2);
 
         store.write_if("p-one", "forced", Expected::Any).unwrap();
         assert_eq!(store.read("p-one").unwrap().as_deref(), Some("forced"));

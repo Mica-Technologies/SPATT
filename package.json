@@ -16,7 +16,7 @@
     "lint": "oxlint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "e2e": "playwright test",
+    "e2e": "npm run build && playwright test",
     "check": "npm run typecheck && npm run lint && npm run test",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",

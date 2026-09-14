@@ -8,7 +8,10 @@ import RedoRoundedIcon from '@mui/icons-material/RedoRounded';
 import SyncRoundedIcon from '@mui/icons-material/SyncRounded';
 import UndoRoundedIcon from '@mui/icons-material/UndoRounded';
 import ViewSidebarRoundedIcon from '@mui/icons-material/ViewSidebarRounded';
+import Alert from '@mui/material/Alert';
+import AlertTitle from '@mui/material/AlertTitle';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
 import Tab from '@mui/material/Tab';
@@ -21,7 +24,7 @@ import AppHeader from '../components/AppHeader';
 import ClearanceDialog from '../dialogs/ClearanceDialog';
 import SheetScreen from '../sheet/SheetScreen';
 import { findFieldElement } from '../fields/paths';
-import { useAutosave, type SaveStatus } from '../state/useAutosave';
+import { useAutosave, type ConflictChoice, type SaveStatus } from '../state/useAutosave';
 import { useIntersectionIssues } from '../state/useIssues';
 import { redoLabel, selectIntersection, undoLabel, useWorkspace, type WorkspaceTab } from '../state/workspace';
 import PatternsTab from '../tabs/PatternsTab';
@@ -44,6 +47,7 @@ const SAVE_LABEL: Record<SaveStatus, string> = {
   pending: 'Unsaved changes',
   saving: 'Saving…',
   error: 'Save failed',
+  conflict: 'Changed elsewhere',
 };
 
 function isEditable(target: EventTarget | null): boolean {
@@ -60,7 +64,12 @@ export default function Workspace() {
   const undoText = useWorkspace(undoLabel);
   const redoText = useWorkspace(redoLabel);
   const { undo, redo, setTab, setView, close } = useWorkspace.getState();
-  const { status, error } = useAutosave();
+  const { status, error, conflict, resolveConflict } = useAutosave();
+  const [resolving, setResolving] = useState(false);
+  const settle = (choice: ConflictChoice) => {
+    setResolving(true);
+    void resolveConflict(choice).finally(() => setResolving(false));
+  };
   const wide = useMediaQuery('(min-width: 1280px)');
   const [diagramOpen, setDiagramOpen] = useState(true);
   const intersectionIndex = project.intersections.findIndex((i) => i.id === intersection?.id);
@@ -97,7 +106,7 @@ export default function Workspace() {
     return () => cancelAnimationFrame(frame);
   }, [focusRequest]);
 
-  const saveIcon = status === 'error' ? <ErrorOutlineRoundedIcon fontSize="small" color="error" /> : status === 'saved' ? <CloudDoneRoundedIcon fontSize="small" /> : <SyncRoundedIcon fontSize="small" />;
+  const saveIcon = status === 'error' || status === 'conflict' ? <ErrorOutlineRoundedIcon fontSize="small" color="error" /> : status === 'saved' ? <CloudDoneRoundedIcon fontSize="small" /> : <SyncRoundedIcon fontSize="small" />;
   const showDiagram = wide && diagramOpen && intersection !== null;
 
   if (view === 'sheet') {
@@ -112,7 +121,7 @@ export default function Workspace() {
         actions={
           <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
             <Tooltip title={error ?? SAVE_LABEL[status]}>
-              <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', color: status === 'error' ? 'error.main' : 'text.secondary', mr: 1 }} aria-live="polite">
+              <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', color: status === 'error' || status === 'conflict' ? 'error.main' : 'text.secondary', mr: 1 }} aria-live="polite">
                 {saveIcon}
                 <Typography variant="caption" sx={{ display: { xs: 'none', md: 'block' } }}>
                   {SAVE_LABEL[status]}
@@ -160,6 +169,29 @@ export default function Workspace() {
           </Stack>
         }
       />
+      {conflict ? (
+        <Alert
+          severity="warning"
+          square
+          sx={{ borderBottom: 1, borderColor: 'divider', alignItems: 'center' }}
+          action={
+            <Stack direction="row" spacing={1}>
+              <Button size="small" color="inherit" disabled={conflict.current === null || resolving} onClick={() => settle('theirs')}>
+                Load their version
+              </Button>
+              <Button size="small" color="inherit" disabled={resolving} onClick={() => settle('mine')}>
+                Keep mine
+              </Button>
+              <Button size="small" color="inherit" disabled={resolving} onClick={() => settle('copy')}>
+                Save mine as a copy
+              </Button>
+            </Stack>
+          }
+        >
+          <AlertTitle sx={{ mb: 0 }}>{conflict.current === null ? 'This project was deleted elsewhere' : 'This project was changed elsewhere'}</AlertTitle>
+          Saving is paused. Loading their version discards your unsaved edits; keeping yours replaces theirs.
+        </Alert>
+      ) : null}
       <Box sx={{ flexGrow: 1, minHeight: 0, display: 'grid', gridTemplateColumns: showDiagram ? '240px minmax(0, 1fr) 380px' : '240px minmax(0, 1fr)' }}>
         <Sidebar />
         <Box component="main" sx={{ display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>

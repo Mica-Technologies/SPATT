@@ -2,13 +2,13 @@
  * Project library in the browser's IndexedDB. Used when SPATT runs in a plain browser.
  * Data stays in this browser profile on this device; export a project to move it elsewhere.
  */
-import type { ProjectStore, ProjectSummary } from './store';
+import { checkExpected, versionOf, type ExpectedVersion, type ProjectStore, type ProjectSummary, type StoredProject } from './store';
 
 const DB_NAME = 'spatt';
 const DB_VERSION = 1;
 const PROJECTS = 'projects';
 
-interface StoredProject {
+interface StoredRecord {
   id: string;
   text: string;
   summary: ProjectSummary;
@@ -61,23 +61,41 @@ export class BrowserStore implements ProjectStore {
   }
 
   async list(): Promise<ProjectSummary[]> {
-    const all = (await request((await this.objects('readonly')).getAll())) as StoredProject[];
+    const all = (await request((await this.objects('readonly')).getAll())) as StoredRecord[];
     return all.map((p) => p.summary).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }
 
-  async read(id: string): Promise<string | null> {
-    const found = (await request((await this.objects('readonly')).get(id))) as StoredProject | undefined;
-    return found?.text ?? null;
+  async read(id: string): Promise<StoredProject | null> {
+    const found = (await request((await this.objects('readonly')).get(id))) as StoredRecord | undefined;
+    return found ? { text: found.text, version: versionOf(found.text) } : null;
   }
 
-  async write(id: string, text: string): Promise<void> {
-    const record: StoredProject = { id, text, summary: summaryOf(id, text) };
+  /**
+   * Checks the version and writes in one readwrite transaction, which IndexedDB runs exclusively
+   * against other tabs' writes to the same store.
+   */
+  async write(id: string, text: string, expected?: ExpectedVersion): Promise<string> {
+    const record: StoredRecord = { id, text, summary: summaryOf(id, text) };
     const objects = await this.objects('readwrite');
+    if (expected === undefined) {
+      const done = request(objects.put(record));
+      // Commit now rather than when the transaction goes idle: a write made while the page is
+      // being unloaded (autosave's pagehide flush) is otherwise aborted with the page.
+      objects.transaction.commit?.();
+      await done;
+      return versionOf(text);
+    }
+    const current = (await request(objects.get(id))) as StoredRecord | undefined;
+    try {
+      checkExpected(current ? versionOf(current.text) : null, expected, versionOf(text));
+    } catch (conflict) {
+      objects.transaction.abort();
+      throw conflict;
+    }
     const done = request(objects.put(record));
-    // Commit now rather than when the transaction goes idle: a write made while the page is
-    // being unloaded (autosave's pagehide flush) is otherwise aborted with the page.
     objects.transaction.commit?.();
     await done;
+    return versionOf(text);
   }
 
   async remove(id: string): Promise<void> {

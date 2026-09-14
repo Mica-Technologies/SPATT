@@ -79,7 +79,16 @@ export function uniqueName(base: string, taken: Iterable<string>): string {
   }
 }
 
+/**
+ * Random lowercase hex digits. Uses `crypto.getRandomValues`, which, unlike `crypto.randomUUID`,
+ * also exists on plain-http pages, such as a SPATT server opened by its network address.
+ */
+export function randomHex(digits: number): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(Math.ceil(digits / 2)));
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('').slice(0, digits);
+}
+
 /** A short random id with a prefix, e.g. `i-3f9a1c2b`. */
-export function randomId(prefix: string, random: () => string = () => crypto.randomUUID()): string {
+export function randomId(prefix: string, random: () => string = () => randomHex(8)): string {
   return `${prefix}-${random().replace(/-/g, '').slice(0, 8).toLowerCase()}`;
 }

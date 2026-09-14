@@ -6,43 +6,113 @@
 
 use std::path::PathBuf;
 
-use spatt_server::store::{FileProjectStore, ProjectSummary};
+use serde::{Deserialize, Serialize};
+use spatt_server::store::{self, FileProjectStore, ProjectSummary, StoreError};
 use tauri::{AppHandle, Manager, State, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
 
-/// The store as Tauri state, rooted at the app data folder when the app starts.
-pub struct Projects(FileProjectStore);
+/// The store as Tauri state, rooted at the app data folder when the app starts. The in-app
+/// server serves a clone of the same store, so both check and write under one lock.
+pub struct Projects(pub FileProjectStore);
 
 impl Projects {
     pub fn for_app(app: &AppHandle) -> tauri::Result<Self> {
-        Ok(Self(FileProjectStore::new(
-            app.path().app_data_dir()?.join("projects"),
-        )))
+        Ok(Self(FileProjectStore::new(spatt_server::projects_dir(
+            &app.path().app_data_dir()?,
+        ))))
+    }
+}
+
+/// Mirrors `StoredProject` in `src/io/store.ts`.
+#[derive(Serialize)]
+pub struct StoredProject {
+    text: String,
+    version: String,
+}
+
+/// Mirrors `ExpectedArg` in `src/io/tauri-store.ts`.
+#[derive(Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum Expected {
+    Any,
+    Absent,
+    Version { version: String },
+}
+
+impl Expected {
+    fn as_store(&self) -> store::Expected<'_> {
+        match self {
+            Expected::Any => store::Expected::Any,
+            Expected::Absent => store::Expected::Absent,
+            Expected::Version { version } => store::Expected::Version(version),
+        }
+    }
+}
+
+/// Mirrors `CommandError` in `src/io/tauri-store.ts`.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommandError {
+    kind: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    current: Option<Option<String>>,
+    message: String,
+}
+
+impl From<StoreError> for CommandError {
+    fn from(error: StoreError) -> Self {
+        let message = error.to_string();
+        match error {
+            StoreError::Conflict { current } => Self {
+                kind: "conflict",
+                current: Some(current),
+                message,
+            },
+            _ => Self::failed(message),
+        }
+    }
+}
+
+impl CommandError {
+    fn failed(message: impl Into<String>) -> Self {
+        Self {
+            kind: "failed",
+            current: None,
+            message: message.into(),
+        }
     }
 }
 
 /// File IO runs on the blocking pool so a slow disk never stalls the async runtime.
 async fn blocking<T: Send + 'static>(
-    job: impl FnOnce() -> Result<T, String> + Send + 'static,
-) -> Result<T, String> {
+    job: impl FnOnce() -> Result<T, StoreError> + Send + 'static,
+) -> Result<T, CommandError> {
     tauri::async_runtime::spawn_blocking(job)
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(|e| CommandError::failed(e.to_string()))?
+        .map_err(CommandError::from)
 }
 
 #[tauri::command]
-pub async fn projects_list(projects: State<'_, Projects>) -> Result<Vec<ProjectSummary>, String> {
+pub async fn projects_list(
+    projects: State<'_, Projects>,
+) -> Result<Vec<ProjectSummary>, CommandError> {
     let store = projects.0.clone();
-    blocking(move || store.list().map_err(|e| e.to_string())).await
+    blocking(move || store.list()).await
 }
 
 #[tauri::command]
 pub async fn projects_read(
     projects: State<'_, Projects>,
     id: String,
-) -> Result<Option<String>, String> {
+) -> Result<Option<StoredProject>, CommandError> {
     let store = projects.0.clone();
-    blocking(move || store.read(&id).map_err(|e| e.to_string())).await
+    blocking(move || {
+        Ok(store
+            .read_versioned(&id)?
+            .map(|(text, version)| StoredProject { text, version }))
+    })
+    .await
 }
 
 #[tauri::command]
@@ -50,15 +120,19 @@ pub async fn projects_write(
     projects: State<'_, Projects>,
     id: String,
     text: String,
-) -> Result<(), String> {
+    expected: Expected,
+) -> Result<String, CommandError> {
     let store = projects.0.clone();
-    blocking(move || store.write(&id, &text).map_err(|e| e.to_string())).await
+    blocking(move || store.write_if(&id, &text, expected.as_store())).await
 }
 
 #[tauri::command]
-pub async fn projects_remove(projects: State<'_, Projects>, id: String) -> Result<(), String> {
+pub async fn projects_remove(
+    projects: State<'_, Projects>,
+    id: String,
+) -> Result<(), CommandError> {
     let store = projects.0.clone();
-    blocking(move || store.remove(&id).map_err(|e| e.to_string())).await
+    blocking(move || store.remove(&id)).await
 }
 
 /// Asks where to save the project with the native Save dialog and writes it there. Resolves with
@@ -72,7 +146,8 @@ pub async fn project_export(
     suggested_name: String,
     text: String,
 ) -> Result<Option<String>, String> {
-    blocking(move || {
+    // The dialog blocks until the user answers, so it waits on the blocking pool too.
+    tauri::async_runtime::spawn_blocking(move || -> Result<Option<String>, String> {
         let chosen = window
             .dialog()
             .file()
@@ -89,4 +164,5 @@ pub async fn project_export(
         Ok(Some(path.display().to_string()))
     })
     .await
+    .map_err(|e| e.to_string())?
 }

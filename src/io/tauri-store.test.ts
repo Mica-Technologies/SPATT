@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { emptyProject } from '../model';
-import { openFromStore, saveToStore } from './store';
+import { ConflictError, openFromStore, saveToStore, versionOf } from './store';
 import { TauriStore } from './tauri-store';
 
 const invoke = vi.hoisted(() => vi.fn());
@@ -22,21 +22,33 @@ describe('TauriStore', () => {
 
   it('reads through projects_read, passing null through for a missing project', async () => {
     const store = new TauriStore();
-    invoke.mockResolvedValueOnce('{"name":"A"}');
-    expect(await store.read('p-a')).toBe('{"name":"A"}');
+    invoke.mockResolvedValueOnce({ text: '{"name":"A"}', version: 'v1' });
+    expect(await store.read('p-a')).toEqual({ text: '{"name":"A"}', version: 'v1' });
     expect(invoke).toHaveBeenLastCalledWith('projects_read', { id: 'p-a' });
 
     invoke.mockResolvedValueOnce(null);
     expect(await store.read('p-missing')).toBeNull();
   });
 
-  it('writes and removes through their commands', async () => {
+  it('writes with the expected version and removes through their commands', async () => {
     const store = new TauriStore();
+    invoke.mockResolvedValue('v2');
+    expect(await store.write('p-a', 'text')).toBe('v2');
+    expect(invoke).toHaveBeenLastCalledWith('projects_write', { id: 'p-a', text: 'text', expected: { kind: 'any' } });
+    await store.write('p-a', 'text', null);
+    expect(invoke).toHaveBeenLastCalledWith('projects_write', { id: 'p-a', text: 'text', expected: { kind: 'absent' } });
+    await store.write('p-a', 'text', 'v1');
+    expect(invoke).toHaveBeenLastCalledWith('projects_write', { id: 'p-a', text: 'text', expected: { kind: 'version', version: 'v1' } });
     invoke.mockResolvedValue(null);
-    await store.write('p-a', 'text');
-    expect(invoke).toHaveBeenLastCalledWith('projects_write', { id: 'p-a', text: 'text' });
     await store.remove('p-a');
     expect(invoke).toHaveBeenLastCalledWith('projects_remove', { id: 'p-a' });
+  });
+
+  it('turns a conflict command error into ConflictError', async () => {
+    invoke.mockRejectedValueOnce({ kind: 'conflict', current: 'v9', message: 'the project was changed elsewhere' });
+    const error = await new TauriStore().write('p-a', 'x', 'v1').catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ConflictError);
+    expect((error as ConflictError).current).toBe('v9');
   });
 
   it('round-trips a project through the shared store helpers', async () => {
@@ -44,21 +56,23 @@ describe('TauriStore', () => {
     invoke.mockImplementation((command: string, args?: { id: string; text?: string }) => {
       if (command === 'projects_write' && args?.text !== undefined) {
         files.set(args.id, args.text);
-        return Promise.resolve(null);
+        return Promise.resolve(versionOf(args.text));
       }
       if (command === 'projects_read' && args) {
-        return Promise.resolve(files.get(args.id) ?? null);
+        const text = files.get(args.id);
+        return Promise.resolve(text === undefined ? null : { text, version: versionOf(text) });
       }
       return Promise.reject(new Error(`unexpected ${command}`));
     });
     const store = new TauriStore();
-    await saveToStore(store, emptyProject('Corridor', 'p-corridor', new Date('2026-09-13T00:00:00.000Z')));
+    const version = await saveToStore(store, emptyProject('Corridor', 'p-corridor', new Date('2026-09-13T00:00:00.000Z')), null);
     const loaded = await openFromStore(store, 'p-corridor');
-    expect(loaded?.ok && loaded.project.name).toBe('Corridor');
+    expect(loaded?.result.ok && loaded.result.project.name).toBe('Corridor');
+    expect(loaded?.version).toBe(version);
   });
 
-  it('rejects with the command error', async () => {
-    invoke.mockRejectedValueOnce('project id "../x" cannot be stored');
-    await expect(new TauriStore().read('../x')).rejects.toBe('project id "../x" cannot be stored');
+  it('rejects with the command error message', async () => {
+    invoke.mockRejectedValueOnce({ kind: 'failed', message: 'project id "../x" cannot be stored' });
+    await expect(new TauriStore().read('../x')).rejects.toThrow('project id "../x" cannot be stored');
   });
 });

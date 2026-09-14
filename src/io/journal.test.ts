@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { emptyProject, saveProject } from '../model';
 import { journalProject, recoverJournal } from './journal';
-import type { ProjectStore } from './store';
+import { checkExpected, versionOf, type ProjectStore } from './store';
 
 class MemoryStorage implements Storage {
   private readonly items = new Map<string, string>();
@@ -30,8 +30,12 @@ function memoryStore(files: Record<string, string> = {}): ProjectStore & { files
     kind: 'browser',
     files,
     list: () => Promise.resolve([]),
-    read: (id) => Promise.resolve(files[id] ?? null),
-    write: (id, text) => Promise.resolve(void (files[id] = text)),
+    read: (id) => Promise.resolve(files[id] === undefined ? null : { text: files[id], version: versionOf(files[id]) }),
+    write: (id, text, expected) => {
+      checkExpected(files[id] === undefined ? null : versionOf(files[id]), expected, versionOf(text));
+      files[id] = text;
+      return Promise.resolve(versionOf(text));
+    },
     remove: (id) => Promise.resolve(void delete files[id]),
   };
 }
@@ -60,6 +64,24 @@ describe('journal', () => {
     expect(await recoverJournal(store, storage)).toEqual([]);
     expect(store.files['p-a']).toBe(stored);
     expect(storage.length).toBe(0);
+  });
+
+  it('drops a copy when the project changes between reading and writing it', async () => {
+    const storage = new MemoryStorage();
+    const base = memoryStore({ 'p-a': saveProject(at('p-a', '2026-09-01T00:00:00.000Z')) });
+    const store: ProjectStore = {
+      ...base,
+      // Another device saves right after the journal reads the project.
+      read: async (id) => {
+        const stored = await base.read(id);
+        base.files['p-a'] = saveProject(at('p-a', '2026-09-03T00:00:00.000Z'));
+        return stored;
+      },
+    };
+    journalProject(at('p-a', '2026-09-02T00:00:00.000Z'), storage);
+    expect(await recoverJournal(store, storage)).toEqual([]);
+    expect(storage.length).toBe(0);
+    expect(base.files['p-a']).toContain('2026-09-03');
   });
 
   it('restores a project the store does not have', async () => {

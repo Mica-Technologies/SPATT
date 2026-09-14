@@ -6,7 +6,7 @@
  * the store's to the store and clears it.
  */
 import { saveProject, type Project } from '../model';
-import type { ProjectStore } from './store';
+import { ConflictError, type ProjectStore } from './store';
 
 const PREFIX = 'spatt:unsaved:';
 
@@ -39,7 +39,9 @@ export function journalProject(project: Project, storage: Storage | null = defau
 /**
  * Writes every journal copy that is newer than the store's version of that project (or whose
  * project the store no longer has) to the store, then clears the journal. Resolves with the ids
- * written. A copy the store refuses stays in the journal for the next attempt.
+ * written. The write is conditional on the version just read, so a save from another device in
+ * the meantime wins and the copy is dropped. A copy the store refuses for another reason stays
+ * in the journal for the next attempt.
  */
 export async function recoverJournal(store: ProjectStore, storage: Storage | null = defaultStorage()): Promise<string[]> {
   if (!storage) {
@@ -55,13 +57,17 @@ export async function recoverJournal(store: ProjectStore, storage: Storage | nul
     }
     try {
       const stored = await store.read(id);
-      if (stored === null || updatedAtOf(text) > updatedAtOf(stored)) {
-        await store.write(id, text);
+      if (stored === null || updatedAtOf(text) > updatedAtOf(stored.text)) {
+        await store.write(id, text, stored?.version ?? null);
         written.push(id);
       }
       storage.removeItem(key);
     } catch (cause) {
-      console.error(`Could not recover unsaved changes to project ${id}`, cause);
+      if (cause instanceof ConflictError) {
+        storage.removeItem(key);
+      } else {
+        console.error(`Could not recover unsaved changes to project ${id}`, cause);
+      }
     }
   }
   return written;

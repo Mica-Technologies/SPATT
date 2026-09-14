@@ -30,10 +30,15 @@ export interface WorkspaceState {
   selectedPatternId: string | null;
   past: HistoryEntry[];
   future: HistoryEntry[];
+  /**
+   * The open project's version in the store, as last read or saved; `undefined` when unknown
+   * (autosave then writes unconditionally). See `ProjectStore.write`.
+   */
+  storeVersion: string | undefined;
   /** A field the UI should scroll to and focus (from the problems panel), as an issue path. */
   focusRequest: { path: (string | number)[]; nonce: number } | null;
 
-  open(project: Project): void;
+  open(project: Project, storeVersion?: string): void;
   close(): void;
   edit(label: string, recipe: (project: Project) => void): void;
   editIntersection(label: string, recipe: (intersection: Intersection, project: Project) => void): void;
@@ -44,6 +49,7 @@ export interface WorkspaceState {
   setView(view: WorkspaceView): void;
   selectPattern(id: string | null): void;
   requestFocus(path: (string | number)[]): void;
+  setStoreVersion(version: string | undefined): void;
 }
 
 const touch = (project: Project, now = new Date()): void => {
@@ -59,9 +65,10 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
   selectedPatternId: null,
   past: [],
   future: [],
+  storeVersion: undefined,
   focusRequest: null,
 
-  open(project) {
+  open(project, storeVersion) {
     const first = project.intersections[0];
     set({
       project,
@@ -72,12 +79,13 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
       view: 'editor',
       past: [],
       future: [],
+      storeVersion,
       focusRequest: null,
     });
   },
 
   close() {
-    set({ project: null, selectedIntersectionId: null, selectedPatternId: null, past: [], future: [], focusRequest: null });
+    set({ storeVersion: undefined, project: null, selectedIntersectionId: null, selectedPatternId: null, past: [], future: [], focusRequest: null });
   },
 
   edit(label, recipe) {
@@ -157,6 +165,10 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
 
   selectPattern(id) {
     set({ selectedPatternId: id });
+  },
+
+  setStoreVersion(version) {
+    set({ storeVersion: version });
   },
 
   requestFocus(path) {
