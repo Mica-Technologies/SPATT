@@ -10,6 +10,9 @@ import type { Intersection, Project } from '../../model';
 
 export type WorkspaceTab = 'phases' | 'rings' | 'patterns' | 'schedule';
 
+/** The editor, or the printable timing sheet preview. */
+export type WorkspaceView = 'editor' | 'sheet';
+
 export const HISTORY_LIMIT = 200;
 
 interface HistoryEntry {
@@ -23,6 +26,7 @@ export interface WorkspaceState {
   revision: number;
   selectedIntersectionId: string | null;
   tab: WorkspaceTab;
+  view: WorkspaceView;
   selectedPatternId: string | null;
   past: HistoryEntry[];
   future: HistoryEntry[];
@@ -37,6 +41,7 @@ export interface WorkspaceState {
   redo(): void;
   selectIntersection(id: string | null): void;
   setTab(tab: WorkspaceTab): void;
+  setView(view: WorkspaceView): void;
   selectPattern(id: string | null): void;
   requestFocus(path: (string | number)[]): void;
 }
@@ -50,6 +55,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
   revision: 0,
   selectedIntersectionId: null,
   tab: 'phases',
+  view: 'editor',
   selectedPatternId: null,
   past: [],
   future: [],
@@ -63,6 +69,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
       selectedIntersectionId: first?.id ?? null,
       selectedPatternId: first?.patterns[0]?.id ?? null,
       tab: 'phases',
+      view: 'editor',
       past: [],
       future: [],
       focusRequest: null,
@@ -142,6 +149,10 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
 
   setTab(tab) {
     set({ tab });
+  },
+
+  setView(view) {
+    set({ view });
   },
 
   selectPattern(id) {

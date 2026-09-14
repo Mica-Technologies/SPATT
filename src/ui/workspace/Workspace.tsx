@@ -3,6 +3,7 @@ import CloudDoneRoundedIcon from '@mui/icons-material/CloudDoneRounded';
 import ErrorOutlineRoundedIcon from '@mui/icons-material/ErrorOutlineRounded';
 import FileDownloadRoundedIcon from '@mui/icons-material/FileDownloadRounded';
 import FolderOpenRoundedIcon from '@mui/icons-material/FolderOpenRounded';
+import PrintRoundedIcon from '@mui/icons-material/PrintRounded';
 import RedoRoundedIcon from '@mui/icons-material/RedoRounded';
 import SyncRoundedIcon from '@mui/icons-material/SyncRounded';
 import UndoRoundedIcon from '@mui/icons-material/UndoRounded';
@@ -18,6 +19,7 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import { downloadProject } from '../../io/files';
 import AppHeader from '../components/AppHeader';
 import ClearanceDialog from '../dialogs/ClearanceDialog';
+import SheetScreen from '../sheet/SheetScreen';
 import { findFieldElement } from '../fields/paths';
 import { useAutosave, type SaveStatus } from '../state/useAutosave';
 import { useIntersectionIssues } from '../state/useIssues';
@@ -54,9 +56,10 @@ export default function Workspace() {
   const tab = useWorkspace((s) => s.tab);
   const patternId = useWorkspace((s) => s.selectedPatternId);
   const focusRequest = useWorkspace((s) => s.focusRequest);
+  const view = useWorkspace((s) => s.view);
   const undoText = useWorkspace(undoLabel);
   const redoText = useWorkspace(redoLabel);
-  const { undo, redo, setTab, close } = useWorkspace.getState();
+  const { undo, redo, setTab, setView, close } = useWorkspace.getState();
   const { status, error } = useAutosave();
   const wide = useMediaQuery('(min-width: 1280px)');
   const [diagramOpen, setDiagramOpen] = useState(true);
@@ -67,7 +70,7 @@ export default function Workspace() {
   // Ctrl/Cmd+Z and Ctrl+Y / Ctrl+Shift+Z, except while typing in a field (its own undo applies).
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!(event.ctrlKey || event.metaKey) || isEditable(event.target)) return;
+      if (useWorkspace.getState().view !== 'editor' || !(event.ctrlKey || event.metaKey) || isEditable(event.target)) return;
       const key = event.key.toLowerCase();
       if (key === 'z' && !event.shiftKey) {
         event.preventDefault();
@@ -97,6 +100,10 @@ export default function Workspace() {
   const saveIcon = status === 'error' ? <ErrorOutlineRoundedIcon fontSize="small" color="error" /> : status === 'saved' ? <CloudDoneRoundedIcon fontSize="small" /> : <SyncRoundedIcon fontSize="small" />;
   const showDiagram = wide && diagramOpen && intersection !== null;
 
+  if (view === 'sheet') {
+    return <SheetScreen project={project} selectedIntersectionId={intersection?.id ?? null} onBack={() => setView('editor')} />;
+  }
+
   return (
     <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', bgcolor: 'background.default' }}>
       <AppHeader
@@ -123,6 +130,13 @@ export default function Workspace() {
               <span>
                 <IconButton size="small" aria-label="Redo" disabled={!redoText} onClick={redo}>
                   <RedoRoundedIcon fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Tooltip title="Timing sheet">
+              <span>
+                <IconButton size="small" aria-label="Timing sheet" disabled={project.intersections.length === 0} onClick={() => setView('sheet')}>
+                  <PrintRoundedIcon fontSize="small" />
                 </IconButton>
               </span>
             </Tooltip>

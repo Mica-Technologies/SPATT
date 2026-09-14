@@ -15,36 +15,14 @@ import {
   addPhase,
   nextPhaseNumber,
   removePhase,
-  type Approach,
   type Intersection,
   type Issue,
-  type MovementKind,
   type Phase,
-  type VehicleRecall,
 } from '../../model';
 import { CheckboxInput, SecondsInput, SelectInput, TextInput } from '../fields/GridInputs';
+import { APPROACHES, MOVEMENTS, RECALLS } from '../fields/phaseOptions';
 import { fieldId, issuesFor, type FieldPath } from '../fields/paths';
 import { useWorkspace } from '../state/workspace';
-
-const APPROACHES: { value: Approach | ''; label: string }[] = [
-  { value: '', label: '—' },
-  ...(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'] as const).map((a) => ({ value: a, label: `${a}B` })),
-];
-
-const MOVEMENTS: { value: MovementKind; label: string }[] = [
-  { value: 'through', label: 'Thru' },
-  { value: 'left', label: 'Left' },
-  { value: 'right', label: 'Rt' },
-  { value: 'pedestrian', label: 'Ped' },
-  { value: 'other', label: 'Other' },
-];
-
-const RECALLS: { value: VehicleRecall; label: string }[] = [
-  { value: 'none', label: 'None' },
-  { value: 'minimum', label: 'Min' },
-  { value: 'maximum', label: 'Max' },
-  { value: 'soft', label: 'Soft' },
-];
 
 type TenthsKey = 'minGreen' | 'passage' | 'maxGreen1' | 'maxGreen2' | 'yellow' | 'redClear';
 type VolumeKey = keyof Phase['volumeDensity'];
