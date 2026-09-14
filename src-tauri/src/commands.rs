@@ -1,9 +1,12 @@
 //! Commands the manager UI calls. Keep the structs in step with `src/manager/bridge.ts`.
 
 use serde::Serialize;
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_opener::OpenerExt;
 
 use crate::platform;
+use crate::server::{LogLine, Server, ServerStatus, SettingsPatch};
+use crate::tray;
 
 const SPATT_WINDOW: &str = "spatt";
 
@@ -13,12 +16,6 @@ pub struct AppInfo {
     os: &'static str,
     arch: &'static str,
     mode: &'static str,
-}
-
-#[derive(Debug, Serialize)]
-pub struct ServerStatus {
-    running: bool,
-    url: Option<String>,
 }
 
 #[tauri::command]
@@ -32,12 +29,69 @@ pub fn app_info(app: AppHandle) -> AppInfo {
 }
 
 #[tauri::command]
-pub fn server_status() -> ServerStatus {
-    // The in-process server is not started by this build yet.
-    ServerStatus {
-        running: false,
-        url: None,
-    }
+pub fn server_status(server: State<'_, Server>) -> ServerStatus {
+    server.status()
+}
+
+#[tauri::command]
+pub async fn server_start(
+    app: AppHandle,
+    server: State<'_, Server>,
+) -> Result<ServerStatus, String> {
+    let result = server.start().await;
+    tray::changed(&app);
+    result.map(|()| server.status())
+}
+
+#[tauri::command]
+pub fn server_stop(app: AppHandle, server: State<'_, Server>) -> ServerStatus {
+    server.stop();
+    tray::changed(&app);
+    server.status()
+}
+
+#[tauri::command]
+pub async fn server_update(
+    app: AppHandle,
+    server: State<'_, Server>,
+    patch: SettingsPatch,
+) -> Result<ServerStatus, String> {
+    let result = server.update(patch).await;
+    tray::changed(&app);
+    result.map(|()| server.status())
+}
+
+#[tauri::command]
+pub async fn server_regenerate_token(
+    app: AppHandle,
+    server: State<'_, Server>,
+) -> Result<ServerStatus, String> {
+    let result = server.regenerate_token().await;
+    tray::changed(&app);
+    result.map(|()| server.status())
+}
+
+#[tauri::command]
+pub fn server_logs(server: State<'_, Server>) -> Vec<LogLine> {
+    server.logs()
+}
+
+/// Opens this computer's own URL for the server in the default browser.
+#[tauri::command]
+pub fn server_open_in_browser(app: AppHandle, server: State<'_, Server>) -> Result<(), String> {
+    app.opener()
+        .open_url(server.status().local_url, None::<&str>)
+        .map_err(|e| e.to_string())
+}
+
+/// Shows the project folder in the file manager.
+#[tauri::command]
+pub fn open_projects_folder(app: AppHandle, server: State<'_, Server>) -> Result<(), String> {
+    let dir = std::path::PathBuf::from(server.status().data_dir);
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    app.opener()
+        .open_path(dir.display().to_string(), None::<&str>)
+        .map_err(|e| e.to_string())
 }
 
 /// Focuses the SPATT window, creating it on first use.

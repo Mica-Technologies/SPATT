@@ -555,10 +555,15 @@ mod tests {
 
         // The same save sent twice from v1 (or already stored text from any version) succeeds.
         assert_eq!(
-            store.write_if("p-one", "two", Expected::Version(&v1)).unwrap(),
+            store
+                .write_if("p-one", "two", Expected::Version(&v1))
+                .unwrap(),
             v2
         );
-        assert_eq!(store.write_if("p-one", "two", Expected::Absent).unwrap(), v2);
+        assert_eq!(
+            store.write_if("p-one", "two", Expected::Absent).unwrap(),
+            v2
+        );
 
         store.write_if("p-one", "forced", Expected::Any).unwrap();
         assert_eq!(store.read("p-one").unwrap().as_deref(), Some("forced"));

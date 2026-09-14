@@ -1,19 +1,16 @@
 import { useEffect, useState } from 'react';
-import LanRoundedIcon from '@mui/icons-material/LanRounded';
 import LaunchRoundedIcon from '@mui/icons-material/LaunchRounded';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
-import Chip from '@mui/material/Chip';
 import Divider from '@mui/material/Divider';
-import FormControlLabel from '@mui/material/FormControlLabel';
 import Stack from '@mui/material/Stack';
-import Switch from '@mui/material/Switch';
 import Typography from '@mui/material/Typography';
 import AppHeader from '../ui/components/AppHeader';
 import { fontFamilyMono } from '../ui/theme/themePrimitives';
-import { getAppInfo, getServerStatus, openSpattWindow, type AppInfo, type ServerStatus } from './bridge';
+import { getAppInfo, openSpattWindow, type AppInfo } from './bridge';
+import ServerCard from './ServerCard';
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
@@ -30,11 +27,9 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 export default function ManagerApp() {
   const [info, setInfo] = useState<AppInfo | null>(null);
-  const [server, setServer] = useState<ServerStatus | null>(null);
 
   useEffect(() => {
     void getAppInfo().then(setInfo);
-    void getServerStatus().then(setServer);
   }, []);
 
   return (
@@ -59,29 +54,7 @@ export default function ManagerApp() {
           </CardContent>
         </Card>
 
-        <Card variant="outlined">
-          <CardContent>
-            <Stack spacing={1.5}>
-              <Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}>
-                <LanRoundedIcon fontSize="small" />
-                <Typography variant="h6" component="h2" sx={{ flexGrow: 1 }}>
-                  Network server
-                </Typography>
-                <Chip
-                  size="small"
-                  color={server?.running ? 'success' : 'default'}
-                  label={server?.running ? 'Running' : 'Stopped'}
-                />
-              </Stack>
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                Serves SPATT to browsers on this computer or your local network. Server controls are
-                not available in this build yet.
-              </Typography>
-              <FormControlLabel control={<Switch disabled />} label="Serve on the local network" />
-              <FormControlLabel control={<Switch disabled />} label="Run in the background" />
-            </Stack>
-          </CardContent>
-        </Card>
+        <ServerCard />
 
         <Card variant="outlined">
           <CardContent>

@@ -19,6 +19,9 @@ export default defineConfig({
     // WebView2 (Windows) and WebKitGTK are evergreen; WKWebView on older macOS is the floor.
     target: tauriPlatform === 'windows' ? 'chrome120' : ['es2022', 'safari16'],
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
+    // The UI is loaded from the app bundle or a server on the same network, never over the
+    // internet, so the shared MUI chunk being over the default 500 kB costs nothing.
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       input: {
         main: resolve(import.meta.dirname, 'index.html'),
