@@ -13,7 +13,7 @@ export type WorkspaceTab = 'phases' | 'rings' | 'patterns' | 'schedule';
 /** The editor, or the printable timing sheet preview. */
 export type WorkspaceView = 'editor' | 'sheet';
 
-export type CorridorTab = 'layout' | 'plans';
+export type CorridorTab = 'layout' | 'plans' | 'progression';
 
 export const HISTORY_LIMIT = 200;
 

@@ -9,6 +9,53 @@ test.afterEach(() => {
   expect(errors).toEqual([]);
 });
 
+test('shows progression bands on the time-space diagram and moves offsets by typing and dragging', async ({ page }) => {
+  await createProject(page, 'Green wave');
+  await addIntersection(page, 'Two-phase');
+  await addIntersection(page, 'Two-phase');
+  await page.getByRole('button', { name: 'Project settings' }).click();
+  await page.getByLabel('Units').click();
+  await page.getByRole('option', { name: 'Metric (m, km/h)' }).click();
+  await page.getByRole('button', { name: 'Save' }).click();
+
+  await page.getByRole('button', { name: 'Add corridor' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Add corridor' }).click();
+  // 300 m at 36 km/h (10 m/s) both ways: 30 s of travel.
+  for (const direction of ['Outbound', 'Inbound']) {
+    const speed = page.getByLabel(`${direction} speed to Elm St & 3rd Ave (2)`, { exact: true });
+    await speed.fill('36');
+    await speed.press('Enter');
+  }
+
+  await page.getByRole('tab', { name: 'Time-space diagram' }).click();
+  const outbound = page.getByRole('group', { name: 'EB band' });
+  const inbound = page.getByRole('group', { name: 'WB band' });
+  // Both at offset 0: EB leaves A in [0, 34) s and must reach B in [0, 34) after 30 s: 4 s.
+  await expect(outbound).toContainText('4.0 s');
+
+  // B's offset at the travel time: the whole 34 s green each way outbound, 24 s inbound.
+  const offsetB = page.getByLabel('Offset at Elm St & 3rd Ave (2)', { exact: true });
+  await offsetB.fill('30');
+  await offsetB.press('Enter');
+  await expect(outbound).toContainText('34.0 s');
+  await expect(outbound).toContainText('49 % of the cycle');
+  await expect(inbound).toContainText('24.0 s');
+
+  // Drag B to the left: the offset moves in whole seconds as one undo step.
+  const diagram = page.getByRole('img', { name: /^Time-space diagram/ });
+  const box = (await diagram.boundingBox())!;
+  const rowY = box.y + box.height * (24 / 440); // B, the last stop, is drawn at the top
+  await page.mouse.move(box.x + box.width * 0.6, rowY);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.5, rowY, { steps: 6 });
+  await page.mouse.up();
+  const moved = Number(await offsetB.inputValue());
+  expect(moved).toBeLessThan(30);
+  expect(Number.isInteger(moved)).toBe(true);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(offsetB).toHaveValue('30.0');
+});
+
 test('builds a corridor: stops, links in project units, through phases and a timing plan', async ({ page }) => {
   await createProject(page, 'Corridor');
   await addIntersection(page, 'Standard eight-phase');
