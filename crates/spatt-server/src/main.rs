@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use anyhow::Context;
 use clap::Parser;
 use spatt_server::config::{validate_token, FileConfig};
+use spatt_server::datalock::DataLock;
 use spatt_server::store::FileProjectStore;
 use spatt_server::{
     access_url, auth, default_data_dir, lan_ip, projects_dir, serve, ServerConfig, UiSource,
@@ -70,6 +71,9 @@ async fn main() -> anyhow::Result<()> {
         tracing::warn!("No access token configured; generated one for this run. Set `token` in the config file to keep it.");
     }
 
+    // One writer per library: refuse to share a folder with a running desktop app or service.
+    let _lock = DataLock::acquire(&data_dir, "spatt-server")
+        .with_context(|| format!("{}", data_dir.display()))?;
     let store = FileProjectStore::new(projects_dir(&data_dir));
     tracing::info!("Projects folder: {}", store.dir().display());
     if !bind.is_loopback() {

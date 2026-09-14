@@ -16,7 +16,7 @@ use spatt_server::store::FileProjectStore;
 use spatt_server::{access_url, auth, lan_ip, LogSink, ServerConfig, UiSource, DEFAULT_PORT};
 use tokio::sync::oneshot;
 
-const SETTINGS_FILE: &str = "server.json";
+pub const SETTINGS_FILE: &str = "server.json";
 const LOG_LINES: usize = 200;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -30,6 +30,49 @@ pub struct Settings {
     pub keep_serving_on_close: bool,
     /// The one-time notice about the tray has been shown.
     pub tray_notice_shown: bool,
+}
+
+impl Settings {
+    /// Reads `server.json` from `data_dir`: `None` if it is missing, unreadable or has a bad token.
+    pub fn read(data_dir: &std::path::Path) -> Option<Self> {
+        std::fs::read_to_string(data_dir.join(SETTINGS_FILE))
+            .ok()
+            .and_then(|text| serde_json::from_str::<Settings>(&text).ok())
+            .filter(|s| spatt_server::config::validate_token(&s.token).is_ok())
+    }
+
+    /// Reads `server.json`, or creates it with defaults (and a new token).
+    pub fn read_or_create(data_dir: &std::path::Path) -> Result<Self, String> {
+        match Self::read(data_dir) {
+            Some(settings) => Ok(settings),
+            None => {
+                let settings = Self::default();
+                settings.write(data_dir)?;
+                Ok(settings)
+            }
+        }
+    }
+
+    pub fn write(&self, data_dir: &std::path::Path) -> Result<(), String> {
+        std::fs::create_dir_all(data_dir)
+            .and_then(|()| {
+                std::fs::write(
+                    data_dir.join(SETTINGS_FILE),
+                    serde_json::to_string_pretty(self).unwrap_or_default(),
+                )
+            })
+            .map_err(|error| format!("Could not save server settings: {error}"))
+    }
+
+    /// The address to bind: every interface when sharing on the network, else this computer only.
+    pub fn bind(&self) -> SocketAddr {
+        let ip = if self.lan {
+            IpAddr::V4(Ipv4Addr::UNSPECIFIED)
+        } else {
+            IpAddr::V4(Ipv4Addr::LOCALHOST)
+        };
+        SocketAddr::new(ip, self.port)
+    }
 }
 
 impl Default for Settings {
@@ -116,10 +159,7 @@ impl Server {
     /// missing or unreadable.
     pub fn load(data_dir: PathBuf, store: FileProjectStore) -> Self {
         let settings_path = data_dir.join(SETTINGS_FILE);
-        let loaded = std::fs::read_to_string(&settings_path)
-            .ok()
-            .and_then(|text| serde_json::from_str::<Settings>(&text).ok())
-            .filter(|s| spatt_server::config::validate_token(&s.token).is_ok());
+        let loaded = Settings::read(&data_dir);
         let server = Self {
             settings_path,
             store,
@@ -136,16 +176,10 @@ impl Server {
 
     fn save(&self) {
         let settings = lock(&self.settings).clone();
-        let result =
-            std::fs::create_dir_all(self.settings_path.parent().unwrap_or(&self.settings_path))
-                .and_then(|()| {
-                    std::fs::write(
-                        &self.settings_path,
-                        serde_json::to_string_pretty(&settings).unwrap_or_default(),
-                    )
-                });
-        if let Err(error) = result {
-            self.note(format!("Could not save server settings: {error}"));
+        if let Err(error) =
+            settings.write(self.settings_path.parent().unwrap_or(&self.settings_path))
+        {
+            self.note(error);
         }
     }
 
@@ -190,15 +224,10 @@ impl Server {
             return Ok(());
         }
         let settings = self.settings();
-        let ip = if settings.lan {
-            IpAddr::V4(Ipv4Addr::UNSPECIFIED)
-        } else {
-            IpAddr::V4(Ipv4Addr::LOCALHOST)
-        };
         let log = self.log.clone();
         let sink: LogSink = Arc::new(move |line| push_line(&log, line));
         let config = ServerConfig {
-            bind: SocketAddr::new(ip, settings.port),
+            bind: settings.bind(),
             ui: UiSource::Embedded,
             store: self.store.clone(),
             token: settings.lan.then(|| settings.token.clone()),

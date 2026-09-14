@@ -27,7 +27,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import QRCode from 'qrcode';
 import { fontFamilyMono } from '../ui/theme/themePrimitives';
-import { getServerLogs, getServerStatus, onServerChanged, openInBrowser, openProjectsFolder, regenerateToken, startServer, stopServer, updateServer, type LogLine, type ServerSettingsPatch, type ServerStatus } from './bridge';
+import { getServerLogs, getServerStatus, onServerChanged, openInBrowser, openProjectsFolder, regenerateToken, startServer, stopServer, updateServer, type LogLine, type ServerSettingsPatch, type ServerStatus, type ServiceServer } from './bridge';
 
 const LOG_POLL_MS = 2000;
 const timeFormat = new Intl.DateTimeFormat(undefined, { timeStyle: 'medium' });
@@ -67,7 +67,7 @@ function AccessQr({ url }: { url: string }) {
   return svg ? <Box role="img" aria-label="QR code of the access link" sx={{ width: 148, height: 148, p: 0.5, bgcolor: 'common.white', borderRadius: 1, flexShrink: 0, '& svg': { display: 'block', width: '100%', height: '100%' } }} dangerouslySetInnerHTML={{ __html: svg }} /> : null;
 }
 
-export default function ServerCard() {
+export default function ServerCard({ service }: { service: ServiceServer | null }) {
   const [status, setStatus] = useState<ServerStatus | null>(null);
   const [logs, setLogs] = useState<LogLine[]>([]);
   const [busy, setBusy] = useState(false);
@@ -113,6 +113,27 @@ export default function ServerCard() {
 
   if (!status) {
     return null;
+  }
+
+  if (service) {
+    return (
+      <Card variant="outlined">
+        <CardContent>
+          <Stack spacing={1.5}>
+            <Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}>
+              <LanRoundedIcon fontSize="small" />
+              <Typography variant="h6" component="h2" sx={{ flexGrow: 1 }}>
+                Network server
+              </Typography>
+              <Chip size="small" color="success" label="System service" />
+            </Stack>
+            <Alert severity="info">
+              The SPATT system service is serving this computer&apos;s shared library at <Box component="span" sx={{ fontFamily: fontFamilyMono }}>{service.localUrl}</Box>, so this app&apos;s own server stays off and Open SPATT works on the service&apos;s projects. Manage the service under Run in background.
+            </Alert>
+          </Stack>
+        </CardContent>
+      </Card>
+    );
   }
 
   const portNumber = Number(port);

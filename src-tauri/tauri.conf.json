@@ -13,6 +13,7 @@
     "windows": [
       {
         "label": "manager",
+        "create": false,
         "title": "SPATT Manager",
         "url": "manager.html",
         "width": 480,

@@ -8,6 +8,7 @@
 pub mod api;
 pub mod auth;
 pub mod config;
+pub mod datalock;
 pub mod store;
 
 use std::net::{IpAddr, SocketAddr, UdpSocket};
@@ -77,6 +78,25 @@ pub const DEFAULT_PORT: u16 = 8787;
 /// `$XDG_DATA_HOME/<identifier>` or `~/Library/Application Support/<identifier>`.
 pub fn default_data_dir() -> Option<PathBuf> {
     directories::BaseDirs::new().map(|dirs| dirs.data_dir().join(APP_IDENTIFIER))
+}
+
+/// The machine-wide data folder the system service uses: `%ProgramData%\Mica Technologies\SPATT`,
+/// `/var/lib/spatt` or `/Library/Application Support/SPATT`.
+pub fn machine_data_dir() -> PathBuf {
+    #[cfg(target_os = "windows")]
+    {
+        let base = std::env::var_os("ProgramData")
+            .map_or_else(|| PathBuf::from(r"C:\ProgramData"), PathBuf::from);
+        base.join("Mica Technologies").join("SPATT")
+    }
+    #[cfg(target_os = "macos")]
+    {
+        PathBuf::from("/Library/Application Support/SPATT")
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        PathBuf::from("/var/lib/spatt")
+    }
 }
 
 /// Must match `identifier` in `src-tauri/tauri.conf.json`.

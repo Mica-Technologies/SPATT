@@ -92,21 +92,70 @@ token = "replace-with-a-long-random-string"
 
 The server logs the projects folder, the access link and every API request (never the token).
 Stop it with ++ctrl+c++. Running it as a background service is described under
-[Background modes](#background-modes-planned).
+[Background modes](#background-modes).
+
+Only one SPATT program uses a data folder at a time. `spatt-server` refuses to start on a folder the desktop app or the service already has open, and says which one holds it.
 
 !!! warning "Home networks only"
     The server speaks plain HTTP and is meant for a trusted local network. Do not expose it to the
     internet.
 
-## Background modes (planned)
+## Background modes
 
-The desktop app will be able to keep the server running without a window:
+The desktop app can keep serving projects without its window open. Choose a mode under **Run in
+background** in the manager:
 
-| Mode | Starts | Needs admin | Tray icon |
-|---|---|---|---|
-| **Start at login** | When you sign in | No | Yes, from the same process |
-| **System service** | At boot, before anyone signs in | Yes | Yes, from a small tray companion |
+| Mode | Starts | Projects | Needs administrator rights | Tray icon |
+|---|---|---|---|---|
+| **Start at login** | When you sign in | Your own library | No | Yes |
+| **System service** | At boot, before anyone signs in | A shared library for the computer | Yes | Yes, from a small companion that starts when you sign in |
 
-A system service (Windows Service, systemd unit, launchd daemon) runs outside any user session
-and cannot draw a tray icon itself, which is why that mode pairs it with a companion. Both modes
-will be available from the manager and from the command line (`--install-headless`).
+Only one mode is installed at a time; choosing one removes the other. **Off** removes whichever
+is installed.
+
+### Start at login
+
+SPATT starts with your session, without a window, and serves your projects with the settings in
+the **Network server** card. Launching SPATT again opens the manager in that same program, so
+there is never a second copy writing your files. On Windows this is an entry in your startup
+programs, which Task Manager lists under **Startup apps**.
+
+### System service
+
+The service runs as a low-privilege system account and keeps its own library:
+
+| System | Service | Library and settings |
+|---|---|---|
+| Windows | *SPATT Server* (runs as Local Service) | `%ProgramData%\Mica Technologies\SPATT` |
+| Linux | `spatt.service` (systemd, runs as the `spatt` user) | `/var/lib/spatt` |
+| macOS | `com.micatechnologies.spatt.server` (launchd daemon) | `/Library/Application Support/SPATT` |
+
+- **Installing** offers to copy your projects into the service's library. Your own copy is kept.
+- **Opening SPATT** while the service runs works on the service's library through its address on
+  this computer. The app's own server stays off.
+- **Network sharing, the port and the access token** for the service are set under **Run in
+  background**. Changing them restarts the service and asks for administrator permission.
+- **On Windows, network sharing** adds a firewall rule for SPATT's port on *private* networks
+  (home or work), never public ones. Turning sharing off, or removing the service, removes the rule.
+- **Removing** the service keeps its library unless you tick **Also delete**.
+- **Log:** the service writes `server.log` in its data folder.
+
+!!! note "Where this has been tested"
+    The Windows installers were built and tested on Windows. The Linux (systemd, XDG autostart)
+    and macOS (launchd) installers follow the same design, but have not yet been tried on those
+    systems.
+
+### From the command line
+
+```text
+spatt --status                                          what is installed and running
+spatt --install-headless --mode login                   start at login
+spatt --install-headless --mode service [--copy-library-from <data folder>]
+spatt --uninstall-headless --mode login|service [--delete-data]
+spatt --configure-service [--port N] [--lan true|false] [--regenerate-token]
+```
+
+Commands that change the service ask for administrator permission (UAC on Windows, a password
+prompt on Linux and macOS). Run from an administrator terminal, they don't ask. `spatt --headless`,
+`spatt --tray` and `spatt --service` are what the background entries run; you don't normally start
+them yourself.
