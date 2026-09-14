@@ -72,7 +72,12 @@ export class BrowserStore implements ProjectStore {
 
   async write(id: string, text: string): Promise<void> {
     const record: StoredProject = { id, text, summary: summaryOf(id, text) };
-    await request((await this.objects('readwrite')).put(record));
+    const objects = await this.objects('readwrite');
+    const done = request(objects.put(record));
+    // Commit now rather than when the transaction goes idle: a write made while the page is
+    // being unloaded (autosave's pagehide flush) is otherwise aborted with the page.
+    objects.transaction.commit?.();
+    await done;
   }
 
   async remove(id: string): Promise<void> {

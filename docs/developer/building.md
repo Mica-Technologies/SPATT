@@ -37,6 +37,7 @@ npm run tauri:dev           # desktop app with hot reload
 npm run server:dev          # spatt-server serving ./dist (run `npm run build` first)
 
 npm run check               # typecheck + lint + unit tests
+npm run e2e                 # Playwright end-to-end specs in e2e/ (starts the dev server)
 cargo test --workspace      # Rust tests
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all
@@ -45,6 +46,14 @@ npm run build               # web UI into dist/
 npm run tauri:build         # installers for the current OS into target/release/bundle/
 npm run build:linux         # Linux installers + server in Docker, into release-assets/
 ```
+
+## End-to-end tests
+
+2e/ drives the web UI in Chromium through Playwright: templates, editing, problems-panel
+navigation, undo and redo, ring moves, patterns, autosave across a reload, and export/import.
+The first run on a machine needs the browser: `npx playwright install chromium`. A running
+`npm run dev` is reused; otherwise Playwright starts one. Failures leave a trace in
+`test-results/` (`npx playwright show-trace <trace.zip>`).
 
 ## Building Linux packages on Windows or macOS
 

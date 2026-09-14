@@ -17,5 +17,5 @@
     "noUnusedParameters": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["test"]
+  "include": ["test", "e2e", "playwright.config.ts"]
 }

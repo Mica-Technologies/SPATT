@@ -21,6 +21,7 @@ npm run dev                 # web UI, http://localhost:5173 (index.html = SPATT,
 npm run tauri:dev           # desktop app
 npm run check               # typecheck + oxlint + vitest
 npx vitest run src/model/units.test.ts   # a single test file
+npm run e2e                 # Playwright specs in e2e/ (reuses a running dev server)
 cargo test --workspace
 cargo test -p spatt-server health        # a single Rust test
 cargo clippy --workspace --all-targets -- -D warnings

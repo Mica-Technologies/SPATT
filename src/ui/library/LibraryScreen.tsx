@@ -20,6 +20,7 @@ import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { pickProjectFile } from '../../io/files';
+import { recoverJournal } from '../../io/journal';
 import { newProjectId, openFromStore, saveToStore, type ProjectSummary } from '../../io/store';
 import { emptyProject, loadProject, type Issue } from '../../model';
 import AppHeader from '../components/AppHeader';
@@ -38,7 +39,9 @@ export default function LibraryScreen({ hostLabel }: { hostLabel: string }) {
   const [deleting, setDeleting] = useState<ProjectSummary | null>(null);
 
   const refresh = useCallback(() => {
-    store.list().then(setProjects, (cause: unknown) => setProblem({ title: `Could not read the project library: ${String(cause)}`, issues: [] }));
+    recoverJournal(store)
+      .then(() => store.list())
+      .then(setProjects, (cause: unknown) => setProblem({ title: `Could not read the project library: ${String(cause)}`, issues: [] }));
   }, [store]);
 
   useEffect(refresh, [refresh]);

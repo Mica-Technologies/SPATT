@@ -74,12 +74,14 @@ export function apportion(total: number, weights: readonly number[]): number[] {
  * 1. In each barrier group, every ring with enabled phases there is raised to the group's
  *    longest ring total. The difference goes to that ring's coordinated phase in the group, or
  *    to its last enabled phase in the group.
- * 2. The barrier groups are then made to fill the cycle: the remainder is added to (or taken
- *    from) the coordinated phases' group, on each serving ring's coordinated phase there, or its
- *    last phase. Time is only taken down to the phase's `splitMinimums().floor`, equally in every
- *    ring so they still reach the barrier together; whatever cannot be removed is left for
- *    validation to report. Without a usable coordinated phase, the first barrier group takes the
- *    remainder. Free patterns, and patterns without a cycle, skip this step.
+ * 2. The barrier groups are then made to fill the cycle. Spare time goes to the coordinated
+ *    phases' group, on each serving ring's coordinated phase there, or its last phase. Excess time
+ *    comes off that group first (the coordinated phase, then the ring's other phases from last to
+ *    first) and then off the other groups in order, only down to each phase's
+ *    `splitMinimums().floor` and equally in every ring, so the rings still reach each barrier
+ *    together; whatever cannot be removed is left for validation to report. Without a usable
+ *    coordinated phase, the first barrier group is used. Free patterns, and patterns without a
+ *    cycle, skip this step.
  *
  * Splits of phases that are disabled or not in the ring structure are carried over untouched.
  */
@@ -137,16 +139,35 @@ export function balanceSplits(intersection: Intersection, patternId: string): Re
     }
     return 0;
   })();
-  const targets = servingRings(sequence, coordGroup, enabled).map(target);
-  if (targets.length === 0) {
+  if (remainder > 0) {
+    for (const n of servingRings(sequence, coordGroup, enabled).map(target)) {
+      splits[String(n)] = get(n) + remainder;
+    }
     return splits;
   }
-  if (remainder < 0) {
-    const removable = Math.min(...targets.map((n) => Math.max(0, get(n) - splitMinimums(phases.get(n)!).floor)));
-    remainder = -Math.min(removable, -remainder);
-  }
-  for (const n of targets) {
-    splits[String(n)] = get(n) + remainder;
+
+  // Too long: take time off group by group (the coordinated phases' group first), the same amount
+  // from every serving ring, each ring giving from its target phase first and then from its other
+  // phases, last to first, never below a floor.
+  const spare = (n: number) => Math.max(0, get(n) - splitMinimums(phases.get(n)!).floor);
+  const givingOrder = (entry: GroupRing) => [target(entry), ...entry.phases.filter((n) => n !== target(entry)).reverse()];
+  const groupOrder = [coordGroup, ...Array.from({ length: groupCount }, (_, g) => g).filter((g) => g !== coordGroup)];
+  let excess = -remainder;
+  for (const g of groupOrder) {
+    const serving = servingRings(sequence, g, enabled);
+    if (excess === 0 || serving.length === 0) {
+      continue;
+    }
+    const take = Math.min(excess, ...serving.map((entry) => entry.phases.reduce((sum, n) => sum + spare(n), 0)));
+    for (const entry of serving) {
+      let left = take;
+      for (const n of givingOrder(entry)) {
+        const cut = Math.min(left, spare(n));
+        splits[String(n)] = get(n) - cut;
+        left -= cut;
+      }
+    }
+    excess -= take;
   }
   return splits;
 }

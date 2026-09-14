@@ -246,7 +246,7 @@ export default function PhasesTab({ intersection, intersectionIndex, issues, pha
 
   return (
     <Box sx={{ p: 2 }}>
-      <Box sx={{ overflowX: 'auto', border: 1, borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper' }}>
+      <Box sx={{ overflowX: 'auto', width: 'fit-content', maxWidth: '100%', border: 1, borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper' }}>
         <Box component="table" sx={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: 13, minWidth: LABEL_WIDTH + phases.length * COLUMN_WIDTH }}>
           <thead>
             <tr>

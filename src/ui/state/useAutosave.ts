@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { journalProject } from '../../io/journal';
 import { saveToStore } from '../../io/store';
 import { useProjectStore } from './storeContextValue';
 import { useWorkspace } from './workspace';
@@ -9,7 +10,7 @@ export const AUTOSAVE_DELAY_MS = 600;
 
 /**
  * Saves the open project to the library shortly after each change, and immediately when the page
- * is being hidden or closed.
+ * is being hidden or closed (with a synchronous journal copy, in case that write is cut off).
  */
 export function useAutosave(): { status: SaveStatus; error: string | null } {
   const store = useProjectStore();
@@ -40,6 +41,7 @@ export function useAutosave(): { status: SaveStatus; error: string | null } {
     const flush = () => {
       const current = useWorkspace.getState();
       if (current.project && current.revision !== savedRevision) {
+        journalProject(current.project);
         void saveToStore(store, current.project);
       }
     };

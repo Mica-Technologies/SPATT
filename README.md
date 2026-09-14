@@ -92,6 +92,7 @@ npm install
 npm run dev            # web UI at http://localhost:5173
 npm run tauri:dev      # desktop app with hot reload
 npm run check          # typecheck, lint, unit tests
+npm run e2e            # end-to-end specs (Playwright, Chromium)
 cargo test --workspace # Rust tests
 npm run tauri:build    # installers for this OS
 npm run build:linux    # Linux installers from any OS, in Docker

@@ -69,21 +69,36 @@ describe('balanceSplits', () => {
     expect(patternErrors(intersection)).toEqual([]);
   });
 
-  it('takes a shorter cycle from the coordinated phases, but not below their minimum', () => {
-    // 90 → 70 s wants 20 s off phases 2 and 6 (35 s each); their floor is 10 + 4 + 2 = 16 s,
-    // so they stop at 16 s and 1.0 s stays over for validation to report.
+  it('takes a shorter cycle from the coordinated phases, then the rest of their group, not below minimums', () => {
+    // 90 → 70 s: 20 s off group 1. Phases 2 and 6 (35 s, floor 10 + 4 + 2 = 16 s) give 19 s,
+    // phases 1 and 5 (15 s, floor 5 + 3.5 + 1.5 = 10 s) the last 1 s.
     const intersection = standardEightPhase();
     const splits = balanced(intersection, (p) => (p.cycle = 700));
-    expect(splits).toMatchObject({ 2: 160, 6: 160 });
-    expect(patternErrors(intersection).map((i) => i.code)).toEqual(['pattern.cycle-sum']);
+    expect(splits).toEqual({ 1: 140, 2: 160, 3: 120, 4: 280, 5: 140, 6: 160, 7: 120, 8: 280 });
+    expect(patternErrors(intersection)).toEqual([]);
   });
 
-  it('keeps pedestrian time for a phase on pedestrian recall, and every ring together', () => {
-    // Phase 2's floor is now 7 + 18 + 4 + 2 = 31 s, so only 4 s comes off, in both rings.
+  it('moves on to the next barrier group, keeping pedestrian time and every ring together', () => {
+    // Phase 2 on pedestrian recall: floor 7 + 18 + 4 + 2 = 31 s. 90 → 70 s wants 20 s off.
+    // Group 1: ring 1 can give 4 (phase 2) + 5 (phase 1) = 9 s, ring 2 gives 24, so 9 s each:
+    // ring 1 → 2 = 31, 1 = 10; ring 2 → 6 = 26, 5 = 15.
+    // Group 2 gives the other 11 s from its last phases: 4 = 28 − 11 = 17, 8 = 17.
     const intersection = standardEightPhase();
     intersection.phases[1]!.pedestrian.recall = true;
     const splits = balanced(intersection, (p) => (p.cycle = 700));
-    expect(splits).toMatchObject({ 2: 310, 6: 310 });
+    expect(splits).toEqual({ 1: 100, 2: 310, 3: 120, 4: 170, 5: 150, 6: 260, 7: 120, 8: 170 });
+    expect(patternErrors(intersection)).toEqual([]);
+  });
+
+  it('leaves what no phase can give for validation to report', () => {
+    // Every phase at its floor already: 10 + 16 + 10 + 16 = 52 s per ring, cycle 50 s.
+    const intersection = standardEightPhase();
+    const splits = balanced(intersection, (p) => {
+      p.cycle = 500;
+      p.splits = { 1: 100, 2: 160, 3: 100, 4: 160, 5: 100, 6: 160, 7: 100, 8: 160 };
+    });
+    expect(splits).toEqual({ 1: 100, 2: 160, 3: 100, 4: 160, 5: 100, 6: 160, 7: 100, 8: 160 });
+    expect(patternErrors(intersection).map((i) => i.code)).toContain('pattern.cycle-sum');
   });
 
   it('raises splits below their minimum before lining the rings up', () => {
