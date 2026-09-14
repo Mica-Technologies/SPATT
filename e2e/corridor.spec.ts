@@ -70,6 +70,20 @@ test('shows progression bands on the time-space diagram and moves offsets by typ
   await expect(inbound).toContainText('29.0 s');
   await page.getByRole('button', { name: 'Undo' }).click();
   await expect(offsetB).toHaveValue('30.0');
+
+  // The time-space sheet: the plan's bands, diagram, offsets and links, on Legal paper too.
+  await page.getByRole('button', { name: 'Time-space sheet' }).click();
+  const sheet = page.getByRole('article', { name: /^Time-space sheet, / });
+  await expect(sheet).toHaveCount(1);
+  await expect(sheet).toContainText('EB band 34.0 s (49 %)');
+  await expect(sheet).toContainText('WB band 24.0 s (34 %)');
+  await expect(sheet.getByRole('img', { name: /^Time-space diagram/ })).toBeVisible();
+  await expect(sheet.getByRole('row', { name: /^Elm St & 3rd Ave \(2\)/ })).toContainText('30.0');
+  await expect(sheet.getByRole('row', { name: /→ Elm St & 3rd Ave \(2\)/ })).toContainText('3003636');
+  await page.getByRole('button', { name: 'Legal' }).click();
+  await expect(page.getByRole('button', { name: 'Legal' })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Back to editor' }).click();
+  await expect(page.getByRole('tab', { name: 'Time-space diagram' })).toBeVisible();
 });
 
 test('builds a corridor: stops, links in project units, through phases and a timing plan', async ({ page }) => {

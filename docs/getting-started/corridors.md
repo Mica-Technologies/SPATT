@@ -63,6 +63,17 @@ Offsets are measured to each pattern's own reference point (see
 [Offset reference point](../concepts/coordination.md#offset-reference-point)). The table shows
 which reference each one uses.
 
+## Printing
+
+With a corridor open, the print button in the header opens the **time-space sheet** preview.
+Choose **This plan** or **All** plans, and **Letter**, **Legal** or **A4**. Each plan's sheet has:
+
+- the plan's cycle, the width of each band and the direction weights;
+- the time-space diagram over two cycles;
+- each intersection's pattern, cycle, offset, the reference the offset is measured to, and its
+  through phases;
+- each link's distance, progression speeds and travel times, in the project's units.
+
 ## Optimizing offsets
 
 **Optimize offsets…** searches in whole seconds for the offsets that give the best bands. The

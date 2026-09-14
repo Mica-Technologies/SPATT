@@ -30,62 +30,12 @@ import { REFERENCE_LABEL } from '../diagram/diagramText';
 import { flaggedPhases } from '../diagram/flags';
 import RingBarrierDiagram from '../diagram/RingBarrierDiagram';
 import { APPROACHES, MOVEMENTS, RECALLS, optionLabel } from '../fields/phaseOptions';
-import { fontFamilyMono } from '../theme/themePrimitives';
+import { Facts, Section, SheetFooter, SheetHeader, Table } from './sheetParts';
 
 const DIAGRAM_WIDTH = 720;
 const s = formatSeconds;
 const sec = (tenths: number) => (tenths === 0 ? '—' : s(tenths));
 const yes = (value: boolean) => (value ? 'Yes' : '');
-const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-
-const cellSx = { border: 1, borderColor: 'divider', px: 0.75, py: 0.25, textAlign: 'right', whiteSpace: 'nowrap', fontFamily: fontFamilyMono, fontVariantNumeric: 'tabular-nums' } as const;
-const headSx = { ...cellSx, textAlign: 'left', fontFamily: 'inherit', fontWeight: 500, bgcolor: 'action.hover' } as const;
-
-/** A titled block. Short sections keep together; long ones may break, but never right after the title. */
-function Section({ title, children, keepTogether = true }: { title: string; children: ReactNode; keepTogether?: boolean }) {
-  return (
-    <Box component="section" sx={{ mt: 2.5, breakInside: keepTogether ? 'avoid-page' : 'auto' }}>
-      <Typography variant="overline" component="h3" sx={{ display: 'block', breakAfter: 'avoid-page', lineHeight: 1.6, color: 'text.secondary', borderBottom: 1, borderColor: 'divider', mb: 0.75 }}>
-        {title}
-      </Typography>
-      {children}
-    </Box>
-  );
-}
-
-function Table({ head, rows, firstColumnLabel }: { head: ReactNode[]; rows: { label: string; cells: ReactNode[] }[]; firstColumnLabel: string }) {
-  return (
-    <Box component="table" sx={{ borderCollapse: 'collapse', fontSize: 10.5, width: '100%' }}>
-      <thead>
-        <tr>
-          <Box component="th" scope="col" sx={headSx}>
-            {firstColumnLabel}
-          </Box>
-          {head.map((cell, k) => (
-            <Box component="th" scope="col" key={k} sx={{ ...headSx, textAlign: 'right' }}>
-              {cell}
-            </Box>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row) => (
-          <tr key={row.label}>
-            <Box component="th" scope="row" sx={headSx}>
-              {row.label}
-            </Box>
-            {row.cells.map((cell, k) => (
-              <Box component="td" key={k} sx={cellSx}>
-                {cell}
-              </Box>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </Box>
-  );
-}
-
 function PhaseTable({ phases }: { phases: Phase[] }) {
   const row = (label: string, value: (phase: Phase) => ReactNode) => ({ label, cells: phases.map((p) => (p.enabled ? value(p) : '')) });
   const hasVolumeDensity = phases.some((p) => Object.values(p.volumeDensity).some((v) => v > 0));
@@ -157,18 +107,7 @@ function PatternBlock({ intersection, pattern }: { intersection: Intersection; p
       <Typography variant="subtitle2" component="h4">
         {pattern.name}
       </Typography>
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', columnGap: 2.5, rowGap: 0.25, fontSize: 10.5, mb: 0.75 }}>
-        {facts.map(([label, value]) => (
-          <span key={label}>
-            <Box component="span" sx={{ color: 'text.secondary' }}>
-              {label}
-            </Box>{' '}
-            <Box component="span" sx={{ fontFamily: fontFamilyMono }}>
-              {value}
-            </Box>
-          </span>
-        ))}
-      </Box>
+      <Facts facts={facts as [string, string][]} />
       {coordinated ? (
         <>
           <Table
@@ -276,21 +215,7 @@ export default function TimingSheet({ project, intersection, printedAt }: { proj
 
   return (
     <Box component="article" className="sheet-page" aria-label={`Timing sheet, ${intersection.name}`}>
-      <Box component="header" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 2, borderBottom: 2, borderColor: 'text.primary', pb: 0.75 }}>
-        <Box>
-          <Typography variant="overline" sx={{ display: 'block', lineHeight: 1.4, color: 'text.secondary' }}>
-            Signal timing sheet · {project.name}
-          </Typography>
-          <Typography variant="h5" component="h2" sx={{ fontWeight: 600 }}>
-            {intersection.name}
-          </Typography>
-        </Box>
-        <Typography variant="caption" sx={{ color: 'text.secondary', textAlign: 'right' }}>
-          Printed {dateFormat.format(printedAt)}
-          <br />
-          Edited {dateFormat.format(new Date(project.updatedAt))}
-        </Typography>
-      </Box>
+      <SheetHeader kind={`Signal timing sheet · ${project.name}`} title={intersection.name} printedAt={printedAt} editedAt={project.updatedAt} />
 
       <Section title="Phase timing (seconds)" keepTogether={false}>
         <PhaseTable phases={phases} />
@@ -353,9 +278,7 @@ export default function TimingSheet({ project, intersection, printedAt }: { proj
         </Section>
       ) : null}
 
-      <Typography component="footer" variant="caption" sx={{ display: 'block', mt: 3, pt: 0.75, borderTop: 1, borderColor: 'divider', color: 'text.secondary' }}>
-        Produced with SPATT. Not certified engineering software: check every value against local practice and the governing standards before use.
-      </Typography>
+      <SheetFooter />
     </Box>
   );
 }

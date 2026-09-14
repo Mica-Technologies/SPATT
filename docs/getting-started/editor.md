@@ -164,7 +164,7 @@ own yellow and red clearance) the panel asks you to fix those problems first.
 ![A timing sheet in the print preview](../assets/screenshots/timing-sheet.png)
 
 The print button in the header opens the timing sheet preview. Choose **This intersection** or
-**All**, and **Letter** or **A4**, then **Print** to use the system print dialog, which can also
+**All**, and **Letter**, **Legal** or **A4**, then **Print** to use the system print dialog, which can also
 save a PDF. Each sheet has:
 
 - the phase timing table, with the same fields as the Phases tab;

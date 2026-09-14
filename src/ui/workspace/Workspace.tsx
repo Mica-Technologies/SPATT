@@ -68,6 +68,7 @@ export default function Workspace() {
   const patternId = useWorkspace((s) => s.selectedPatternId);
   const focusRequest = useWorkspace((s) => s.focusRequest);
   const view = useWorkspace((s) => s.view);
+  const selectedPlanId = useWorkspace((s) => s.selectedPlanId);
   const undoText = useWorkspace(undoLabel);
   const redoText = useWorkspace(redoLabel);
   const { undo, redo, setTab, setView, close } = useWorkspace.getState();
@@ -117,7 +118,7 @@ export default function Workspace() {
   const showDiagram = wide && diagramOpen && intersection !== null && corridor === null;
 
   if (view === 'sheet') {
-    return <SheetScreen project={project} selectedIntersectionId={intersection?.id ?? null} onBack={() => setView('editor')} />;
+    return <SheetScreen project={project} selectedIntersectionId={intersection?.id ?? null} corridor={corridor} selectedPlanId={selectedPlanId} onBack={() => setView('editor')} />;
   }
 
   return (
@@ -149,9 +150,9 @@ export default function Workspace() {
                 </IconButton>
               </span>
             </Tooltip>
-            <Tooltip title="Timing sheet">
+            <Tooltip title={corridor ? 'Time-space sheet' : 'Timing sheet'}>
               <span>
-                <IconButton size="small" aria-label="Timing sheet" disabled={project.intersections.length === 0} onClick={() => setView('sheet')}>
+                <IconButton size="small" aria-label={corridor ? 'Time-space sheet' : 'Timing sheet'} disabled={corridor ? corridor.plans.length === 0 : project.intersections.length === 0} onClick={() => setView('sheet')}>
                   <PrintRoundedIcon fontSize="small" />
                 </IconButton>
               </span>
