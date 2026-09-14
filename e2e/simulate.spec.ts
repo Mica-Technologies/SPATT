@@ -47,4 +47,13 @@ test('simulates the controller against a count and plays it back', async ({ page
   await page.keyboard.press('End');
   await expect(playback.getByRole('img', { name: 'Signal playback at 20:00' })).toBeVisible();
   await expect(playback.getByRole('list', { name: 'Signals at the cursor' }).getByRole('listitem')).toHaveCount(4);
+
+  // The same run on the City Super Mod controller's logic.
+  await page.getByLabel('Controller').click();
+  await page.getByRole('option', { name: 'CSM ASC-3' }).click();
+  await page.getByRole('button', { name: 'Run' }).click();
+  const csm = page.getByRole('region', { name: 'Results · CSM ASC-3' });
+  await expect(csm).toBeVisible();
+  await expect(csm.getByRole('group', { name: 'Cycle' })).toContainText('70.0');
+  await expect(csm.getByRole('table', { name: 'Phase results' }).getByRole('row')).toHaveCount(5);
 });

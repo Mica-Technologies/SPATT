@@ -23,6 +23,8 @@ export interface ControllerInputs {
   presence: ReadonlySet<number>;
   /** Phases whose detectors saw a new vehicle this tick (arrival or discharge over the detector). */
   actuations: ReadonlySet<number>;
+  /** Vehicles waiting per phase (summed over its lane groups), for controllers that count them. */
+  queues?: ReadonlyMap<number, number>;
   /** Phases whose pushbutton was pressed this tick. */
   pedestrianPresses: ReadonlySet<number>;
 }

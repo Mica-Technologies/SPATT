@@ -104,6 +104,7 @@ nav:
       - Desktop, Network and Headless: getting-started/hosts.md
       - Using the Editor: getting-started/editor.md
       - Corridors and Green Waves: getting-started/corridors.md
+      - Simulation: getting-started/simulation.md
   - Concepts:
       - concepts/index.md
       - Rings, Barriers and Phases: concepts/ring-barrier.md

@@ -132,7 +132,7 @@ export default function SimulateTab({ intersection }: TabProps) {
             </TextField>
             <TextField select size="small" label="Controller" value={behaviour} onChange={(e) => setBehaviour(e.target.value as ControllerBehaviour)} sx={{ minWidth: 160 }}>
               {BEHAVIOURS.map((b) => (
-                <MenuItem key={b.value} value={b.value} disabled={b.value === 'csm'}>
+                <MenuItem key={b.value} value={b.value}>
                   {b.label}
                 </MenuItem>
               ))}

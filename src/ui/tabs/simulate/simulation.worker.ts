@@ -1,6 +1,7 @@
 /** Runs a signal simulation off the UI thread. */
 import { NemaController, simulate, type ControllerModel, type SimulationResult, type SimulationSettings } from '../../../engine';
 import type { Intersection } from '../../../model';
+import { csmControllerFor } from '../../../profiles/csm/controller';
 
 export type ControllerBehaviour = 'nema' | 'csm';
 
@@ -8,7 +9,10 @@ export type SimulationRequest = { intersection: Intersection; settings: Simulati
 export type SimulationMessage = { type: 'done'; result: SimulationResult } | { type: 'failed'; message: string };
 
 function controllerFor(request: SimulationRequest): ControllerModel {
-  return new NemaController(request.intersection, { patternId: request.settings.patternId });
+  if (request.behaviour === 'nema') return new NemaController(request.intersection, { patternId: request.settings.patternId });
+  const csm = csmControllerFor(request.intersection, request.settings.patternId);
+  if (!csm.ok) throw new Error(csm.message);
+  return csm.controller;
 }
 
 self.onmessage = (event: MessageEvent<SimulationRequest>) => {

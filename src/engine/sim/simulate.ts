@@ -79,7 +79,8 @@ export interface SimulationResult {
   warmUpTicks: number;
   /**
    * Cycle lengths (seconds): time between successive yields of the first coordinated phase when
-   * coordinated, otherwise between successive returns to the first barrier group.
+   * coordinated (a second yield within half a cycle, as the CSM controller can make, counts as the same
+   * cycle), otherwise between successive returns to the first barrier group.
    */
   cycle: Stat;
   phases: PhaseResult[];
@@ -120,6 +121,8 @@ export function simulate(intersection: Intersection, settings: SimulationSetting
   const phaseNumbers = [...new Set(sequence.flatMap((r) => r.groups.flat()))].filter((n) => intersection.phases.find((p) => p.number === n)?.enabled).sort((a, b) => a - b);
   const home = new Set(homeGroup(intersection, settings.patternId, sequence));
   const yieldPhase = pattern?.mode === 'coordinated' ? pattern.coordinatedPhases[0] : undefined;
+  const halfCycleTicks = pattern ? pattern.cycle : 0; // tenths × 2 ticks / 2
+  let lastBoundary = Number.NEGATIVE_INFINITY;
 
   const lanes = intersection.laneGroups.map((group) => {
     const volumes = set?.volumes[group.id] ?? { left: 0, through: 0, right: 0 };
@@ -155,12 +158,14 @@ export function simulate(intersection: Intersection, settings: SimulationSetting
   const spans: SignalSpan[] = [];
 
   const presence = new Set<number>();
+  const queues = new Map<number, number>();
   const actuations = new Set<number>();
   const presses = new Set<number>();
 
   for (let tick = 0; tick < ticks; tick++) {
     const measuring = tick >= warmUpTicks;
     presence.clear();
+    queues.clear();
     actuations.clear();
     presses.clear();
     for (const lane of lanes) {
@@ -171,6 +176,7 @@ export function simulate(intersection: Intersection, settings: SimulationSetting
         lane.next += nextArrivalTicks(random, lane.rate, TICKS_PER_SECOND);
       }
       if (lane.queue.length > 0) presence.add(lane.group.phase);
+      queues.set(lane.group.phase, (queues.get(lane.group.phase) ?? 0) + lane.queue.length);
     }
     for (const ped of pedestrians) {
       while (ped.next <= tick) {
@@ -179,7 +185,7 @@ export function simulate(intersection: Intersection, settings: SimulationSetting
       }
     }
 
-    controller.step({ tick, presence, actuations, pedestrianPresses: presses });
+    controller.step({ tick, presence, actuations, queues, pedestrianPresses: presses });
 
     // Discharge, statistics and the playback trace.
     for (const lane of lanes) {
@@ -233,8 +239,9 @@ export function simulate(intersection: Intersection, settings: SimulationSetting
     for (const t of drained) {
       if (t.tick >= warmUpTicks) terminations.get(t.phase)![t.reason]++;
     }
-    const boundary = yieldPhase === undefined ? homeActive && !homeWasActive : drained.some((t) => t.phase === yieldPhase && t.reason === 'yield');
+    const boundary = yieldPhase === undefined ? homeActive && !homeWasActive : drained.some((t) => t.phase === yieldPhase && t.reason === 'yield') && tick - lastBoundary >= halfCycleTicks;
     if (boundary) {
+      lastBoundary = tick;
       if (measuring && cycleStarts.length > 0) {
         for (const n of servedThisCycle) served.set(n, served.get(n)! + 1);
       }

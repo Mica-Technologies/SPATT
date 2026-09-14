@@ -38,5 +38,5 @@ SPATT is built in stages. Each stage ends with something usable.
 
 ## Later
 
-- Actuated operation simulation
+- [x] Actuated operation simulation: NEMA and CSM ASC-3 controller logic, playback ([simulation](getting-started/simulation.md))
 - Import from other timing tools
