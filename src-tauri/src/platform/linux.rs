@@ -25,11 +25,13 @@ pub fn is_elevated() -> bool {
 
 /// Runs `exe args` through pkexec (a graphical password prompt) and returns its exit code.
 pub fn run_elevated(exe: &Path, args: &[String]) -> Result<i32, String> {
-    let status = Command::new("pkexec")
-        .arg(exe)
-        .args(args)
-        .status()
-        .map_err(|e| format!("Could not ask for administrator permission (pkexec): {e}"))?;
+    let status = Command::new("pkexec").arg(exe).args(args).status().map_err(|e| {
+        if e.kind() == std::io::ErrorKind::NotFound {
+            "This needs administrator rights and there is no graphical password prompt (pkexec): run the same spatt command with sudo".to_owned()
+        } else {
+            format!("Could not ask for administrator permission (pkexec): {e}")
+        }
+    })?;
     Ok(status.code().unwrap_or(1))
 }
 

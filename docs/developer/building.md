@@ -71,3 +71,20 @@ than built in place, so the host's `node_modules/` and `target/` are never overw
 binaries. Cargo and npm caches persist in named Docker volumes.
 
 macOS packages can only be built on macOS; the release workflow builds both architectures there.
+
+## Testing the Linux background modes
+
+`node scripts/test-linux-background.mjs` tests start at login and the system service on Linux,
+using the `.deb` from `SPATT_BUNDLES=deb npm run build:linux`. It starts `docker/systemd-test`,
+an Ubuntu 22.04 container with systemd as PID 1, and checks that SPATT can:
+
+- install the service, serve from `/var/lib/spatt` as the `spatt` user, and be seen by an
+  ordinary user;
+- refuse a second server on the same library, and change the service's port;
+- start the service again after a reboot (the container restarts);
+- stop an ordinary user from replacing the service;
+- remove the service with its data;
+- install start at login for a user, run its autostart entry under a virtual display, log off and
+  in again, and remove it.
+
+Every check prints PASS or FAIL, and the script exits non-zero on any failure.
