@@ -61,4 +61,11 @@ test('analyses a pattern against a count and suggests timing from it', async ({ 
   await expect(page.getByLabel('Volume count', { exact: true })).toHaveValue(/count-/);
   await page.getByRole('button', { name: 'Undo' }).click();
   await expect(page.getByLabel('Cycle length', { exact: true })).toHaveValue('70.0');
+
+  // The timing sheet carries the lane groups, the count and the analysis.
+  await page.getByRole('button', { name: 'Timing sheet' }).click();
+  const sheet = page.getByRole('article', { name: /^Timing sheet, / });
+  await expect(sheet.getByRole('heading', { name: 'Lane groups, counts and capacity (HCM 2000, simplified)' })).toBeVisible();
+  await expect(sheet.getByRole('heading', { level: 4, name: /^All Day with AM peak/ })).toContainText('delay 15.9 s/veh, LOS B');
+  await expect(sheet.getByRole('heading', { level: 4, name: /^AM peak peak hour factor 1/ })).toBeVisible();
 });

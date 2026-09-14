@@ -1,13 +1,30 @@
 /**
  * One intersection's timing sheet, laid out for paper: phase timing, ring structure, each
- * pattern with its splits, force-offs and diagram, the daily schedule, unresolved problems and
- * notes. Always drawn in the light colour scheme, whatever the app's theme.
+ * pattern with its splits, force-offs and diagram, the daily schedule, lane groups, counts and
+ * capacity analysis, unresolved problems and notes. Always drawn in the light colour scheme, whatever the app's theme.
  */
 import type { ReactNode } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import { projectCycle, toLocal } from '../../engine';
-import { effectiveSequence, formatClock, formatDuration, formatSeconds, scheduleSpans, validateIntersection, type Intersection, type Pattern, type Phase, type Project } from '../../model';
+import { analyzePattern, projectCycle, saturationFlow, toLocal } from '../../engine';
+import {
+  effectiveSequence,
+  formatClock,
+  formatDuration,
+  formatMeasure,
+  formatSeconds,
+  fromMetres,
+  LENGTH_LABEL,
+  MOVEMENT_LABEL,
+  MOVEMENTS as TURNS,
+  scheduleSpans,
+  validateIntersection,
+  type Intersection,
+  type LengthUnit,
+  type Pattern,
+  type Phase,
+  type Project,
+} from '../../model';
 import CycleClock from '../diagram/CycleClock';
 import { REFERENCE_LABEL } from '../diagram/diagramText';
 import { flaggedPhases } from '../diagram/flags';
@@ -131,6 +148,7 @@ function PatternBlock({ intersection, pattern }: { intersection: Intersection; p
         ['Max green', pattern.maxGreen === 'max2' ? 'Max 2' : 'Max 1'],
         ['Force-off', pattern.forceOffMode === 'fixed' ? 'Fixed' : 'Floating'],
         ['Sequence', pattern.sequence ? sequence.map((ring, r) => `R${r + 1} ${ring.groups.map((g) => g.join(' ')).join(' | ')}`).join('; ') : 'Base'],
+        ...(pattern.volumeSetId ? [['Count', intersection.volumeSets.find((v) => v.id === pattern.volumeSetId)?.name ?? 'Missing']] : []),
       ]
     : [['Mode', 'Free (no cycle, offset or splits)']];
 
@@ -180,6 +198,72 @@ function PatternBlock({ intersection, pattern }: { intersection: Intersection; p
         </>
       ) : null}
     </Box>
+  );
+}
+
+function CapacityTables({ intersection, lengthUnit }: { intersection: Intersection; lengthUnit: LengthUnit }) {
+  const groups = intersection.laneGroups;
+  const label = (k: number) => groups[k]!.label || `Lane group ${k + 1}`;
+  return (
+    <>
+      <Typography variant="caption" component="p" sx={{ mb: 0.5 }}>
+        Base saturation flow {intersection.capacity.baseSaturationFlow} pc/h/g/ln{intersection.capacity.centralBusinessDistrict ? ', central business district' : ''}
+      </Typography>
+      <Table
+        firstColumnLabel="Lane group"
+        head={['Phase', 'Movements', 'Lanes', `Width (${LENGTH_LABEL[lengthUnit]})`, 'Heavy veh. %', 'Grade %', 'Sat. flow (veh/h)']}
+        rows={groups.map((g, k) => ({
+          label: label(k),
+          cells: [
+            g.phase,
+            TURNS.filter((m) => g.movements[m]).map((m) => MOVEMENT_LABEL[m]).join(', '),
+            g.lanes,
+            formatMeasure(fromMetres(g.laneWidth, lengthUnit)),
+            g.heavyVehiclesPercent,
+            g.gradePercent,
+            g.saturationFlow === null ? Math.round(saturationFlow(intersection, g, undefined).calculated) : `${g.saturationFlow} (entered)`,
+          ],
+        }))}
+      />
+      {intersection.volumeSets.map((set) => (
+        <Box key={set.id} sx={{ mt: 1.5, breakInside: 'avoid-page' }}>
+          <Typography variant="subtitle2" component="h4">
+            {set.name || 'Count'} <Box component="span" sx={{ fontWeight: 400, color: 'text.secondary', fontSize: 11 }}>peak hour factor {set.peakHourFactor}</Box>
+          </Typography>
+          <Table
+            firstColumnLabel="Lane group"
+            head={[...TURNS.map((m) => `${MOVEMENT_LABEL[m]} (veh/h)`), 'Total']}
+            rows={groups.map((g, k) => {
+              const v = set.volumes[g.id] ?? { left: 0, through: 0, right: 0 };
+              return { label: label(k), cells: [...TURNS.map((m) => (g.movements[m] || v[m] > 0 ? v[m] : '—')), v.left + v.through + v.right] };
+            })}
+          />
+        </Box>
+      ))}
+      {intersection.patterns.map((pattern) => {
+        const analysis = analyzePattern(intersection, pattern.id);
+        if (!analysis.ok) return null;
+        return (
+          <Box key={pattern.id} sx={{ mt: 1.5, breakInside: 'avoid-page' }}>
+            <Typography variant="subtitle2" component="h4">
+              {pattern.name} with {analysis.volumeSet.name || 'its count'}{' '}
+              <Box component="span" sx={{ fontWeight: 400, color: 'text.secondary', fontSize: 11 }}>
+                delay {analysis.delay === null ? '—' : `${analysis.delay.toFixed(1)} s/veh, LOS ${analysis.los}`} · Xc {analysis.criticalVolumeToCapacity?.toFixed(2) ?? '—'} · Y {analysis.critical.flowRatio.toFixed(3)} · Webster{' '}
+                {analysis.critical.webster === null ? 'none (Y ≥ 1)' : `${s(analysis.critical.webster)} s`}
+              </Box>
+            </Typography>
+            <Table
+              firstColumnLabel="Lane group"
+              head={['v (veh/h)', 's (veh/h)', 'g (s)', 'c (veh/h)', 'v/c', 'Delay (s)', 'LOS']}
+              rows={analysis.laneGroups.map((g, k) => ({
+                label: label(k),
+                cells: [g.flow.toFixed(0), g.saturation.value.toFixed(0), g.effectiveGreen.toFixed(1), g.capacity.toFixed(0), Number.isFinite(g.volumeToCapacity) ? g.volumeToCapacity.toFixed(2) : '—', g.delay?.toFixed(1) ?? '—', g.los ?? '—'],
+              }))}
+            />
+          </Box>
+        );
+      })}
+    </>
   );
 }
 
@@ -242,6 +326,12 @@ export default function TimingSheet({ project, intersection, printedAt }: { proj
           />
         )}
       </Section>
+
+      {intersection.laneGroups.length > 0 ? (
+        <Section title="Lane groups, counts and capacity (HCM 2000, simplified)" keepTogether={false}>
+          <CapacityTables intersection={intersection} lengthUnit={project.units.length} />
+        </Section>
+      ) : null}
 
       {issues.length > 0 ? (
         <Section title={`Problems (${errors.length} error${errors.length === 1 ? '' : 's'}, ${warnings} warning${warnings === 1 ? '' : 's'})`}>

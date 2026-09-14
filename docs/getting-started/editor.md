@@ -172,6 +172,8 @@ save a PDF. Each sheet has:
 - each pattern's cycle, offset and its reference, coordinated phases, splits, green starts and
   force-offs in local time, its ring-barrier diagram with a legend, and its cycle clock;
 - the daily schedule with end times and durations;
+- when the intersection has lane groups: the lane groups, each count, and each linked pattern's
+  capacity analysis;
 - any unresolved problems, and the intersection's notes.
 
 Sheets always print in light colours, and every intersection starts on a new page. **Back to
