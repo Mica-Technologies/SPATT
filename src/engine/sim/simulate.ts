@@ -77,7 +77,10 @@ export interface SimulationResult {
   /** Ticks simulated, warm-up included; statistics start at `warmUpTicks`. */
   ticks: number;
   warmUpTicks: number;
-  /** Cycle lengths (seconds): time between successive returns to the home barrier group. */
+  /**
+   * Cycle lengths (seconds): time between successive yields of the first coordinated phase when
+   * coordinated, otherwise between successive returns to the first barrier group.
+   */
   cycle: Stat;
   phases: PhaseResult[];
   laneGroups: LaneGroupSimResult[];
@@ -116,6 +119,7 @@ export function simulate(intersection: Intersection, settings: SimulationSetting
   const sequence = pattern ? effectiveSequence(pattern, intersection.rings) : intersection.rings;
   const phaseNumbers = [...new Set(sequence.flatMap((r) => r.groups.flat()))].filter((n) => intersection.phases.find((p) => p.number === n)?.enabled).sort((a, b) => a - b);
   const home = new Set(homeGroup(intersection, settings.patternId, sequence));
+  const yieldPhase = pattern?.mode === 'coordinated' ? pattern.coordinatedPhases[0] : undefined;
 
   const lanes = intersection.laneGroups.map((group) => {
     const volumes = set?.volumes[group.id] ?? { left: 0, through: 0, right: 0 };
@@ -225,7 +229,12 @@ export function simulate(intersection: Intersection, settings: SimulationSetting
         }
       }
     }
-    if (homeActive && !homeWasActive) {
+    const drained = controller.drainTerminations();
+    for (const t of drained) {
+      if (t.tick >= warmUpTicks) terminations.get(t.phase)![t.reason]++;
+    }
+    const boundary = yieldPhase === undefined ? homeActive && !homeWasActive : drained.some((t) => t.phase === yieldPhase && t.reason === 'yield');
+    if (boundary) {
       if (measuring && cycleStarts.length > 0) {
         for (const n of servedThisCycle) served.set(n, served.get(n)! + 1);
       }
@@ -234,10 +243,6 @@ export function simulate(intersection: Intersection, settings: SimulationSetting
       for (const n of phaseNumbers) if (controller.signal(n).vehicle !== 'red') servedThisCycle.add(n);
     }
     homeWasActive = homeActive;
-
-    for (const t of controller.drainTerminations()) {
-      if (t.tick >= warmUpTicks) terminations.get(t.phase)![t.reason]++;
-    }
   }
   for (const span of open.values()) spans.push({ ...span, end: ticks });
   spans.sort((a, b) => a.start - b.start || a.phase - b.phase);
