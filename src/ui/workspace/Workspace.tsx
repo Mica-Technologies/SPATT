@@ -24,6 +24,7 @@ import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { downloadProject } from '../../io/files';
+import CompareScreen from '../compare/CompareScreen';
 import AppHeader from '../components/AppHeader';
 import CorridorEditor from '../corridor/CorridorEditor';
 import ClearanceDialog from '../dialogs/ClearanceDialog';
@@ -184,6 +185,10 @@ export default function Workspace() {
 
   if (view === 'sheet') {
     return <SheetScreen project={project} selectedIntersectionId={intersection?.id ?? null} corridor={corridor} selectedPlanId={selectedPlanId} onBack={() => setView('editor')} />;
+  }
+
+  if (view === 'compare') {
+    return <CompareScreen project={project} intersectionId={intersection?.id ?? null} patternId={patternId} onBack={() => setView('editor')} />;
   }
 
   const sheetName = corridor ? 'Time-space sheet' : 'Timing sheet';

@@ -56,6 +56,14 @@ function browserDownload(fileName: string, text: string): void {
 
 /** Lets the user pick a JSON file and resolves with its text, or null if they cancel. */
 export function pickProjectFile(accept = `${PROJECT_FILE_EXTENSION},.json,application/json`): Promise<{ name: string; text: string } | null> {
+  return pickTextFile(accept);
+}
+
+/**
+ * Lets the user pick a text file (CSV, JSON...) matching `accept` and resolves with its name and
+ * text, or null if they cancel. The browser file picker works in every host, the webview included.
+ */
+export function pickTextFile(accept: string): Promise<{ name: string; text: string } | null> {
   return new Promise((resolve) => {
     const input = document.createElement('input');
     input.type = 'file';

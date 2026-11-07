@@ -30,7 +30,7 @@ interface PatternListProps {
 
 export default function PatternList({ intersection, intersectionIndex, selectedId, issues }: PatternListProps) {
   const editIntersection = useWorkspace((s) => s.editIntersection);
-  const { selectPattern, requestFocus } = useWorkspace.getState();
+  const { selectPattern, requestFocus, setView } = useWorkspace.getState();
   const [menu, setMenu] = useState<{ anchor: HTMLElement; pattern: Pattern } | null>(null);
   const [deleting, setDeleting] = useState<Pattern | null>(null);
 
@@ -119,6 +119,15 @@ export default function PatternList({ intersection, intersectionIndex, selectedI
           }}
         >
           Duplicate
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            selectPattern(menu!.pattern.id);
+            setView('compare');
+            setMenu(null);
+          }}
+        >
+          Compare…
         </MenuItem>
         <MenuItem
           sx={{ color: 'error.main' }}

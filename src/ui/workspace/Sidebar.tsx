@@ -21,7 +21,9 @@ import Typography from '@mui/material/Typography';
 import { randomId, removeIntersectionFromCorridors, uniqueName, type Intersection } from '../../model';
 import AddCorridorDialog from '../corridor/AddCorridorDialog';
 import CsmExportDialog from '../dialogs/CsmExportDialog';
+import CountImportDialog from '../dialogs/CountImportDialog';
 import CsmImportDialog from '../dialogs/CsmImportDialog';
+import UtdfImportDialog from '../dialogs/UtdfImportDialog';
 import { useIssues } from '../state/useIssues';
 import { useWorkspace } from '../state/workspace';
 import { addTemplateIntersection } from './addIntersection';
@@ -39,7 +41,7 @@ export default function Sidebar() {
   const project = useWorkspace((s) => s.project)!;
   const selectedId = useWorkspace((s) => s.selectedIntersectionId);
   const selectedCorridorId = useWorkspace((s) => s.selectedCorridorId);
-  const { edit, selectIntersection, selectCorridor } = useWorkspace.getState();
+  const { edit, selectIntersection, selectCorridor, setView } = useWorkspace.getState();
   const issues = useIssues();
   const [addAnchor, setAddAnchor] = useState<HTMLElement | null>(null);
   const [itemMenu, setItemMenu] = useState<{ anchor: HTMLElement; target: Target } | null>(null);
@@ -47,6 +49,8 @@ export default function Sidebar() {
   const [deleting, setDeleting] = useState<Target | null>(null);
   const [csmExport, setCsmExport] = useState<string | null>(null);
   const [csmImportId, setCsmImportId] = useState<string | null>(null);
+  const [utdfImport, setUtdfImport] = useState(false);
+  const [countImport, setCountImport] = useState<string | null>(null);
   const [addingCorridor, setAddingCorridor] = useState(false);
   // An added template whose name was taken: offered for renaming without interrupting the user.
   const [numbered, setNumbered] = useState<Target | null>(null);
@@ -64,6 +68,17 @@ export default function Sidebar() {
     intersection.name = uniqueName(intersection.name, project.intersections.map((i) => i.name));
     edit(`Add ${intersection.name}`, (p) => p.intersections.push(intersection));
     selectIntersection(id);
+  };
+
+  /** Several imported intersections, as one undo step. */
+  const insertAll = (intersections: Intersection[]) => {
+    const taken = project.intersections.map((i) => i.name);
+    for (const intersection of intersections) {
+      intersection.name = uniqueName(intersection.name, taken);
+      taken.push(intersection.name);
+    }
+    edit(intersections.length === 1 ? `Add ${intersections[0]!.name}` : `Import ${intersections.length} intersections`, (p) => p.intersections.push(...intersections));
+    if (intersections[0]) selectIntersection(intersections[0].id);
   };
 
   const duplicate = (id: string) => {
@@ -186,11 +201,30 @@ export default function Sidebar() {
         >
           Import from CSM ASC-3…
         </MenuItem>
+        <MenuItem
+          onClick={() => {
+            setUtdfImport(true);
+            setAddAnchor(null);
+          }}
+        >
+          Import from Synchro UTDF…
+        </MenuItem>
       </Menu>
 
       <Menu anchorEl={itemMenu?.anchor} open={itemMenu !== null} onClose={() => setItemMenu(null)}>
         <MenuItem onClick={closeMenuAnd((target) => setRenaming(target))}>Rename…</MenuItem>
         {itemMenu?.target.kind === 'intersection' ? <MenuItem onClick={closeMenuAnd((target) => duplicate(target.id))}>Duplicate</MenuItem> : null}
+        {itemMenu?.target.kind === 'intersection' ? (
+          <MenuItem
+            onClick={closeMenuAnd((target) => {
+              selectIntersection(target.id);
+              setView('compare');
+            })}
+          >
+            Compare plans…
+          </MenuItem>
+        ) : null}
+        {itemMenu?.target.kind === 'intersection' ? <MenuItem onClick={closeMenuAnd((target) => setCountImport(target.id))}>Import counts from CSV…</MenuItem> : null}
         {itemMenu?.target.kind === 'intersection' ? <MenuItem onClick={closeMenuAnd((target) => setCsmExport(target.id))}>Export for CSM ASC-3…</MenuItem> : null}
         <MenuItem sx={{ color: 'error.main' }} onClick={closeMenuAnd((target) => setDeleting(target))}>
           Delete…
@@ -222,6 +256,8 @@ export default function Sidebar() {
         intersectionIndex={project.intersections.findIndex((i) => i.id === csmExport)}
       />
       <CsmImportDialog open={csmImportId !== null} id={csmImportId ?? ''} onClose={() => setCsmImportId(null)} onImport={insert} />
+      <UtdfImportDialog open={utdfImport} onClose={() => setUtdfImport(false)} onImport={insertAll} />
+      <CountImportDialog open={countImport !== null} onClose={() => setCountImport(null)} intersection={project.intersections.find((i) => i.id === countImport) ?? null} />
       <AddCorridorDialog
         open={addingCorridor}
         project={project}

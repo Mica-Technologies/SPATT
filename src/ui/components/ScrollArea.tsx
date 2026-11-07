@@ -14,6 +14,8 @@ interface ScrollAreaProps {
   sx?: SxProps<Theme>;
   /** Background the fades blend into (a palette path). */
   background?: 'paper' | 'default';
+  /** On the outer box, e.g. for print styles. */
+  className?: string;
 }
 
 const FADE = 36;
@@ -23,7 +25,7 @@ function stickyWidth(cell: Element | null): number {
   return cell && getComputedStyle(cell).position === 'sticky' ? cell.getBoundingClientRect().width : 0;
 }
 
-export default function ScrollArea({ children, sx, background = 'paper' }: ScrollAreaProps) {
+export default function ScrollArea({ children, sx, background = 'paper', className }: ScrollAreaProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [edges, setEdges] = useState({ start: false, end: false, stickyStart: 0, stickyEnd: 0 });
   const { stickyStart, stickyEnd } = edges;
@@ -103,7 +105,7 @@ export default function ScrollArea({ children, sx, background = 'paper' }: Scrol
   );
 
   return (
-    <Box sx={[{ position: 'relative', overflow: 'hidden', minWidth: 0 }, ...(Array.isArray(sx) ? sx : [sx])]}>
+    <Box className={className} sx={[{ position: 'relative', overflow: 'hidden', minWidth: 0 }, ...(Array.isArray(sx) ? sx : [sx])]}>
       <Box ref={ref} sx={{ overflowX: 'auto', minWidth: 0, position: 'relative' }}>
         {children}
       </Box>
