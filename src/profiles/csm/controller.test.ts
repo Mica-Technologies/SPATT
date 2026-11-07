@@ -148,6 +148,47 @@ describe('CSM ASC-3 controller', () => {
     expect([controller.signal(2).vehicle, controller.signal(6).vehicle]).toEqual(['yellow', 'yellow']);
   });
 
+  it('holds a green at the barrier while the other ring still works it, then crosses together', () => {
+    // RingBarrierStateTest.concurrentThroughHoldsGreenAcrossTheLeadLeftChange (CSM #196): 6 has no
+    // traffic and only the standing calls on 4 and 8 oppose it, so it would gap out and go dark
+    // between 1+6 and 2+6.
+    const quick = { minGreen: 20, passage: 10, yellow: 20, redClear: 20 };
+    const min = { ...quick, recall: 'MINIMUM' as const };
+    const controller = new CsmController(csmPlan([csmPhase(1, 0, quick), csmPhase(2, 0, min), csmPhase(4, 1, min), csmPhase(6, 0, min), csmPhase(8, 1, min)], [[1, 2, 4], [6, 8]]));
+    const step = (tick: number, presence: number[]) => controller.step({ tick, presence: new Set(presence), actuations: new Set(), pedestrianPresses: new Set() });
+    step(0, [1, 2]);
+    expect([controller.signal(1).vehicle, controller.signal(6).vehicle]).toEqual(['green', 'green']);
+    let sawThrough2 = false;
+    for (let t = 1; t <= 300; t++) {
+      step(t, [2]);
+      expect(controller.signal(6).vehicle, `tick ${t}`).toBe('green');
+      sawThrough2 ||= controller.signal(2).vehicle === 'green';
+    }
+    expect(sawThrough2).toBe(true);
+    let yellows: string[] = [];
+    let crossed = false;
+    for (let t = 301; t <= 500 && !crossed; t++) {
+      step(t, []);
+      if (yellows.length === 0 && controller.signal(2).vehicle !== 'green') yellows = [controller.signal(2).vehicle, controller.signal(6).vehicle];
+      crossed = controller.signal(4).vehicle === 'green';
+    }
+    expect(yellows).toEqual(['yellow', 'yellow']);
+    expect(crossed).toBe(true);
+    expect(controller.signal(8).vehicle).toBe('green');
+  });
+
+  it('lets a phase take the time of a skipped phase ahead of it in its window', () => {
+    // A side-street through on minimum recall behind a left with no call: the left's window is the
+    // through's, so the rings do not return to the main street at the start of the barrier.
+    const i = standardEightPhase();
+    for (const n of [4, 8]) i.phases.find((p) => p.number === n)!.recall = 'minimum';
+    const result = simulate(i, settings('am-peak'), csm(i, 'am-peak'));
+    expect(result.cycle).toMatchObject({ min: 90, max: 90 });
+    const main = result.phases.find((p) => p.phase === 2)!;
+    expect(main.terminations.yield).toBe(result.phases.find((p) => p.phase === 4)!.green.count);
+    expect(main.green.min).toBe(main.green.max);
+  });
+
   it('holds the 90 s background cycle, returning to the main street between a short left and its through', () => {
     // Every side phase on minimum recall, no traffic. The side-street lefts (3, 7) gap out at their
     // 5 s minimum before the throughs' (4, 8) windows open, so their calls are not yet accepted and
@@ -167,15 +208,19 @@ describe('CSM ASC-3 controller', () => {
   });
 
   it('returns to the main street when a side through phase has no accepted call as its barrier starts', () => {
-    // A left turn that gaps out before the side-street through's window opens leaves its barrier
-    // with no accepted call, so the rings go back to the coordinated phases, which yield again when
-    // the window opens: extra, short main-street greens that the NEMA controller does not have.
+    // A left turn that is served but gaps out before the side-street through's window opens leaves
+    // its barrier with no accepted call, so the rings go back to the coordinated phases, which
+    // yield again when the window opens: extra, short main-street greens that the NEMA controller
+    // does not have. (A left with no call at all gives its time to the through.) The cycle holds.
     const i = counted(standardEightPhase());
     const csmRun = simulate(i, settings('am-peak'), csm(i, 'am-peak'));
     const nemaRun = simulate(i, settings('am-peak'), new NemaController(i, { patternId: 'am-peak' }));
+    const main = (run: typeof csmRun) => run.phases.find((p) => p.phase === 2)!;
     expect(nemaRun.cycle).toMatchObject({ min: 90, max: 90 });
-    expect(csmRun.cycle.min!).toBeLessThan(90);
-    expect(csmRun.phases.find((p) => p.phase === 2)!.green.min!).toBeLessThan(nemaRun.phases.find((p) => p.phase === 2)!.green.min!);
+    expect(csmRun.cycle).toMatchObject({ min: 90, max: 90 });
+    expect(main(csmRun).terminations.yield).toBeGreaterThan(main(nemaRun).terminations.yield);
+    expect(main(csmRun).green.min!).toBeLessThan(main(nemaRun).green.min!);
+    expect(csmRun.meanDelay!).toBeGreaterThan(nemaRun.meanDelay!);
   });
 
   it('explains a plan the controller cannot run', () => {

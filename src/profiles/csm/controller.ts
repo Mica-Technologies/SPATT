@@ -48,6 +48,8 @@ interface RingRuntime {
   coordYieldFor: number;
   /** The phase this ring's coordinated green last yielded early for, or 0 (the wrap in fillIdleRing). */
   yieldedFor: number;
+  /** Held at the barrier: finished, but the other ring still works this barrier (§4.3). */
+  barrierWaiting: boolean;
 }
 
 const DEFAULT_WALK = 140;
@@ -77,6 +79,7 @@ function newRing(): RingRuntime {
     clearedAlongside: -1,
     coordYieldFor: 0,
     yieldedFor: 0,
+    barrierWaiting: false,
   };
 }
 
@@ -223,6 +226,9 @@ export class CsmController implements ControllerModel {
     }
     this.advanceRing(1);
     this.advanceRing(2);
+    // Ring 1 cannot see a ring 2 that finishes with the barrier this run, so a ring 1 green held
+    // only for the barrier re-decides once ring 2 has moved, and a concurrent pair ends together.
+    if (this.rings[0].barrierWaiting && this.rings[0].interval === 'GREEN') this.advanceRing(1);
     this.fillIdleRing(1);
     this.fillIdleRing(2);
     this.fillDualEntry(1, 2);
@@ -346,24 +352,46 @@ export class CsmController implements ControllerModel {
     return (this.windowEnd.get(n) ?? 0) - (this.windowStart.get(n) ?? 0);
   }
 
-  private windowPos(n: number): number {
-    return mod(this.localCycle - (this.windowStart.get(n) ?? 0), this.cycle);
+  /** The local cycle's position in a window beginning at `start`; it wraps, so outside is past the end. */
+  private windowPos(start: number): number {
+    return mod(this.localCycle - start, this.cycle);
   }
 
   private windowInstance(n: number): number {
     return Math.floor((this.cycleTime - (this.windowStart.get(n) ?? 0)) / this.cycle);
   }
 
+  /**
+   * Where a phase is actually served from (§5.4): its window start, walked back over each phase
+   * just ahead of it in its ring on the same barrier that was not served in its current window
+   * instance. A skipped phase's time belongs to the phase that took it.
+   */
+  private effectiveWindowStart(n: number): number {
+    let start = this.windowStart.get(n) ?? 0;
+    const p = this.phase.get(n);
+    const ring = this.ringOf(n);
+    if (!this.coordinated || !p || ring === 0) return start;
+    const onBarrier = this.seq(ring).filter((m) => this.active(m) && this.phase.get(m)!.barrier === p.barrier);
+    for (let i = onBarrier.indexOf(n) - 1; i >= 0; i--) {
+      const earlier = onBarrier[i]!;
+      if (this.servedWindow.get(earlier) === this.windowInstance(earlier)) break;
+      start = this.windowStart.get(earlier) ?? 0;
+    }
+    return start;
+  }
+
   private acceptanceOpen(n: number, clearance: number): boolean {
-    const len = this.windowLen(n);
+    const start = this.effectiveWindowStart(n);
+    const len = (this.windowEnd.get(n) ?? 0) - start;
     if (len <= 0) return false;
-    return this.windowPos(n) < Math.max(1, len - Math.max(0, clearance));
+    return this.windowPos(start) < Math.max(1, len - Math.max(0, clearance));
   }
 
   private pastYieldPoint(n: number, clearance: number): boolean {
-    const len = this.windowLen(n);
+    const start = this.effectiveWindowStart(n);
+    const len = (this.windowEnd.get(n) ?? 0) - start;
     if (len <= 0) return true;
-    return this.windowPos(n) >= Math.max(0, len - Math.max(0, clearance));
+    return this.windowPos(start) >= Math.max(0, len - Math.max(0, clearance));
   }
 
   private coordYieldReached(n: number, clearance: number, greenElapsed: number): boolean {
@@ -377,7 +405,7 @@ export class CsmController implements ControllerModel {
   }
 
   private conflictingWindowOpening(n: number, ring: number, clearance: number): number {
-    if (this.windowPos(n) < this.windowLen(n)) return 0;
+    if (this.windowPos(this.windowStart.get(n) ?? 0) < this.windowLen(n)) return 0;
     let best = 0;
     let bestArc = Number.POSITIVE_INFINITY;
     for (const m of PHASES) {
@@ -420,6 +448,7 @@ export class CsmController implements ControllerModel {
       dualEntry: false,
       coordYieldFor: 0,
       yieldedFor: 0,
+      barrierWaiting: false,
     } satisfies Partial<RingRuntime>);
   }
 
@@ -536,7 +565,18 @@ export class CsmController implements ControllerModel {
     // it, and that would hold it green for good once its companion has finished.
     const gapDone = gapOut || r.dualEntry;
     const gapTerminate = !coordHold && minMet && pedDone && gapDone && conflict;
-    const terminate = maxOut || forceOff || (coordYieldDue && pedDone) || gapTerminate;
+    let terminate = maxOut || forceOff || (coordYieldDue && pedDone) || gapTerminate;
+
+    // Barrier hold: when everything still calling against this green is on another barrier and the
+    // other ring still works this one, ending would release nothing, so the green holds (the max
+    // timer keeps running). Not for force-off or the coordinated yield, which are timed against the
+    // cycle, nor beside a dual-entry companion. A held ring flags itself so the two rings cannot
+    // hold each other.
+    const otherNum = ringNum === 1 ? 2 : 1;
+    const companion = this.ring(otherNum);
+    const barrierHold = terminate && minMet && !forceOff && !coordYieldDue && !r.dualEntry && !companion.dualEntry && !this.withinBarrierConflict(n, ringNum, this.called) && this.ringWorkingBarrier(otherNum) && !companion.barrierWaiting;
+    r.barrierWaiting = barrierHold;
+    if (barrierHold) terminate = false;
 
     if (terminate && minMet) {
       this.commitConflictingCalls(n, ringNum);
