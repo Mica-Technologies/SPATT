@@ -131,6 +131,23 @@ describe('CSM ASC-3 controller', () => {
     }
   });
 
+  it('maxes out a resting phase against a call while its own detection holds it (CSM #317)', () => {
+    // RingBarrierStateTest.restingPhaseMaxesOutAgainstConflictingCall: 2 and 6 rest in green with
+    // nothing calling; a call on 4 arrives while vehicles keep standing in the zones of 2 and 6.
+    const quick = { minGreen: 20, passage: 10, yellow: 20, redClear: 20, maxGreen: 200 };
+    const controller = new CsmController(csmPlan([csmPhase(2, 0, quick), csmPhase(4, 1, quick), csmPhase(6, 0, quick)], [[2, 4], [6]]));
+    const step = (tick: number, presence: number[]) => controller.step({ tick, presence: new Set(presence), actuations: new Set(), pedestrianPresses: new Set() });
+    for (let t = 0; t < 300; t++) step(t, []);
+    expect([controller.signal(2).vehicle, controller.signal(6).vehicle]).toEqual(['green', 'green']);
+    let end = -1;
+    for (let t = 300; t < 2000 && end < 0; t++) {
+      step(t, [2, 4, 6]);
+      if (controller.signal(2).vehicle !== 'green') end = t;
+    }
+    expect(end).toBe(500);
+    expect([controller.signal(2).vehicle, controller.signal(6).vehicle]).toEqual(['yellow', 'yellow']);
+  });
+
   it('holds the 90 s background cycle, returning to the main street between a short left and its through', () => {
     // Every side phase on minimum recall, no traffic. The side-street lefts (3, 7) gap out at their
     // 5 s minimum before the throughs' (4, 8) windows open, so their calls are not yet accepted and

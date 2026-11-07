@@ -82,6 +82,7 @@ windows and their rounding are the controller's own. Where it differs from the N
 - **Pedestrian and conditional service.** A press during walk is lost when the flashing don't walk
   starts. Conditional service has no time check.
 - **Rest.** With no calls anywhere, the controller rests on the coordinated phases even when free.
+  A resting phase still maxes out once a conflicting call is waiting, but is not forced off.
 
 !!! warning "A return to the main street before a side-street through"
     With coordination, a phase that ends before the next phase's window opens leaves its barrier

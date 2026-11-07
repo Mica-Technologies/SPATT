@@ -528,7 +528,8 @@ export class CsmController implements ControllerModel {
       r.maxStart = -1;
     }
 
-    const maxOut = !r.resting && !isCoord && r.maxStart >= 0 && now - r.maxStart >= effMax && pedDone;
+    // Any non-coordinated phase maxes out, resting or not (CSM #317); force-off keeps its rest exemption.
+    const maxOut = !isCoord && r.maxStart >= 0 && now - r.maxStart >= effMax && pedDone;
     const gapOut = now - r.lastActuation >= effPassage;
     const forceOff = this.coordinated && !isCoord && !r.resting && !r.dualEntry && this.pastYieldPoint(n, p.yellow + p.redClear) && pedDone;
     // A dual-entry companion need not gap out: with no demand of its own, only MAX recall extends
