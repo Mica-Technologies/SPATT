@@ -29,6 +29,7 @@ import {
   CSM_MAX_TICKS,
   CSM_PACKET_LIMIT_BYTES,
   CSM_PHASE_COUNT,
+  CSM_PRIORITY_COUNT,
   csmFlashSchema,
   csmMovementSchema,
   type CsmPattern,
@@ -56,7 +57,8 @@ export interface CsmPhaseExtension {
 export interface CsmIntersectionExtension {
   overlaps?: Record<string, unknown>[];
   preempts?: Record<string, unknown>[];
-  priority?: Record<string, unknown>;
+  /** Transit priority plans (up to four). */
+  priorities?: Record<string, unknown>[];
 }
 
 const isTicks = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= 0 && (v as number) <= CSM_MAX_TICKS;
@@ -81,7 +83,8 @@ function intersectionExtension(intersection: Intersection): CsmIntersectionExten
   return {
     overlaps: Array.isArray(raw.overlaps) ? raw.overlaps.filter(isObject) : undefined,
     preempts: Array.isArray(raw.preempts) ? raw.preempts.filter(isObject) : undefined,
-    priority: isObject(raw.priority) ? raw.priority : undefined,
+    // An intersection imported from a version 1 plan holds one `priority` plan.
+    priorities: Array.isArray(raw.priorities) ? raw.priorities.filter(isObject).slice(0, CSM_PRIORITY_COUNT) : isObject(raw.priority) ? [raw.priority] : undefined,
   };
 }
 
@@ -256,7 +259,7 @@ export function exportCsm(intersection: Intersection, generator = 'SPATT'): CsmE
     schedule: { enabled: slots.scheduleEnabled, startHours: slots.startHours },
     ...(ext.overlaps ? { overlaps: ext.overlaps } : {}),
     ...(ext.preempts ? { preempts: ext.preempts } : {}),
-    ...(ext.priority ? { priority: ext.priority } : {}),
+    ...(ext.priorities ? { priorities: ext.priorities } : {}),
   };
   const text = `${JSON.stringify(plan, null, 2)}\n`;
   if (new TextEncoder().encode(JSON.stringify(plan)).length > CSM_PACKET_LIMIT_BYTES) {

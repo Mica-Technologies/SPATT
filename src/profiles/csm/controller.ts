@@ -295,7 +295,8 @@ export class CsmController implements ControllerModel {
     if (!other || other.barrier !== active.barrier) return true;
     const otherRing = this.ringOf(n);
     if (otherRing === 0 || otherRing === activeRing) return true;
-    return (other.permissivePhase ?? 0) === active.number || (active.permissivePhase ?? 0) === n;
+    // The flashing yellow arrow pair conflicts; a PROTECTED (bus, train, bike) phase is never its left.
+    return (other.movement !== 'PROTECTED' && (other.permissivePhase ?? 0) === active.number) || (active.movement !== 'PROTECTED' && (active.permissivePhase ?? 0) === n);
   }
 
   private demandConflictsWith(phaseN: number, ring: number, calls: ReadonlySet<number>): boolean {

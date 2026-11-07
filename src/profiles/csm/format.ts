@@ -1,5 +1,5 @@
 /**
- * The CSM ASC-3 timing-plan JSON (`csm-asc3-plan`, format version 1): what SPATT exports for, and
+ * The CSM ASC-3 timing-plan JSON (`csm-asc3-plan`, format version 2): what SPATT exports for, and
  * imports from, the City Super Mod's Advanced signal controller.
  *
  * The format is **CSM-native**: every duration is in game ticks (20 per second), names follow the
@@ -17,7 +17,9 @@
 import { z } from 'zod';
 
 export const CSM_FORMAT = 'csm-asc3-plan';
-export const CSM_FORMAT_VERSION = 1;
+export const CSM_FORMAT_VERSION = 2;
+/** Transit priority plans the controller holds. */
+export const CSM_PRIORITY_COUNT = 4;
 
 /** Every controller time value is clamped to 0..12000 ticks (600 s) by the mod. */
 export const CSM_MAX_TICKS = 12_000;
@@ -31,11 +33,11 @@ export const CSM_PACKET_LIMIT_BYTES = 32_767;
 const ticks = z.number().int().min(0).max(CSM_MAX_TICKS);
 const phaseNumber = z.number().int().min(1).max(CSM_PHASE_COUNT);
 const phaseList = z.array(phaseNumber);
-/** Opaque controller data SPATT carries without interpreting (overlaps, preempts, priority). */
+/** Opaque controller data SPATT carries without interpreting (overlaps, preempts, priority plans). */
 const opaque = z.record(z.string(), z.unknown());
 
 export const csmRecallSchema = z.enum(['NONE', 'MINIMUM', 'MAXIMUM', 'PEDESTRIAN', 'SOFT']);
-export const csmMovementSchema = z.enum(['THROUGH', 'LEFT', 'PROTECTED_LEFT', 'RIGHT', 'PED']);
+export const csmMovementSchema = z.enum(['THROUGH', 'LEFT', 'PROTECTED_LEFT', 'RIGHT', 'PED', 'PROTECTED']);
 export const csmFlashSchema = z.enum(['AUTO', 'YELLOW', 'RED', 'DARK']);
 export const csmModeSchema = z.enum(['FREE', 'COORDINATED']);
 
@@ -65,6 +67,7 @@ export const csmPhaseSchema = z.object({
   // Optional: absent = the controller keeps its own value.
   walk: ticks.optional(),
   pedClear: ticks.optional(),
+  /** `PROTECTED`: a bus, train or bike lane phase, never the left of a flashing yellow arrow pair. */
   movement: csmMovementSchema.optional(),
   /** 0-based signal circuit; -1 = none. */
   circuit: z.number().int().min(-1).optional(),
@@ -117,9 +120,22 @@ export const csmPlanSchema = z.object({
   // Optional, carried verbatim; absent = the controller keeps its own.
   overlaps: z.array(opaque).optional(),
   preempts: z.array(opaque).optional(),
-  priority: opaque.optional(),
+  /** Transit priority plans, up to four. */
+  priorities: z.array(opaque).max(CSM_PRIORITY_COUNT).optional(),
 });
 export type CsmPlan = z.infer<typeof csmPlanSchema>;
+
+/**
+ * Brings an older plan up to the current format version, before it is parsed; anything else is
+ * returned as it is. Version 1 had one `priority` plan where version 2 has a `priorities` list.
+ */
+export function migrateCsmPlan(raw: unknown): unknown {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return raw;
+  const plan = raw as Record<string, unknown>;
+  if (plan.format !== CSM_FORMAT || plan.formatVersion !== 1) return raw;
+  const { priority, ...rest } = plan;
+  return { ...rest, formatVersion: 2, ...(priority !== undefined ? { priorities: [priority] } : {}) };
+}
 
 /** The JSON Schema of the format, as committed to `docs/profiles/csm-asc3-plan.schema.json`. */
 export function csmPlanJsonSchema(): Record<string, unknown> {

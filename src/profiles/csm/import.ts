@@ -10,11 +10,11 @@
  */
 import { convertOffset, projectCycle } from '../../engine';
 import { DEFAULT_CAPACITY, error, ticksToTenths, warning, type Intersection, type Issue, type MovementKind, type OffsetReference, type Pattern, type Phase, type ScheduleEntry, type VehicleRecall } from '../../model';
-import { CSM_SLOT_NAMES, csmPlanSchema, type CsmPhase, type CsmPlan } from './format';
+import { CSM_SLOT_NAMES, csmPlanSchema, migrateCsmPlan, type CsmPhase, type CsmPlan } from './format';
 import type { CsmIntersectionExtension, CsmPhaseExtension } from './export';
 
 const RECALL: Record<CsmPhase['recall'], VehicleRecall> = { NONE: 'none', MINIMUM: 'minimum', MAXIMUM: 'maximum', PEDESTRIAN: 'none', SOFT: 'soft' };
-const KIND: Record<NonNullable<CsmPhase['movement']>, MovementKind> = { THROUGH: 'through', LEFT: 'left', PROTECTED_LEFT: 'left', RIGHT: 'right', PED: 'pedestrian' };
+const KIND: Record<NonNullable<CsmPhase['movement']>, MovementKind> = { THROUGH: 'through', LEFT: 'left', PROTECTED_LEFT: 'left', RIGHT: 'right', PED: 'pedestrian', PROTECTED: 'other' };
 
 export interface CsmImportOptions {
   id: string;
@@ -34,7 +34,7 @@ export function importCsm(input: string | unknown, options: CsmImportOptions): C
       return { ok: false, issues: [error('csm.invalid-json', `Not valid JSON: ${(cause as Error).message}`, [])] };
     }
   }
-  const parsed = csmPlanSchema.safeParse(raw);
+  const parsed = csmPlanSchema.safeParse(migrateCsmPlan(raw));
   if (!parsed.success) {
     return {
       ok: false,
@@ -182,7 +182,7 @@ function convertPlan(plan: CsmPlan, options: CsmImportOptions): CsmImportResult 
   const extension: CsmIntersectionExtension = {};
   if (plan.overlaps) extension.overlaps = plan.overlaps;
   if (plan.preempts) extension.preempts = plan.preempts;
-  if (plan.priority) extension.priority = plan.priority;
+  if (plan.priorities) extension.priorities = plan.priorities;
 
   const intersection: Intersection = {
     id: options.id,

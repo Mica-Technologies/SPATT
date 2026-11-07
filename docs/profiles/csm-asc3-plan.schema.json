@@ -11,7 +11,7 @@
     },
     "formatVersion": {
       "type": "number",
-      "const": 1
+      "const": 2
     },
     "generator": {
       "type": "string",
@@ -137,7 +137,8 @@
               "LEFT",
               "PROTECTED_LEFT",
               "RIGHT",
-              "PED"
+              "PED",
+              "PROTECTED"
             ]
           },
           "circuit": {
@@ -348,12 +349,16 @@
         "additionalProperties": {}
       }
     },
-    "priority": {
-      "type": "object",
-      "propertyNames": {
-        "type": "string"
-      },
-      "additionalProperties": {}
+    "priorities": {
+      "maxItems": 4,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "propertyNames": {
+          "type": "string"
+        },
+        "additionalProperties": {}
+      }
     }
   },
   "required": [

@@ -84,14 +84,14 @@ controller (which stores its own movement). An imported phase without one is a t
 
 ## Plan format
 
-The format is `csm-asc3-plan`, version 1. The JSON Schema is
+The format is `csm-asc3-plan`, version 2. The JSON Schema is
 [csm-asc3-plan.schema.json](csm-asc3-plan.schema.json); example plans for every SPATT template are
 in the repository under `test/fixtures/csm/`. An excerpt (one phase, part of the splits):
 
 ```json
 {
   "format": "csm-asc3-plan",
-  "formatVersion": 1,
+  "formatVersion": 2,
   "generator": "SPATT",
   "name": "Main St & Side St",
   "phases": [
@@ -120,7 +120,7 @@ the plan does not list is disabled. Enum values are the controller's own constan
 | Field | Values |
 |---|---|
 | `recall` | `NONE`, `MINIMUM`, `MAXIMUM`, `PEDESTRIAN`, `SOFT` |
-| `movement` | `THROUGH`, `LEFT`, `PROTECTED_LEFT`, `RIGHT`, `PED` |
+| `movement` | `THROUGH`, `LEFT`, `PROTECTED_LEFT`, `RIGHT`, `PED`, `PROTECTED` (a bus, train or bike lane phase; imports as an *other* movement) |
 | `flash` | `AUTO`, `YELLOW`, `RED`, `DARK` |
 | pattern `mode` | `FREE`, `COORDINATED` |
 
@@ -129,10 +129,13 @@ Optional fields, which the controller keeps its own values for when a plan leave
 | Where | Fields |
 |---|---|
 | Phase | `walk`, `pedClear`, `movement`, `circuit` (0-based, −1 none), `flash`, `delayedGreen`, `bikeMinGreen`, `permissivePhase` (flashing yellow arrow; 0 = protected only) |
-| Plan | `patterns` entries (slots not listed are kept), `overlaps`, `preempts`, `priority` (carried verbatim) |
+| Plan | `patterns` entries (slots not listed are kept), `overlaps`, `preempts` and `priorities` (up to four transit priority plans), carried verbatim |
 
 Informational fields the controller ignores: `generator`, `name`, a phase's `label`, a pattern's
 `name`, and `hasPedestrianSignals`, which the controller writes on export.
+
+SPATT still imports version 1 plans. Version 1 had a single `priority` plan where version 2 has
+the `priorities` list; on import it becomes the first entry, and SPATT exports version 2.
 
 ## Green waves in CSM
 

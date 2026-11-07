@@ -145,12 +145,33 @@ describe('importCsm', () => {
     const result = importCsm({ format: 'csm-asc3-plan', formatVersion: 2 }, { id: 'x' });
     expect(result.ok).toBe(false);
     expect(result.issues[0]!.code).toBe('csm.invalid-plan');
+    expect(importCsm({ ...exported(twoPhase()), formatVersion: 3 }, { id: 'x' })).toMatchObject({ ok: false, issues: [{ code: 'csm.invalid-plan' }] });
+  });
+
+  it('reads a version 1 plan, its one priority plan becoming the list', () => {
+    const { priorities: _, ...v2 } = exported(standardEightPhase());
+    const v1 = { ...v2, formatVersion: 1, priority: { en: true } };
+    const imported = importCsm(JSON.stringify(v1), { id: 'x' });
+    if (!imported.ok) throw new Error(imported.issues.map((i) => i.message).join('\n'));
+    const again = exported(imported.intersection);
+    expect(again.formatVersion).toBe(2);
+    expect(again.priorities).toEqual([{ en: true }]);
+    expect(again).not.toHaveProperty('priority');
+  });
+
+  it('imports a PROTECTED (bus, train, bike) phase as an other movement and exports it back', () => {
+    const plan = exported(standardEightPhase());
+    plan.phases[3]!.movement = 'PROTECTED';
+    const imported = importCsm(plan, { id: 'x' });
+    if (!imported.ok) throw new Error('import failed');
+    expect(imported.intersection.phases[3]!.movement.kind).toBe('other');
+    expect(exported(imported.intersection).phases[3]!.movement).toBe('PROTECTED');
   });
 
   it('keeps controller data SPATT does not model and gives it back on export', () => {
     const plan = exported(standardEightPhase());
     plan.overlaps = [{ en: true, oc: 4, in: [2, 3] }];
-    plan.priority = { en: false };
+    plan.priorities = [{ en: false }, { en: true, td: true, qj: 80 }];
     plan.phases[5]!.flash = 'RED';
     plan.phases[0]!.walk = 140; // a phase without pedestrian signals still has timers on the controller
     plan.phases[0]!.pedClear = 200;
@@ -160,7 +181,7 @@ describe('importCsm', () => {
     expect(imported.intersection.phases[0]!.pedestrian.enabled).toBe(false);
     const again = exported(imported.intersection);
     expect(again.overlaps).toEqual(plan.overlaps);
-    expect(again.priority).toEqual(plan.priority);
+    expect(again.priorities).toEqual(plan.priorities);
     expect(again.phases[5]!.flash).toBe('RED');
     expect(again.phases[0]).toMatchObject({ walk: 140, pedClear: 200 });
     expect(again.preempts).toBeUndefined();

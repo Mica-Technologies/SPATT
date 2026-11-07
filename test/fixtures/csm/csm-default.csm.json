@@ -1,6 +1,6 @@
 {
   "format": "csm-asc3-plan",
-  "formatVersion": 1,
+  "formatVersion": 2,
   "generator": "SPATT",
   "name": "CSM ASC-3 default",
   "phases": [
