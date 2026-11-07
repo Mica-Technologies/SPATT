@@ -88,6 +88,21 @@ describe('CSM ASC-3 controller', () => {
     expect(result.phases.every((p) => p.green.mean === 10)).toBe(true);
   });
 
+  it('records vehicles and pedestrians on request without changing the run', () => {
+    const i = counted(standardEightPhase());
+    i.phases.find((p) => p.number === 4)!.pedestrian.enabled = true;
+    const base = settings(null, { durationSeconds: 900, pedestrianCallsPerHour: { 4: 60 } });
+    const plain = simulate(i, base, csm(i, null));
+    const result = simulate(i, { ...base, detail: { seconds: 1200, limit: 100_000 } }, csm(i, null));
+    const { vehicles, pedestrians, detailUntil: _, ...trace } = result.trace;
+    expect({ ...result, trace }).toEqual(plain);
+    for (const lane of result.laneGroups) {
+      expect(vehicles!.filter((v) => v.laneGroupId === lane.laneGroupId && v.arrive >= result.warmUpTicks && v.depart !== null).length).toBe(lane.departures);
+    }
+    expect(pedestrians!.some((p) => p.start !== null && p.end !== null && p.end > p.start)).toBe(true);
+    expect(simulate(i, { ...base, detail: { seconds: 1200, limit: 100_000 } }, csm(i, null)).trace).toEqual(result.trace);
+  });
+
   it('runs maximum recall to max green against a waiting phase, as the NEMA controller does', () => {
     // RingBarrierStateTest.maxRecallRunsToMax: the green extends on its own recall. The max timer
     // starts on the first engine run that sees the waiting call, one run (0.1 s) after the green.
