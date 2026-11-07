@@ -15,8 +15,9 @@
 import { MOVEMENTS, type Intersection, type Movement, type Ring } from '../../model';
 import { effectiveSequence } from '../../model';
 import { saturationFlow } from '../capacity';
+import { allOverlapSpans, overlapTimingOf, type OverlapSpan } from '../overlaps';
 import { nextArrivalTicks, seededRandom } from './random';
-import { TICKS_PER_SECOND, type ControllerModel, type PedestrianSignal, type Termination, type VehicleSignal } from './types';
+import { TICKS_PER_SECOND, TICKS_PER_TENTH, type ControllerModel, type PedestrianSignal, type Termination, type VehicleSignal } from './types';
 
 export interface SimulationSettings {
   /** The pattern the controller runs, or `null` to run free. */
@@ -118,6 +119,8 @@ export interface SimulationResult {
     spans: SignalSpan[];
     /** Queue length per lane group, sampled every second (index = second). */
     queues: Record<string, number[]>;
+    /** Overlap signals from their included phases, when the intersection has enabled overlaps (the controller does not time them). */
+    overlaps?: OverlapSpan[];
     /** With `detail` only: the vehicles and presses recorded. */
     vehicles?: VehicleRecord[];
     pedestrians?: PedestrianRecord[];
@@ -341,6 +344,7 @@ export function simulate(intersection: Intersection, settings: SimulationSetting
   for (const span of open.values()) spans.push({ ...span, end: ticks });
   for (const crossing of crossingPedestrians.values()) for (const id of crossing) pedestrianRecords[id]!.end = ticks;
   spans.sort((a, b) => a.start - b.start || a.phase - b.phase);
+  const overlapSpans = intersection.overlaps.some((o) => o.enabled) ? allOverlapSpans(intersection.overlaps, spans, overlapTimingOf(intersection, TICKS_PER_TENTH)) : null;
 
   const cycleLengths = cycleStarts.slice(1).map((t, k) => (t - cycleStarts[k]!) / TICKS_PER_SECOND);
   const departed = lanes.reduce((sum, l) => sum + l.departures, 0);
@@ -370,6 +374,7 @@ export function simulate(intersection: Intersection, settings: SimulationSetting
     trace: {
       spans,
       queues: Object.fromEntries(lanes.map((l) => [l.group.id, l.samples])),
+      ...(overlapSpans ? { overlaps: overlapSpans } : {}),
       ...(detail ? { vehicles: vehicleRecords, pedestrians: pedestrianRecords, detailUntil } : {}),
     },
   };

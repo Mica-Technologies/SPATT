@@ -63,7 +63,9 @@ A generic dual-ring actuated controller built from SPATT's own plan:
   minimum green, and a called walk, fits before its force-off. Time a phase doesn't use goes to the
   phases after it.
 
-Not modelled: conditional service, preemption and overlaps. The max timer runs while a conflicting
+Not modelled: conditional service and preemption. Overlaps are shown in playback, worked out from
+their included phases as in the [intersection view](editor.md#the-intersection-view), but lane groups still move on their
+own phase's green, so an overlap does not serve traffic. The max timer runs while a conflicting
 call is waiting and holds, rather than resets, if the call goes away.
 
 ### CSM ASC-3

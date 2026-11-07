@@ -11,7 +11,7 @@
  * The scene is schematic: it shows which lanes each phase serves and where its heads are, not a
  * surveyed layout. Traffic drives on the right.
  */
-import { DEFAULT_LANE_WIDTH, toMetres, type Approach, type Intersection, type LaneGroup, type LengthUnit, type MovementKind, type Phase } from '../../model';
+import { DEFAULT_LANE_WIDTH, toMetres, type Approach, type Intersection, type LaneGroup, type LengthUnit, type MovementKind, type Overlap, type Phase } from '../../model';
 
 export interface ScenePoint {
   x: number;
@@ -101,8 +101,10 @@ export interface SceneCrosswalk {
 export interface SceneSignalHead {
   id: string;
   kind: 'vehicle' | 'pedestrian';
-  /** The phases it shows (one for a vehicle head; a crosswalk may be served by several). */
+  /** The phases it shows (one for a vehicle head; a crosswalk may be served by several; an overlap's included phases). */
   phases: number[];
+  /** Set on an overlap's head: the overlap's letter. */
+  overlap?: string;
   leg: Approach;
   movement: TurnMovement | 'pedestrian';
   /** The centre of the head's housing. */
@@ -169,6 +171,7 @@ const VEHICLE_HEAD_HEIGHT = 5.6;
 const MAST_HEIGHT = 6.6;
 const PED_HEAD_HEIGHT = 2.7;
 const PEDESTAL_HEIGHT = 3.3;
+const OVERLAP_HEAD_SPACING = 2.2;
 
 const S = Math.SQRT1_2;
 /** Unit vectors toward each compass direction, in plan coordinates (y south). */
@@ -469,6 +472,25 @@ export function buildScene(intersection: Intersection, options: SceneOptions = {
   const heads: SceneSignalHead[] = [];
   const poles: ScenePole[] = [];
 
+  // An overlap has no direction of its own: its heads go on the approach of an included right
+  // turn or through phase (the usual right-turn overlap), else of its first included phase.
+  const overlapsBySide = new Map<Approach, { overlap: Overlap; movement: TurnMovement }[]>();
+  const unplacedOverlaps: string[] = [];
+  for (const overlap of intersection.overlaps) {
+    if (!overlap.enabled) continue;
+    const included = overlap.includedPhases.map((n) => placedByNumber.get(n)).filter((p): p is PlacedPhase => p !== undefined);
+    const carrier = included.find((p) => p.kind === 'right') ?? included.find((p) => p.kind === 'through') ?? included[0];
+    const side = carrier ? oppositeSide(carrier.direction) : null;
+    if (!carrier || !side || !legs.some((l) => l.side === side)) {
+      unplacedOverlaps.push(overlap.id);
+      continue;
+    }
+    overlapsBySide.set(side, [...(overlapsBySide.get(side) ?? []), { overlap, movement: carrier.kind === 'left' ? 'left' : 'right' }]);
+  }
+  if (unplacedOverlaps.length > 0) {
+    assumptions.push(`Overlap${unplacedOverlaps.length === 1 ? '' : 's'} ${unplacedOverlaps.join(', ')} not drawn: no included phase has a direction of travel.`);
+  }
+
   for (const leg of legs) {
     const at = (distance: number, offset: number) => onLeg(leg.axis, leg.across, distance, offset);
     const armDistance = leg.edge + CROSSWALK_SETBACK + CROSSWALK_WIDTH / 2;
@@ -495,6 +517,23 @@ export function buildScene(intersection: Intersection, options: SceneOptions = {
         facing: leg.axis,
       };
     });
+    // Overlap heads: beside the phase heads, on the side of the turn they serve.
+    const phaseOffsets = vehicleHeads.map((h) => dot(h.position, leg.across));
+    let outer = phaseOffsets.length > 0 ? Math.max(...phaseOffsets) : leg.inboundWidth - OVERLAP_HEAD_SPACING;
+    let inner = phaseOffsets.length > 0 ? Math.min(...phaseOffsets) : OVERLAP_HEAD_SPACING;
+    for (const { overlap, movement } of overlapsBySide.get(leg.side) ?? []) {
+      const offset = movement === 'left' ? (inner -= OVERLAP_HEAD_SPACING) : (outer += OVERLAP_HEAD_SPACING);
+      vehicleHeads.push({
+        id: `${leg.side}-overlap-${overlap.id}`,
+        kind: 'vehicle',
+        phases: [...overlap.includedPhases],
+        overlap: overlap.id,
+        leg: leg.side,
+        movement,
+        position: { ...at(armDistance, offset), z: VEHICLE_HEAD_HEIGHT },
+        facing: leg.axis,
+      });
+    }
     heads.push(...vehicleHeads);
     const rightPole: ScenePole = { base: at(armDistance, curbRight), height: MAST_HEIGHT, arm: null, armHeight: MAST_HEIGHT - 0.4, heads: vehicleHeads.map((h) => h.id) };
     if (vehicleHeads.length > 0) {

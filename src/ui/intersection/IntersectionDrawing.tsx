@@ -13,6 +13,7 @@ import {
   sceneExtent,
   signalFor,
   type HeadStates,
+  type OverlapStates,
   type IntersectionScene,
   type ProjectedFace,
   type SceneBounds,
@@ -38,18 +39,20 @@ export interface IntersectionDrawingProps {
   scene: IntersectionScene;
   view: SceneView;
   states: HeadStates | null;
+  /** What each overlap shows; overlap heads are dark without it. */
+  overlaps?: OverlapStates | null;
   /** Whether a flashing don't-walk hand is lit at this moment. */
   flashOn: boolean;
   label: string;
 }
 
-export default function IntersectionDrawing({ scene, view, states, flashOn, label }: IntersectionDrawingProps) {
+export default function IntersectionDrawing({ scene, view, states, overlaps = null, flashOn, label }: IntersectionDrawingProps) {
   const b = sceneExtent(scene, view, PAD);
   const viewBox = `${n(b.minX)} ${n(b.minY)} ${n(b.maxX - b.minX)} ${n(b.maxY - b.minY)}`;
   return (
     <Box component="svg" viewBox={viewBox} role="img" aria-label={label} sx={drawingSx}>
       <Ground scene={scene} view={view} extent={b} />
-      <Signals scene={scene} view={view} states={states} flashOn={flashOn} />
+      <Signals scene={scene} view={view} states={states} overlaps={overlaps} flashOn={flashOn} />
     </Box>
   );
 }
@@ -153,10 +156,10 @@ function Compass({ view, extent }: { view: SceneView; extent: SceneBounds }) {
   );
 }
 
-function Signals({ scene, view, states, flashOn }: { scene: IntersectionScene; view: SceneView; states: HeadStates | null; flashOn: boolean }) {
+function Signals({ scene, view, states, overlaps, flashOn }: { scene: IntersectionScene; view: SceneView; states: HeadStates | null; overlaps: OverlapStates | null; flashOn: boolean }) {
   const project = projectorFor(view);
   const lampFor = (head: SceneSignalHead): Lamp => {
-    const signal = headSignal(head, states);
+    const signal = headSignal(head, states, overlaps);
     if (signal === 'pedestrianClearance' && !flashOn) return 'off';
     return lampOf(signal);
   };

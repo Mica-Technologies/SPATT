@@ -14,7 +14,7 @@ import Stack from '@mui/material/Stack';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
-import { buildScene, headStatesAt, PEDESTRIAN_SIGNAL_LABEL, signalFor, VEHICLE_SIGNAL_LABEL, type ProjectionResult, type SceneView } from '../../engine';
+import { buildScene, headStatesAt, overlapStatesAt, PEDESTRIAN_SIGNAL_LABEL, signalFor, VEHICLE_SIGNAL_LABEL, type ProjectionResult, type SceneView } from '../../engine';
 import { formatSeconds, type Intersection } from '../../model';
 import { useWorkspace } from '../state/workspace';
 import { fontFamilyMono } from '../theme/themePrimitives';
@@ -45,6 +45,7 @@ export default function IntersectionView({ intersection, result }: IntersectionV
   const player = useCyclePlayer(cycle);
   const time = Math.min(player.time, Math.max(0, cycle - 1));
   const states = useMemo(() => (projection ? headStatesAt(projection, time) : null), [projection, time]);
+  const overlaps = useMemo(() => (projection ? overlapStatesAt(projection, intersection, time) : null), [projection, intersection, time]);
   const flashOn = !player.playing || player.reducedMotion || Math.floor(time / 5) % 2 === 0;
 
   const phases = intersection.phases.filter((p) => p.enabled);
@@ -70,7 +71,7 @@ export default function IntersectionView({ intersection, result }: IntersectionV
       </Stack>
 
       {scene.legs.length > 0 ? (
-        <IntersectionDrawing scene={scene} view={view} states={states} flashOn={flashOn} label={`${viewName} view of ${intersection.name}`} />
+        <IntersectionDrawing scene={scene} view={view} states={states} overlaps={overlaps} flashOn={flashOn} label={`${viewName} view of ${intersection.name}`} />
       ) : (
         <Typography variant="body2" sx={{ color: 'text.secondary' }}>
           Give the phases directions of travel on the Phases tab to draw the intersection.
@@ -134,6 +135,11 @@ export default function IntersectionView({ intersection, result }: IntersectionV
             ];
             return <li key={p.number}>{`${name}: ${parts.join(', ')}`}</li>;
           })}
+        {scene.heads
+          .filter((h) => h.overlap !== undefined)
+          .map((h) => (
+            <li key={h.id}>{`Overlap ${h.overlap}: ${VEHICLE_SIGNAL_LABEL[overlaps?.get(h.overlap!) ?? 'dark']}`}</li>
+          ))}
       </Box>
     </Stack>
   );
