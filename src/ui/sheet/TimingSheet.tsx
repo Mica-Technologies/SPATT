@@ -37,20 +37,20 @@ const s = formatSeconds;
 const sec = (tenths: number) => (tenths === 0 ? '—' : s(tenths));
 const yes = (value: boolean) => (value ? 'Yes' : 'No');
 function PhaseTable({ phases }: { phases: Phase[] }) {
-  const row = (label: string, value: (phase: Phase) => ReactNode) => ({ label, cells: phases.map((p) => (p.enabled ? value(p) : '')) });
+  const row = (label: string, value: (phase: Phase) => ReactNode, text = false) => ({ label, text, cells: phases.map((p) => (p.enabled ? value(p) : '')) });
   const hasVolumeDensity = phases.some((p) => Object.values(p.volumeDensity).some((v) => v > 0));
   const vd = (key: keyof Phase['volumeDensity']) => (p: Phase) => sec(p.volumeDensity[key]);
   const ped = (value: (phase: Phase) => ReactNode) => (p: Phase) => (p.pedestrian.enabled ? value(p) : '—');
   const rows = [
-    { label: 'Label', cells: phases.map((p) => (p.enabled ? p.label : 'Disabled')) },
-    row('Direction', (p) => `${p.movement.approach ? optionLabel(APPROACHES, p.movement.approach) : '—'} ${optionLabel(MOVEMENTS, p.movement.kind)}`),
+    { label: 'Label', text: true, cells: phases.map((p) => (p.enabled ? p.label : 'Disabled')) },
+    row('Direction', (p) => `${p.movement.approach ? optionLabel(APPROACHES, p.movement.approach) : '—'} ${optionLabel(MOVEMENTS, p.movement.kind)}`, true),
     row('Min green', (p) => s(p.minGreen)),
     row('Passage', (p) => s(p.passage)),
     row('Max 1', (p) => s(p.maxGreen1)),
     row('Max 2', (p) => sec(p.maxGreen2)),
     row('Yellow', (p) => s(p.yellow)),
     row('Red clear', (p) => s(p.redClear)),
-    row('Recall', (p) => optionLabel(RECALLS, p.recall)),
+    row('Recall', (p) => optionLabel(RECALLS, p.recall), true),
     row('Walk', ped((p) => s(p.pedestrian.walk))),
     row('Ped clear', ped((p) => s(p.pedestrian.clearance))),
     row('Ped recall', ped((p) => yes(p.pedestrian.recall))),

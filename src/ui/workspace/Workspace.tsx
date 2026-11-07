@@ -291,7 +291,7 @@ export default function Workspace() {
             open={navOpen}
             onClose={() => setNavOpen(false)}
             ModalProps={{ keepMounted: true }}
-            slotProps={{ paper: { id: 'workspace-navigation', sx: { width: SIDEBAR_WIDTH + 40, maxWidth: '85vw', display: 'flex' } } }}
+            slotProps={{ paper: { id: 'workspace-navigation', sx: { width: SIDEBAR_WIDTH + 40, maxWidth: '85vw', '& > nav': { flexGrow: 1, borderRight: 0 } } } }}
           >
             {sidebar}
           </Drawer>

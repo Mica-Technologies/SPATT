@@ -42,7 +42,8 @@ export function Alarm({ children }: { children: ReactNode }) {
 
 interface TableProps {
   head: ReactNode[];
-  rows: { label: string; cells: ReactNode[] }[];
+  /** 	ext rows (labels, names) are set as body text rather than monospaced numbers. */
+  rows: { label: string; cells: ReactNode[]; text?: boolean }[];
   firstColumnLabel: string;
   /** Per column: numbers (right-aligned, monospaced; the default) or text (left-aligned, as body text). */
   columns?: ('number' | 'text')[];
@@ -75,7 +76,7 @@ export function Table({ head, rows, firstColumnLabel, columns = [], numericLabel
               {row.label}
             </Box>
             {row.cells.map((cell, c) => (
-              <Box component="td" key={c} sx={kind(c) === 'text' ? { ...cellSx, ...textSx } : cellSx}>
+              <Box component="td" key={c} sx={kind(c) === 'text' ? { ...cellSx, ...textSx } : row.text ? { ...cellSx, fontFamily: 'inherit' } : cellSx}>
                 {cell}
               </Box>
             ))}
