@@ -30,9 +30,9 @@ in version control. The format is documented in [Project File Format](../develop
   standard eight-phase intersection, eight-phase with a lagging left, a split-phased side street,
   two-phase, or the CSM ASC-3 controller's defaults, or imports a plan from that controller. An
   empty project offers the same templates in the main area. A template whose name is already
-  taken asks for a new name. Each intersection's menu renames, duplicates, exports for the
-  controller, or deletes it (see [CSM ASC-3](../profiles/csm-asc3.md)). On narrow windows the
-  sidebar is a drawer, opened with the menu button at the left of the header.
+  taken asks for a new name. Each intersection's menu renames, duplicates, compares its plans
+  ([Comparing plans](#comparing-plans)), exports for the controller, or deletes it (see
+  [CSM ASC-3](../profiles/csm-asc3.md)). On narrow windows the sidebar is a drawer, opened with the menu button at the left of the header.
 - **Header.** Undo and redo, then the timing sheet, **Export**, the diagram toggle, project
   **Settings** and **All projects** (back to the library). Wide windows label these buttons;
   narrower ones show icons with tooltips, and phones put them in the **More actions** menu.
@@ -242,3 +242,33 @@ save a PDF. Each sheet has:
 
 Sheets always print in light colours, and every intersection starts on a new page. **Back to
 editor** returns to where you were.
+
+## Comparing plans
+
+**Compare…** in a pattern's menu on the Patterns tab, or **Compare plans…** in an intersection's
+menu in the sidebar, opens a side-by-side comparison of two timing plans:
+
+- **A** is a pattern of an intersection in the open project.
+- **B** is another pattern of **This project** (by default the same intersection's next
+  pattern), or a pattern of **Another project** in the library. With another project, SPATT
+  picks the intersection with the same name (ignoring case and spacing) and the pattern with the
+  same name, and says so when there is no such intersection. The other project is only read,
+  never changed.
+
+The comparison lists:
+
+- the pattern settings: mode, cycle, offset and its reference, coordinated phases, max green
+  and force-off mode, with the change in seconds. When the offset references differ, B's offset
+  is also given against A's reference, which shows whether the timing on the ground moved;
+- the phase order in each ring, barrier groups separated by `|`;
+- per phase: split, lead or lag, minimum green, passage, Max 1 and Max 2, yellow, red clearance,
+  recall, walk, pedestrian clearance and pedestrian recall. Phases are matched by number; a phase
+  defined on one side only is marked **A only** or **B only**;
+- both ring-barrier diagrams, stacked on one time scale;
+- when both patterns are linked to a count: v/c, delay and level of service per lane group and
+  for the intersection, with the change (higher in the error colour, lower in the success
+  colour). Across projects, lane groups are matched by phase and label.
+
+Changed values are highlighted and shown as *A → B*. **Only differences** hides the rows that
+match, **Swap** exchanges A and B within one project, and **Print** prints the comparison in
+light colours like a timing sheet.

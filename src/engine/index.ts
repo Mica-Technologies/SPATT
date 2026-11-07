@@ -1,6 +1,7 @@
 export * from './capacity';
 export * from './circular';
 export * from './clearance';
+export * from './compare';
 export * from './cycle-bounds';
 export * from './green-shift';
 export * from './optimize';

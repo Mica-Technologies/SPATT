@@ -39,7 +39,7 @@ export default function Sidebar() {
   const project = useWorkspace((s) => s.project)!;
   const selectedId = useWorkspace((s) => s.selectedIntersectionId);
   const selectedCorridorId = useWorkspace((s) => s.selectedCorridorId);
-  const { edit, selectIntersection, selectCorridor } = useWorkspace.getState();
+  const { edit, selectIntersection, selectCorridor, setView } = useWorkspace.getState();
   const issues = useIssues();
   const [addAnchor, setAddAnchor] = useState<HTMLElement | null>(null);
   const [itemMenu, setItemMenu] = useState<{ anchor: HTMLElement; target: Target } | null>(null);
@@ -191,6 +191,16 @@ export default function Sidebar() {
       <Menu anchorEl={itemMenu?.anchor} open={itemMenu !== null} onClose={() => setItemMenu(null)}>
         <MenuItem onClick={closeMenuAnd((target) => setRenaming(target))}>Rename…</MenuItem>
         {itemMenu?.target.kind === 'intersection' ? <MenuItem onClick={closeMenuAnd((target) => duplicate(target.id))}>Duplicate</MenuItem> : null}
+        {itemMenu?.target.kind === 'intersection' ? (
+          <MenuItem
+            onClick={closeMenuAnd((target) => {
+              selectIntersection(target.id);
+              setView('compare');
+            })}
+          >
+            Compare plans…
+          </MenuItem>
+        ) : null}
         {itemMenu?.target.kind === 'intersection' ? <MenuItem onClick={closeMenuAnd((target) => setCsmExport(target.id))}>Export for CSM ASC-3…</MenuItem> : null}
         <MenuItem sx={{ color: 'error.main' }} onClick={closeMenuAnd((target) => setDeleting(target))}>
           Delete…
