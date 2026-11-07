@@ -6,6 +6,8 @@ import { fontFamilyMono } from '../theme/themePrimitives';
 
 const cellSx = { border: 1, borderColor: 'divider', px: 0.75, py: 0.25, textAlign: 'right', whiteSpace: 'nowrap', fontFamily: fontFamilyMono, fontVariantNumeric: 'tabular-nums' } as const;
 const headSx = { ...cellSx, textAlign: 'left', fontFamily: 'inherit', fontWeight: 500, bgcolor: 'action.hover' } as const;
+const textSx = { textAlign: 'left', fontFamily: 'inherit', whiteSpace: 'normal' } as const;
+const mono = { fontFamily: fontFamilyMono, fontVariantNumeric: 'tabular-nums' } as const;
 const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 
 /** A titled block. Short sections keep together; long ones may break, but never right after the title. */
@@ -20,16 +22,47 @@ export function Section({ title, children, keepTogether = true }: { title: strin
   );
 }
 
-export function Table({ head, rows, firstColumnLabel }: { head: ReactNode[]; rows: { label: string; cells: ReactNode[] }[]; firstColumnLabel: string }) {
+/** A number or time inside running text, set like the tables' numbers. */
+export function Mono({ children }: { children: ReactNode }) {
   return (
-    <Box component="table" sx={{ borderCollapse: 'collapse', fontSize: 10.5, width: '100%' }}>
+    <Box component="span" sx={mono}>
+      {children}
+    </Box>
+  );
+}
+
+/** A value that needs attention (v/c over 1, LOS F): bold, in the error colour. */
+export function Alarm({ children }: { children: ReactNode }) {
+  return (
+    <Box component="span" sx={{ color: 'error.main', fontWeight: 700 }}>
+      {children}
+    </Box>
+  );
+}
+
+interface TableProps {
+  head: ReactNode[];
+  rows: { label: string; cells: ReactNode[] }[];
+  firstColumnLabel: string;
+  /** Per column: numbers (right-aligned, monospaced; the default) or text (left-aligned, as body text). */
+  columns?: ('number' | 'text')[];
+  /** Set the row labels as numbers (times of day, say). */
+  numericLabels?: boolean;
+  /** Size the table to its content instead of the page width. */
+  compact?: boolean;
+}
+
+export function Table({ head, rows, firstColumnLabel, columns = [], numericLabels = false, compact = false }: TableProps) {
+  const kind = (c: number) => columns[c] ?? 'number';
+  return (
+    <Box component="table" sx={{ borderCollapse: 'collapse', fontSize: 10.5, width: compact ? 'auto' : '100%' }}>
       <thead>
         <tr>
           <Box component="th" scope="col" sx={headSx}>
             {firstColumnLabel}
           </Box>
           {head.map((cell, k) => (
-            <Box component="th" scope="col" key={k} sx={{ ...headSx, textAlign: 'right' }}>
+            <Box component="th" scope="col" key={k} sx={{ ...headSx, textAlign: kind(k) === 'text' ? 'left' : 'right' }}>
               {cell}
             </Box>
           ))}
@@ -38,11 +71,11 @@ export function Table({ head, rows, firstColumnLabel }: { head: ReactNode[]; row
       <tbody>
         {rows.map((row, k) => (
           <tr key={`${row.label}-${k}`}>
-            <Box component="th" scope="row" sx={headSx}>
+            <Box component="th" scope="row" sx={numericLabels ? { ...headSx, ...mono } : headSx}>
               {row.label}
             </Box>
             {row.cells.map((cell, c) => (
-              <Box component="td" key={c} sx={cellSx}>
+              <Box component="td" key={c} sx={kind(c) === 'text' ? { ...cellSx, ...textSx } : cellSx}>
                 {cell}
               </Box>
             ))}
@@ -96,9 +129,7 @@ export function Facts({ facts }: { facts: [string, ReactNode][] }) {
           <Box component="span" sx={{ color: 'text.secondary' }}>
             {label}
           </Box>{' '}
-          <Box component="span" sx={{ fontFamily: fontFamilyMono }}>
-            {value}
-          </Box>
+          {typeof value === 'string' && /^[-+\d.,:–\s]+(s|ticks)?$/.test(value) ? <Mono>{value}</Mono> : value}
         </span>
       ))}
     </Box>

@@ -14,8 +14,7 @@ import Typography from '@mui/material/Typography';
 import ScrollArea from '../../components/ScrollArea';
 import { analyzePattern, suggestedPattern, suggestTiming, type SuggestedTiming } from '../../../engine';
 import { formatSeconds, uniqueName, type Intersection, type Issue } from '../../../model';
-import { SelectInput } from '../../fields/GridInputs';
-import { issuesFor, type FieldPath } from '../../fields/paths';
+import { fieldId, issuesFor, type FieldPath } from '../../fields/paths';
 import { useWorkspace } from '../../state/workspace';
 import { fontFamilyMono } from '../../theme/themePrimitives';
 import { nextPatternId } from '../patterns/patternEdits';
@@ -68,6 +67,7 @@ export default function AnalysisSection({ intersection, basePath, issues }: Anal
     );
   }
   const linkPath = [...basePath, 'patterns', patternIndex, 'volumeSetId'];
+  const linkIssues = issuesFor(issues, linkPath);
 
   const suggest = () => {
     const suggestion = suggestTiming(intersection, pattern.id);
@@ -109,18 +109,25 @@ export default function AnalysisSection({ intersection, basePath, issues }: Anal
               </MenuItem>
             ))}
           </TextField>
-          <Box component="label" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: 13, color: 'text.secondary' }}>
-            Timed for count
-            <SelectInput
-              path={linkPath}
-              label="Count this pattern is timed for"
-              value={pattern.volumeSetId ?? ''}
-              options={[{ value: '', label: 'None' }, ...intersection.volumeSets.map((s) => ({ value: s.id, label: s.name || s.id }))]}
-              issues={issuesFor(issues, linkPath)}
-              onCommit={(v) => editIntersection('Pattern count', (i) => (i.patterns.find((p) => p.id === pattern.id)!.volumeSetId = v === '' ? null : v))}
-              style={{ width: 160 }}
-            />
-          </Box>
+          {/* A native select in the same field style as the pattern picker beside it. */}
+          <TextField
+            select
+            size="small"
+            label="Timed for count"
+            value={pattern.volumeSetId ?? ''}
+            error={linkIssues.some((i) => i.severity === 'error')}
+            title={linkIssues.map((i) => i.message).join('\n') || undefined}
+            onChange={(e) => editIntersection('Pattern count', (i) => (i.patterns.find((p) => p.id === pattern.id)!.volumeSetId = e.target.value === '' ? null : e.target.value))}
+            slotProps={{ select: { native: true }, htmlInput: { id: fieldId(linkPath), 'aria-label': 'Count this pattern is timed for' } }}
+            sx={{ minWidth: 180 }}
+          >
+            <option value="">None</option>
+            {intersection.volumeSets.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name || s.id}
+              </option>
+            ))}
+          </TextField>
         </Box>
 
         {created ? (

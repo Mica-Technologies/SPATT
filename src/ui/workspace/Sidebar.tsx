@@ -49,6 +49,7 @@ export default function Sidebar() {
   const [addingCorridor, setAddingCorridor] = useState(false);
   // Opened once the add menu has closed, so the menu handing focus back does not take it from the dialog.
   const pendingRename = useRef<Target | null>(null);
+  const renameInput = useRef<HTMLInputElement>(null);
 
   const add = (build: (id: string) => Intersection) => {
     setAddAnchor(null);
@@ -221,7 +222,21 @@ export default function Sidebar() {
         }}
       />
 
-      <Dialog open={renaming !== null} onClose={() => setRenaming(null)} fullWidth maxWidth="xs">
+      <Dialog
+        open={renaming !== null}
+        onClose={() => setRenaming(null)}
+        fullWidth
+        maxWidth="xs"
+        // Focus once shown: a closing menu may hand focus back to its button after autoFocus ran.
+        slotProps={{
+          transition: {
+            onEntered: () => {
+              renameInput.current?.focus();
+              renameInput.current?.select();
+            },
+          },
+        }}
+      >
         <form
           onSubmit={(event) => {
             event.preventDefault();
@@ -238,7 +253,7 @@ export default function Sidebar() {
         >
           <DialogTitle>Rename {renaming?.kind}</DialogTitle>
           <DialogContent>
-            <TextField autoFocus fullWidth label="Name" value={renaming?.name ?? ''} onFocus={(e) => e.target.select()} onChange={(e) => setRenaming((r) => (r ? { ...r, name: e.target.value } : r))} sx={{ mt: 1 }} slotProps={{ htmlInput: { maxLength: 120 } }} />
+            <TextField autoFocus inputRef={renameInput} fullWidth label="Name" value={renaming?.name ?? ''} onFocus={(e) => e.target.select()} onChange={(e) => setRenaming((r) => (r ? { ...r, name: e.target.value } : r))} sx={{ mt: 1 }} slotProps={{ htmlInput: { maxLength: 120 } }} />
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setRenaming(null)}>Cancel</Button>

@@ -24,7 +24,6 @@ import {
   fromMetres,
   fromMetresPerSecond,
   LENGTH_LABEL,
-  newCorridorStop,
   oppositeDirection,
   SPEED_LABEL,
   suggestThroughPhases,
@@ -37,6 +36,7 @@ import {
   type Project,
 } from '../../model';
 import ScrollArea from '../components/ScrollArea';
+import { defaultLink, newStop } from './linkDefaults';
 import { MeasureInput } from '../fields/GridInputs';
 import { APPROACHES } from '../fields/phaseOptions';
 import { fieldId, issuesFor, type FieldPath } from '../fields/paths';
@@ -94,7 +94,7 @@ export default function CorridorLayout({ project, corridor, corridorIndex, issue
       // The first stop has no link before it; a stop that was first gets a default link.
       c.stops.forEach((s, k) => {
         if (k === 0) s.distance = 0;
-        else if (s.distance === 0) s.distance = 300;
+        else if (s.distance === 0) s.distance = defaultLink(units).distance;
       });
     });
   };
@@ -288,7 +288,7 @@ export default function CorridorLayout({ project, corridor, corridorIndex, issue
             const intersection = intersections.get(adding);
             if (!intersection) return;
             editCorridor(`Add ${intersection.name} to corridor`, (c) => {
-              c.stops.push(newCorridorStop(intersection, c.outbound, c.stops.length === 0));
+              c.stops.push(newStop(intersection, c.outbound, c.stops.length === 0, units));
               for (const plan of c.plans) plan.patterns[intersection.id] = intersection.patterns.find((p) => p.mode === 'coordinated')?.id ?? null;
             });
             setAdding('');

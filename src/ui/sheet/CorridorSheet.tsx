@@ -51,6 +51,7 @@ export default function CorridorSheet({ project, corridor, plan, printedAt }: { 
       <Section title="Intersections">
         <Table
           firstColumnLabel="Intersection"
+          columns={['text', 'number', 'number', 'text']}
           head={['Pattern', 'Cycle (s)', 'Offset (s)', 'Measured to', `${labels.outbound} phases`, `${labels.inbound} phases`]}
           rows={corridor.stops.map((stop) => {
             const intersection = intersections.get(stop.intersectionId);

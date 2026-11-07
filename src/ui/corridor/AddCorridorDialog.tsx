@@ -17,8 +17,9 @@ import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { newCorridorPlan, newCorridorStop, randomId, uniqueName, type Approach, type Corridor, type Project } from '../../model';
+import { formatMeasure, fromMetres, fromMetresPerSecond, LENGTH_LABEL, newCorridorPlan, randomId, SPEED_LABEL, uniqueName, type Approach, type Corridor, type Project } from '../../model';
 import { APPROACHES } from '../fields/phaseOptions';
+import { defaultLink, newStop } from './linkDefaults';
 
 const DIRECTIONS = APPROACHES.filter((a) => a.value !== '') as { value: Approach; label: string }[];
 
@@ -48,6 +49,7 @@ export default function AddCorridorDialog({ open, project, onClose, onCreate }: 
   }
 
   const byId = new Map(project.intersections.map((i) => [i.id, i]));
+  const link = defaultLink(project.units);
   const swap = (k: number, j: number) =>
     setOrder((o) => {
       const next = [...o];
@@ -61,7 +63,7 @@ export default function AddCorridorDialog({ open, project, onClose, onCreate }: 
       id: randomId('c'),
       name: name.trim() || 'Corridor',
       outbound,
-      stops: selected.map((intersection, k) => newCorridorStop(intersection, outbound, k === 0)),
+      stops: selected.map((intersection, k) => newStop(intersection, outbound, k === 0, project.units)),
       plans: [newCorridorPlan(randomId('plan'), 'Plan 1', selected)],
     };
     onCreate(corridor);
@@ -133,7 +135,7 @@ export default function AddCorridorDialog({ open, project, onClose, onCreate }: 
               )}
             </Box>
             <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-              Links start at 300 m and 48 km/h, through phases are chosen from each phase&apos;s direction of travel, and a first timing plan uses each intersection&apos;s first coordinated pattern. Adjust them in the corridor.
+              Links start at {formatMeasure(fromMetres(link.distance, project.units.length))} {LENGTH_LABEL[project.units.length]} and {formatMeasure(fromMetresPerSecond(link.speed, project.units.speed))} {SPEED_LABEL[project.units.speed]}, through phases are chosen from each phase&apos;s direction of travel, and a first timing plan uses each intersection&apos;s first coordinated pattern. Adjust them in the corridor.
             </Typography>
           </Stack>
         </DialogContent>

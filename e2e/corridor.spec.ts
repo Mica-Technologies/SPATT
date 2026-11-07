@@ -159,10 +159,10 @@ test('builds a corridor: stops, links in project units, through phases and a tim
   await expect(first.getByRole('group', { name: 'Outbound through phases at Main St & Side St' }).getByRole('button', { name: 'Phase 2' })).toHaveAttribute('aria-pressed', 'true');
   await expect(first.getByRole('group', { name: 'Inbound through phases at Main St & Side St' }).getByRole('button', { name: 'Phase 6' })).toHaveAttribute('aria-pressed', 'true');
 
-  // The default link, in metres and km/h.
+  // The default link, in round metres and km/h.
   const distance = page.getByLabel('Distance to Elm St & 3rd Ave', { exact: true });
   await expect(distance).toHaveValue('300');
-  await expect(page.getByLabel('Outbound speed to Elm St & 3rd Ave', { exact: true })).toHaveValue('48.2');
+  await expect(page.getByLabel('Outbound speed to Elm St & 3rd Ave', { exact: true })).toHaveValue('50');
   await distance.fill('450');
   await distance.press('Enter');
   await saved(page);
@@ -174,10 +174,10 @@ test('builds a corridor: stops, links in project units, through phases and a tim
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(distance).toHaveValue('1476.4');
 
-  // Reorder: Elm first. The new first stop has no link; the old first gets the default one.
+  // Reorder: Elm first. The new first stop has no link; the old first gets the default one, in round feet.
   await page.getByRole('button', { name: 'Move Elm St & 3rd Ave earlier' }).click();
   await expect(page.getByRole('row', { name: /^Stop 1, Elm St & 3rd Ave/ })).toBeVisible();
-  await expect(page.getByLabel('Distance to Main St & Side St', { exact: true })).toHaveValue('984.3');
+  await expect(page.getByLabel('Distance to Main St & Side St', { exact: true })).toHaveValue('1000');
 
   // The plan pairs each intersection's pattern; the cycles differ (90 s vs 70 s).
   await page.getByRole('tab', { name: 'Timing plans' }).click();
