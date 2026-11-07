@@ -8,3 +8,5 @@
 4. Time your first intersection with [Using the Editor](editor.md).
 5. Coordinate a street with [Corridors and Green Waves](corridors.md).
 6. See how a plan behaves under actuation with [Simulation](simulation.md).
+7. Bring in traffic counts and Synchro networks with
+   [Importing Counts and Synchro Files](imports.md).

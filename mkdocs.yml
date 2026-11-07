@@ -105,6 +105,7 @@ nav:
       - Using the Editor: getting-started/editor.md
       - Corridors and Green Waves: getting-started/corridors.md
       - Simulation: getting-started/simulation.md
+      - Importing Counts and Synchro Files: getting-started/imports.md
   - Concepts:
       - concepts/index.md
       - Rings, Barriers and Phases: concepts/ring-barrier.md

@@ -28,11 +28,13 @@ in version control. The format is documented in [Project File Format](../develop
 
 - **Sidebar.** The project's intersections. **Add intersection** starts from a template: a
   standard eight-phase intersection, eight-phase with a lagging left, a split-phased side street,
-  two-phase, or the CSM ASC-3 controller's defaults, or imports a plan from that controller. An
-  empty project offers the same templates in the main area. A template whose name is already
-  taken asks for a new name. Each intersection's menu renames, duplicates, compares its plans
-  ([Comparing plans](#comparing-plans)), exports for the controller, or deletes it (see
-  [CSM ASC-3](../profiles/csm-asc3.md)). On narrow windows the sidebar is a drawer, opened with the menu button at the left of the header.
+  two-phase, or the CSM ASC-3 controller's defaults, or imports a plan from that controller or
+  intersections from a Synchro UTDF file ([Importing](imports.md)). An empty project offers the
+  same templates in the main area. A template whose name is already taken asks for a new name.
+  Each intersection's menu renames, duplicates, compares its plans
+  ([Comparing plans](#comparing-plans)), imports counts from CSV, exports for the controller, or
+  deletes it (see [CSM ASC-3](../profiles/csm-asc3.md)). On narrow windows the sidebar is a
+  drawer, opened with the menu button at the left of the header.
 - **Header.** Undo and redo, then the timing sheet, **Export**, the diagram toggle, project
   **Settings** and **All projects** (back to the library). Wide windows label these buttons;
   narrower ones show icons with tooltips, and phones put them in the **More actions** menu.
@@ -144,7 +146,9 @@ The Volumes tab holds what the intersection's timing is designed for:
   phases** makes one per phase that has none. The saturation flow column shows the calculated
   value; type a number to override it, and clear it to calculate again.
 - **Counts.** Named sets of hourly volumes per lane group and movement (AM peak, PM peak), each with
-  a peak hour factor. The first count you add is linked to the intersection's patterns. A pattern's
+  a peak hour factor. The first count you add is linked to the intersection's patterns.
+  **Import CSV…** reads a turning-movement count file and adds its peak hour (see
+  [Importing](imports.md#turning-movement-counts)). A pattern's
   count can be changed on the Patterns tab or here.
 - **Analysis.** For the selected pattern and its count: v/c, delay and level of service per lane
   group, intersection delay, the critical flow ratio Y, lost time and Webster's cycle.

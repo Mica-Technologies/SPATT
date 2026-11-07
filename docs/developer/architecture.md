@@ -7,7 +7,7 @@ src/
 ├── model/        timing plan types, schema and validation      ┐
 ├── engine/       timing math: cycle projection, offsets, bands  ├ pure TypeScript
 ├── profiles/     controller dialects (profiles/csm)             ┘
-├── io/           host detection, project storage adapters
+├── io/           host detection, project storage adapters, file imports (import/)
 ├── ui/           the SPATT interface (React + MUI, Mica theme)
 └── manager/      the desktop manager window
 crates/

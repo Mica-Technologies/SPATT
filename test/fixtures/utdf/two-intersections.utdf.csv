@@ -1,0 +1,127 @@
+[Network]
+Network Settings
+RECORDNAME,DATA
+Metric,0
+yellowTime,3.5
+allRedTime,1.0
+Walk,7.0
+DontWalk,11.0
+HV,0.02
+PHF,0.92
+DefWidth,12
+DefFlow,1900
+vehLength,25
+growthFactor,1.00
+PedSpeed,3.5
+LostTimeAdjust,0.0
+
+[Nodes]
+Node Data
+INTID,TYPE,X,Y,Z,DESCRIPTION,CBD,Inside Radius,Outside Radius,Roundabout Lanes,Circle Speed
+1,0,1000,2000,0,"Main St & 1st Ave",0,,,,
+2,0,1650,2000,0,"Main St & 2nd Ave",1,,,,
+3,1,2300,2000,0,,0,,,,
+
+[Links]
+Link Data
+RECORDNAME,INTID,NB,SB,EB,WB,NE,NW,SE,SW
+Up ID,1,,,,2,,,,
+Lanes,1,2,2,3,3,,,,
+Name,1,1st Ave,1st Ave,Main St,Main St,,,,
+Distance,1,600,600,650,650,,,,
+Speed,1,30,30,35,35,,,,
+
+[Lanes]
+Lane Group Data
+RECORDNAME,INTID,NBL,NBT,NBR,SBL,SBT,SBR,EBL,EBT,EBR,WBL,WBT,WBR,PED,HOLD
+Up Node,1,,,,,,,,,,2,2,2,,
+Dest Node,1,,,,,,,2,2,2,,,,,
+Lanes,1,1,1,0,1,1,0,1,2,0,1,2,0,,
+Shared,1,0,2,0,0,2,0,0,2,0,0,2,0,,
+Width,1,11,12,12,11,12,12,11,12,12,11,12,12,,
+Storage,1,150,,,150,,,200,,,200,,,,
+Taper,1,25,,,25,,,25,,,25,,,,
+StLanes,1,1,,,1,,,1,,,1,,,,
+Grade,1,0,0,0,2,2,2,0,0,0,0,0,0,,
+Speed,1,30,30,30,30,30,30,35,35,35,35,35,35,,
+Phase1,1,3,8,8,7,4,4,5,2,2,1,6,6,,
+PermPhase1,1,,,,,,,,,,,,,,
+LostTime,1,4.5,5.5,5.5,4.5,5.5,5.5,4.5,5.5,5.5,4.5,5.5,5.5,,
+IdealFlow,1,1900,1900,1900,1900,1900,1900,1900,1900,1900,1900,1900,1900,,
+Volume,1,95,410,70,80,360,55,160,920,105,140,980,90,,
+Peds,1,,,,,,,,,,,,,20,
+PHF,1,0.92,0.92,0.92,0.92,0.92,0.92,0.94,0.94,0.94,0.94,0.94,0.94,,
+HeavyVehicles,1,2,3,3,2,3,3,2,4,4,2,4,4,,
+Up Node,2,,,,,,,1,1,1,,,,,
+Lanes,2,0,1,0,0,1,0,1,2,0,1,2,0,,
+Shared,2,0,3,0,0,3,0,0,2,0,0,2,0,,
+Width,2,12,12,12,12,12,12,10,11,11,10,11,11,,
+Grade,2,0,0,0,0,0,0,0,0,0,0,0,0,,
+Phase1,2,,8,8,,4,4,,2,2,,6,6,,
+PermPhase1,2,8,,,4,,,2,,,6,,,,
+IdealFlow,2,1800,1800,1800,1800,1800,1800,1800,1800,1800,1800,1800,1800,,
+Volume,2,40,210,35,30,190,45,60,870,50,55,905,65,,
+PHF,2,0.90,0.90,0.90,0.90,0.90,0.90,0.90,0.90,0.90,0.90,0.90,0.90,,
+HeavyVehicles,2,2,2,2,2,2,2,3,3,3,3,3,3,,
+
+[Timeplans]
+Timing Plan Settings
+RECORDNAME,INTID,DATA
+Control Type,1,3
+Cycle Length,1,100.0
+Lock Timings,1,0
+Referenced To,1,0
+Reference Phase,1,206
+Offset,1,0.0
+Master,1,0
+Yield,1,0
+Node 0,1,1
+Node 1,1,0
+Control Type,2,3
+Cycle Length,2,100.0
+Lock Timings,2,0
+Referenced To,2,1
+Reference Phase,2,206
+Offset,2,35.0
+Master,2,0
+Yield,2,0
+Node 0,2,2
+Node 1,2,0
+
+[Phases]
+Phasing Data
+RECORDNAME,INTID,D1,D2,D3,D4,D5,D6,D7,D8
+BRP,1,111,112,211,212,121,122,221,222
+MinGreen,1,5.0,10.0,5.0,7.0,5.0,10.0,5.0,7.0
+MaxGreen,1,10.5,39.5,10.5,19.5,10.5,39.5,10.5,19.5
+VehExt,1,2.5,3.0,2.5,3.0,2.5,3.0,2.5,3.0
+TimeBeforeReduce,1,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+TimeToReduce,1,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+MinGap,1,2.5,3.0,2.5,3.0,2.5,3.0,2.5,3.0
+Yellow,1,3.5,4.0,3.5,4.0,3.5,4.0,3.5,4.0
+AllRed,1,1.0,1.5,1.0,1.5,1.0,1.5,1.0,1.5
+Recall,1,0,4,0,0,0,4,0,0
+Walk,1,,7.0,,7.0,,7.0,,7.0
+DontWalk,1,,18.0,,12.0,,18.0,,12.0
+PedCalls,1,,20,,10,,20,,10
+MinSplit,1,9.5,30.5,9.5,24.5,9.5,30.5,9.5,24.5
+DualEntry,1,0,1,0,1,0,1,0,1
+InhibitMax,1,1,1,1,1,1,1,1,1
+Start,1,85.0,0.0,45.0,60.0,85.0,0.0,45.0,60.0
+End,1,0.0,45.0,60.0,85.0,0.0,45.0,60.0,85.0
+Yield,1,96.0,40.5,56.5,79.5,96.0,40.5,56.5,79.5
+Yield170,1,96.0,26.5,56.5,79.5,96.0,26.5,56.5,79.5
+LocalStart,1,85.0,0.0,45.0,60.0,85.0,0.0,45.0,60.0
+LocalYield,1,96.0,40.5,56.5,79.5,96.0,40.5,56.5,79.5
+LocalYield170,1,96.0,26.5,56.5,79.5,96.0,26.5,56.5,79.5
+ActGreen,1,10.5,39.5,10.5,19.5,10.5,39.5,10.5,19.5
+BRP,2,,111,,211,,121,,221
+MinGreen,2,,15.0,,7.0,,15.0,,7.0
+MaxGreen,2,,59.5,,30.0,,59.5,,30.0
+VehExt,2,,3.0,,3.0,,3.0,,3.0
+Yellow,2,,4.0,,3.5,,4.0,,3.5
+AllRed,2,,1.5,,1.5,,1.5,,1.5
+Recall,2,,4,,1,,4,,1
+Walk,2,,7.0,,7.0,,7.0,,7.0
+DontWalk,2,,20.0,,15.0,,20.0,,15.0
+DualEntry,2,,1,,1,,1,,1
