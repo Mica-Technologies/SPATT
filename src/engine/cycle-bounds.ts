@@ -4,6 +4,8 @@
  *
  * Each ring's time through a barrier group is the sum of its phases' green plus clearances; the
  * rings must wait for each other at the barrier, so a group lasts as long as its longest ring.
+ * The intersection's red+amber comes before every vehicle phase's green; its green flash is part
+ * of the green.
  */
 import type { Intersection, Phase, Tenths } from '../model';
 
@@ -47,7 +49,8 @@ function bound(intersection: Intersection, green: GreenOf): { groups: GroupBound
     const rings = intersection.rings.map((ring) =>
       (ring.groups[g] ?? []).reduce((sum, n) => {
         const phase = phases.get(n);
-        return phase?.enabled ? sum + green(phase) + phase.yellow + phase.redClear : sum;
+        const redAmber = phase?.movement.kind === 'pedestrian' ? 0 : intersection.redAmber;
+        return phase?.enabled ? sum + redAmber + green(phase) + phase.yellow + phase.redClear : sum;
       }, 0),
     );
     groups.push({ rings, total: Math.max(0, ...rings) });

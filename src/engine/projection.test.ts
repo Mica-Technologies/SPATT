@@ -37,6 +37,13 @@ describe('projectCycle — standard eight-phase, 90 s, coordinated 2 + 6, offset
     ]);
   });
 
+  it('starts each vehicle green after the red+amber, inside its split, and the walk with the green', () => {
+    const i = standardEightPhase();
+    i.redAmber = 20;
+    const two = interval(projected(i), 2);
+    expect([two.splitStart, two.greenStart, two.yellowStart, two.walkEnd]).toEqual([150, 170, 440, 240]);
+  });
+
   it('lays out ring 2 identically to ring 1', () => {
     expect(windows(p, 1).map(([, ...times]) => times)).toEqual(windows(p, 0).map(([, ...times]) => times));
   });

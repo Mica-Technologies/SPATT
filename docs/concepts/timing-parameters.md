@@ -26,6 +26,14 @@ Red clearance
 :   All-red time after the yellow so a vehicle that entered on yellow can clear. A common estimate
     is **R = (W + L) / v**, with the width crossed *W* and vehicle length *L*.
 
+Red+amber and green flash
+:   Two settings for the whole intersection, used in some European countries, entered above the
+    phase grid. **Red+amber** shows red and amber together before every vehicle green; it is part
+    of the phase's split, so SPATT adds it to the split minimums and the minimum cycle, and the
+    walk starts with the green. **Green flash** flashes the end of every green before the yellow;
+    it is part of the green, so it does not lengthen a phase: the green is told to end that much
+    sooner. Both are 0 (off) by default.
+
 ## Pedestrian intervals
 
 Walk

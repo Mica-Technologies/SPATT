@@ -26,7 +26,10 @@ export interface PhaseInterval {
   ring: number;
   group: number;
   coordinated: boolean;
-  /** Sequence times. The split runs splitStart → splitEnd; green, yellow, red clear tile it. */
+  /**
+   * Sequence times. The split runs splitStart → splitEnd; red+amber (vehicle phases, when the
+   * intersection has it), green, yellow and red clear tile it. The green flash is the end of green.
+   */
   splitStart: Tenths;
   greenStart: Tenths;
   yellowStart: Tenths;
@@ -137,14 +140,14 @@ export function projectCycle(intersection: Intersection, patternId: string): Pro
     return { ok: false, issues: blocking };
   }
   const projection = project(intersection, pattern);
-  const cramped = projection.rings.flat().filter((interval) => interval.yellowStart < interval.splitStart);
+  const cramped = projection.rings.flat().filter((interval) => interval.yellowStart < interval.greenStart);
   if (cramped.length > 0) {
     return {
       ok: false,
       issues: cramped.map((interval) => ({
         severity: 'error' as const,
         code: 'projection.split-below-clearance',
-        message: `Pattern "${pattern.name}": phase ${interval.phase} split of ${formatSeconds(interval.splitEnd - interval.splitStart)} s cannot hold its yellow and red clearance`,
+        message: `Pattern "${pattern.name}": phase ${interval.phase} split of ${formatSeconds(interval.splitEnd - interval.splitStart)} s cannot hold its ${interval.greenStart > interval.splitStart ? 'red+amber, ' : ''}yellow and red clearance`,
         path: ['patterns', patternIndex, 'splits', String(interval.phase)],
       })),
     };
@@ -190,18 +193,19 @@ function project(intersection: Intersection, pattern: Pattern): CycleProjection 
         const yellowStart = redClearStart - phase.yellow;
         const ped = phase.pedestrian.enabled;
         const isCoordinated = coordinated.has(n);
+        const greenStart = splitStart + (phase.movement.kind === 'pedestrian' ? 0 : intersection.redAmber);
         intervals.push({
           phase: n,
           ring: r,
           group: g,
           coordinated: isCoordinated,
           splitStart,
-          greenStart: splitStart,
+          greenStart,
           yellowStart,
           redClearStart,
           splitEnd,
-          walkEnd: ped ? splitStart + phase.pedestrian.walk : null,
-          pedestrianClearanceEnd: ped ? splitStart + phase.pedestrian.walk + phase.pedestrian.clearance : null,
+          walkEnd: ped ? greenStart + phase.pedestrian.walk : null,
+          pedestrianClearanceEnd: ped ? greenStart + phase.pedestrian.walk + phase.pedestrian.clearance : null,
           forceOff: yellowStart,
           latestVehicleStart: isCoordinated ? null : yellowStart - phase.minGreen,
           latestPedestrianStart: isCoordinated || !ped ? null : yellowStart - phase.pedestrian.walk - phase.pedestrian.clearance,

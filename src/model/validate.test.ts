@@ -230,6 +230,14 @@ describe('pattern rules', () => {
     expect(issues[0]?.message).toContain('10.0 s');
   });
 
+  it('counts red+amber in every vehicle phase split minimum', () => {
+    // Phase 1 has 15 s: 1.0 red+amber + 5.0 + 3.5 + 1.5 fits (as do 4 and 8's walks), 6.0 + 10 = 16 s does not.
+    expect(issuesAfter((i) => (i.redAmber = 10))).toEqual([]);
+    const issues = issuesAfter((i) => (i.redAmber = 60));
+    expect(codes(issues).filter((c) => c.endsWith('split-below-minimum'))).toContain('error:pattern.split-below-minimum');
+    expect(issues.find((i) => i.path.join() === 'patterns,0,splits,1')?.message).toContain('red+amber + minimum green');
+  });
+
   it('warns when the pedestrian interval does not fit and there is no pedestrian recall', () => {
     // Phase 4 needs 7 + 14 + 4 + 2 = 27 s; give it 26 s and phase 3 13 s.
     const issues = issuesAfter((i) => {

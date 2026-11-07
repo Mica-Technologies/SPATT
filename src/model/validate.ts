@@ -78,7 +78,7 @@ export function validateIntersection(intersection: Intersection): Issue[] {
     }
     patternIds.add(pattern.id);
     if (structureOk) {
-      issues.push(...validatePattern(pattern, intersection.rings, phases, excluded, path));
+      issues.push(...validatePattern(pattern, intersection.rings, phases, excluded, intersection.redAmber, path));
     }
   });
 
@@ -185,7 +185,7 @@ export function effectiveSequence(pattern: Pattern, rings: Ring[]): Ring[] {
   return pattern.sequence ?? rings;
 }
 
-function validatePattern(pattern: Pattern, rings: Ring[], phases: Map<number, Phase>, excluded: (a: number, b: number) => boolean, path: (string | number)[]): Issue[] {
+function validatePattern(pattern: Pattern, rings: Ring[], phases: Map<number, Phase>, excluded: (a: number, b: number) => boolean, redAmber: Tenths, path: (string | number)[]): Issue[] {
   const issues: Issue[] = [];
   const name = `Pattern "${pattern.name}"`;
 
@@ -252,15 +252,18 @@ function validatePattern(pattern: Pattern, rings: Ring[], phases: Map<number, Ph
       continue;
     }
     const clearance = phase.yellow + phase.redClear;
-    const vehicleMinimum = phase.movement.kind === 'pedestrian' ? clearance : phase.minGreen + clearance;
+    // Red+amber comes before a vehicle phase's green (and its walk), inside its split.
+    const before = phase.movement.kind === 'pedestrian' ? 0 : redAmber;
+    const withRedAmber = before > 0 ? 'red+amber + ' : '';
+    const vehicleMinimum = phase.movement.kind === 'pedestrian' ? clearance : before + phase.minGreen + clearance;
     if (value < vehicleMinimum) {
-      issues.push(error('pattern.split-below-minimum', `${name}: phase ${n} split of ${s(value)} s is shorter than minimum green + yellow + red clear (${s(vehicleMinimum)} s)`, splitPath));
+      issues.push(error('pattern.split-below-minimum', `${name}: phase ${n} split of ${s(value)} s is shorter than ${withRedAmber}minimum green + yellow + red clear (${s(vehicleMinimum)} s)`, splitPath));
     }
     const ped = phase.pedestrian;
     if (ped.enabled) {
-      const pedMinimum = ped.walk + ped.clearance + clearance;
+      const pedMinimum = before + ped.walk + ped.clearance + clearance;
       if (value < pedMinimum) {
-        const message = `${name}: phase ${n} split of ${s(value)} s is shorter than walk + pedestrian clearance + yellow + red clear (${s(pedMinimum)} s)`;
+        const message = `${name}: phase ${n} split of ${s(value)} s is shorter than ${withRedAmber}walk + pedestrian clearance + yellow + red clear (${s(pedMinimum)} s)`;
         issues.push(ped.recall ? error('pattern.split-below-pedestrian', message, splitPath) : warning('pattern.split-below-pedestrian', `${message}; the pedestrian interval cannot be served in coordination`, splitPath));
       }
     }

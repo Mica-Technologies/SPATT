@@ -14,6 +14,10 @@
  * split's green (floating), and only start if their minimum green (and a called pedestrian interval)
  * fits before the force-off.
  *
+ * Red+amber and green flash (intersection settings): a green starts with red+amber, which holds
+ * its timers and its walk; the green flash is the end of the green, so a green is told to end that
+ * much before its minimum, max, force-off or yield, then flashes, then turns yellow.
+ *
  * Phase exclusions: a phase excluded beside the phase another ring is timing (in any interval)
  * does not start; its ring waits for it at that point in its sequence, and the other ring's green
  * treats it as a conflicting call and ends as soon as it may.
@@ -26,7 +30,8 @@ import { effectiveSequence, phasesExclude, type Intersection, type Phase, type R
 import { projectCycle, type CycleProjection } from '../projection';
 import { TICKS_PER_TENTH, type ControllerInputs, type ControllerModel, type PhaseSignal, type Termination } from './types';
 
-type Interval = 'green' | 'yellow' | 'red' | 'idle';
+/** `redAmber`: before the green; `flash`: the green flash, after the green has been told to end. */
+type Interval = 'redAmber' | 'green' | 'flash' | 'yellow' | 'red' | 'idle';
 
 interface RingState {
   phase: number | null;
@@ -58,6 +63,8 @@ interface PhaseTiming {
   walk: number;
   pedestrianClearance: number;
   hasPedestrian: boolean;
+  /** Not a pedestrian phase: red+amber applies. */
+  vehicle: boolean;
   recall: Phase['recall'];
   pedestrianRecall: boolean;
   restInWalk: boolean;
@@ -103,8 +110,13 @@ export class NemaController implements ControllerModel {
   private readonly redActuations = new Map<number, number>();
   private terminations: { phase: number; reason: Termination; tick: number }[] = [];
   private readonly excludes: (a: number, b: number) => boolean;
+  /** Ticks. */
+  private readonly redAmber: number;
+  private readonly greenFlash: number;
 
   constructor(intersection: Intersection, options: NemaOptions) {
+    this.redAmber = intersection.redAmber * TICKS_PER_TENTH;
+    this.greenFlash = intersection.greenFlash * TICKS_PER_TENTH;
     this.excludes = (a, b) => phasesExclude(intersection.phases, a, b);
     const pattern = intersection.patterns.find((p) => p.id === options.patternId) ?? null;
     this.sequence = pattern ? effectiveSequence(pattern, intersection.rings) : intersection.rings;
@@ -130,6 +142,7 @@ export class NemaController implements ControllerModel {
             walk: t(p.pedestrian.walk),
             pedestrianClearance: t(p.pedestrian.clearance),
             hasPedestrian: p.pedestrian.enabled,
+            vehicle,
             recall: p.recall,
             pedestrianRecall: p.pedestrian.enabled && p.pedestrian.recall,
             restInWalk: p.pedestrian.restInWalk,
@@ -174,7 +187,7 @@ export class NemaController implements ControllerModel {
     const ring = timing ? this.rings[timing.ring] : undefined;
     if (!ring || ring.phase !== phase || ring.interval === 'idle') return { vehicle: 'red', pedestrian: 'dont-walk' };
     return {
-      vehicle: ring.interval === 'green' ? 'green' : ring.interval === 'yellow' ? 'yellow' : 'red',
+      vehicle: ring.interval === 'green' || ring.interval === 'flash' ? 'green' : ring.interval === 'yellow' ? 'yellow' : 'red',
       pedestrian: ring.interval === 'green' && ring.pedestrian === 'walk' ? 'walk' : ring.interval === 'green' && ring.pedestrian === 'clearance' ? 'clearance' : 'dont-walk',
     };
   }
@@ -243,13 +256,17 @@ export class NemaController implements ControllerModel {
     const u = mod(this.seq() - c.yieldRef, c.cycle);
     const forceOff = mod(s.yellowStart - c.yieldRef, c.cycle);
     const needs = Math.max(timing.minGreen, this.pedestrianCalls.has(n) ? timing.walk + timing.pedestrianClearance : 0);
-    return u + needs <= forceOff;
+    return u + this.redAmberOf(timing) + needs <= forceOff;
   }
 
   private nextInGroup(r: number, after: number | null): number | null {
     const list = this.sequence[r]!.groups[this.group] ?? [];
     const from = after === null ? 0 : list.indexOf(after) + 1;
     return list.slice(from).find((n) => this.phases.has(n) && this.serviceable(n)) ?? null;
+  }
+
+  private redAmberOf(timing: PhaseTiming): number {
+    return timing.vehicle ? this.redAmber : 0;
   }
 
   /** Whether another ring is timing (in any interval) a phase excluded beside `n`. */
@@ -289,6 +306,14 @@ export class NemaController implements ControllerModel {
       if (n !== null) this.startOrWait(ring, r, n);
       return;
     }
+    if (ring.interval === 'redAmber') {
+      if (ring.elapsed >= this.redAmberOf(this.phases.get(ring.phase!)!)) Object.assign(ring, { interval: 'green', elapsed: 0 });
+      return;
+    }
+    if (ring.interval === 'flash') {
+      if (ring.elapsed >= this.greenFlash) Object.assign(ring, { interval: 'yellow', elapsed: 0 });
+      return;
+    }
     if (ring.interval === 'yellow') {
       const timing = this.phases.get(ring.phase!)!;
       if (ring.elapsed >= timing.yellow) Object.assign(ring, { interval: 'red', elapsed: 0 });
@@ -325,7 +350,7 @@ export class NemaController implements ControllerModel {
 
     if (ring.ready === null) {
       const pedestrianBusy = ring.pedestrian === 'walk' || ring.pedestrian === 'clearance';
-      const minimumDone = ring.elapsed >= ring.initial && !pedestrianBusy;
+      const minimumDone = ring.elapsed >= ring.initial - this.greenFlash && !pedestrianBusy;
       ring.ready = conflicting && minimumDone ? this.termination(ring, timing, coordinatedPhase) : null;
     }
     if (ring.ready === null) return;
@@ -338,16 +363,16 @@ export class NemaController implements ControllerModel {
   private termination(ring: RingState, timing: PhaseTiming, coordinatedPhase: boolean): Termination | null {
     const c = this.coordination;
     if (c && coordinatedPhase) {
-      return this.tick >= ring.yieldTick ? 'yield' : null;
+      return this.tick >= ring.yieldTick - this.greenFlash ? 'yield' : null;
     }
     if (c) {
       const s = c.schedule.get(timing.number);
       if (s) {
         const u = mod(this.seq() - c.yieldRef, c.cycle);
-        if (u >= mod(s.yellowStart - c.yieldRef, c.cycle) || (c.floating && ring.elapsed >= s.splitGreen)) return 'force-off';
+        if (u >= mod(s.yellowStart - this.greenFlash - c.yieldRef, c.cycle) || (c.floating && ring.elapsed >= s.splitGreen - this.greenFlash)) return 'force-off';
       }
     }
-    if (ring.maxElapsed >= timing.max) return 'max-out';
+    if (ring.maxElapsed >= timing.max - this.greenFlash) return 'max-out';
     if (timing.recall === 'maximum') return null;
     return ring.gap >= this.passage(ring, timing) ? 'gap-out' : null;
   }
@@ -370,20 +395,21 @@ export class NemaController implements ControllerModel {
     // A coordinated phase that starts early (or late) still yields at its next scheduled end of green.
     const c = this.coordination;
     const s = c?.coordinated.has(n) ? c.schedule.get(n) : undefined;
+    const redAmber = this.redAmberOf(timing);
     const yieldTick = c && s ? this.tick + mod(s.yellowStart - this.seq(), c.cycle) : 0;
-    Object.assign(ring, { phase: n, interval: 'green', elapsed: 0, gap: 0, maxElapsed: 0, initial, pedestrian: walk ? 'walk' : 'none', pedestrianElapsed: 0, ready: null, yieldTick, waiting: null } satisfies RingState);
+    Object.assign(ring, { phase: n, interval: redAmber > 0 ? 'redAmber' : 'green', elapsed: 0, gap: 0, maxElapsed: 0, initial, pedestrian: walk ? 'walk' : 'none', pedestrianElapsed: 0, ready: null, yieldTick, waiting: null } satisfies RingState);
   }
 
   private endGreen(ring: RingState, n: number, reason: Termination): void {
     this.terminations.push({ phase: n, reason, tick: this.tick });
-    Object.assign(ring, { interval: 'yellow', elapsed: 0, ready: null });
+    Object.assign(ring, { interval: this.greenFlash > 0 ? 'flash' : 'yellow', elapsed: 0, ready: null });
   }
 
   private crossBarrier(): void {
     const timing = (r: number) => this.sequence[r]!.groups[this.group] ?? [];
     // Rings still green in this group must all be ready to leave it.
     const green = this.rings.filter((ring) => ring.interval === 'green');
-    const clearing = this.rings.some((ring) => ring.interval === 'yellow' || ring.interval === 'red' || ring.waiting !== null);
+    const clearing = this.rings.some((ring) => ring.interval === 'redAmber' || ring.interval === 'flash' || ring.interval === 'yellow' || ring.interval === 'red' || ring.waiting !== null);
     if (green.length > 0) {
       const allReady = green.every((ring) => ring.ready !== null && this.nextInGroup(this.rings.indexOf(ring), ring.phase) === null);
       if (allReady && !clearing && this.demandElsewhere()) {

@@ -113,6 +113,27 @@ describe('simulated traffic', () => {
   });
 });
 
+describe('NEMA controller with red+amber and green flash', () => {
+  it('runs red+amber before each green and takes the green flash out of it', () => {
+    // Two-phase on minimum recall: 2 s red+amber + 10 s green (its last 3 s flashing) + 4 + 2, twice.
+    const i = twoPhase();
+    for (const p of i.phases) p.recall = 'minimum';
+    i.redAmber = 20;
+    i.greenFlash = 30;
+    const result = run(i, settings(null));
+    expect(result.cycle).toMatchObject({ mean: 36, min: 36, max: 36 });
+    expect(result.phases.every((p) => p.green.mean === 10)).toBe(true);
+  });
+
+  it('still holds the coordinated cycle, with the force-off and yield moved for the flash', () => {
+    const i = twoPhase();
+    for (const n of [4, 8]) i.phases.find((p) => p.number === n)!.recall = 'minimum';
+    i.redAmber = 20;
+    i.greenFlash = 30;
+    expect(run(i, settings('all-day')).cycle).toMatchObject({ mean: 70, min: 70, max: 70 });
+  });
+});
+
 describe('NEMA controller with phase exclusions', () => {
   /** Every phase called, free, for `ticks`: whether 1 and 5 were each served, and ever up together. */
   function lefts(i: Intersection, ticks = 8000) {

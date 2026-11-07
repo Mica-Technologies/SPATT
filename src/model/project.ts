@@ -94,7 +94,7 @@ function migrateV2(v2: Record<string, unknown>): Record<string, unknown> {
   };
 }
 
-/** v3 → v4: phases gain an empty exclusion list. */
+/** v3 → v4: phases gain an empty exclusion list; intersections have no red+amber or green flash. */
 function migrateV3(v3: Record<string, unknown>): Record<string, unknown> {
   const intersections = Array.isArray(v3.intersections) ? v3.intersections : [];
   return {
@@ -103,7 +103,7 @@ function migrateV3(v3: Record<string, unknown>): Record<string, unknown> {
     intersections: intersections.map((raw) => {
       const intersection = raw as Record<string, unknown>;
       const phases = Array.isArray(intersection.phases) ? intersection.phases : [];
-      return { ...intersection, phases: phases.map((phase) => ({ ...(phase as object), exclusions: [] })) };
+      return { ...intersection, redAmber: 0, greenFlash: 0, phases: phases.map((phase) => ({ ...(phase as object), exclusions: [] })) };
     }),
   };
 }

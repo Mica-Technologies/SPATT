@@ -221,6 +221,11 @@ export default function TimingSheet({ project, intersection, printedAt }: { proj
 
       <Section title="Phase timing (seconds)" keepTogether={false}>
         <PhaseTable phases={phases} />
+        {intersection.redAmber > 0 || intersection.greenFlash > 0 ? (
+          <Typography variant="caption" component="p" sx={{ mt: 0.5 }}>
+            {[intersection.redAmber > 0 ? `Red+amber ${s(intersection.redAmber)} s before every green` : '', intersection.greenFlash > 0 ? `green flash ${s(intersection.greenFlash)} s at the end of every green` : ''].filter(Boolean).join('; ').replace(/^g/, 'G')}
+          </Typography>
+        ) : null}
       </Section>
 
       <Section title="Rings and barriers">

@@ -49,6 +49,7 @@ sidebar marks **CSM**, and are written back when you export it again.
 | Force-offs | Fixed only | Floating force-offs are a warning |
 | Max green in coordination | Max 2 whenever a phase has one | A pattern set to Max 1 with Max 2 phases is a warning |
 | Overlaps and preempts | Tied to signal circuits | SPATT-side overlaps and preempts are not exported (warning) |
+| Red+amber, green flash | Red+amber 0, 1.0 or 2.0 s; green flash 0, 2.0, 3.0 or 4.0 s; set for the whole controller | Other values block export |
 | Clock | World time, shared by every controller in the world | |
 
 ## How a plan is converted
@@ -130,7 +131,7 @@ Optional fields, which the controller keeps its own values for when a plan leave
 | Where | Fields |
 |---|---|
 | Phase | `exclusions` (phases it must never time beside; SPATT always writes it), `walk`, `pedClear`, `movement`, `circuit` (0-based, −1 none), `flash`, `delayedGreen`, `bikeMinGreen`, `permissivePhase` (flashing yellow arrow; 0 = protected only) |
-| Plan | `patterns` entries (slots not listed are kept), `overlaps`, `preempts` and `priorities` (up to four transit priority plans), carried verbatim |
+| Plan | `redAmber` (0, 20 or 40 ticks) and `greenFlash` (0, 40, 60 or 80 ticks), the controller-wide settings, which SPATT always writes; `patterns` entries (slots not listed are kept), `overlaps`, `preempts` and `priorities` (up to four transit priority plans), carried verbatim |
 
 Informational fields the controller ignores: `generator`, `name`, a phase's `label`, a pattern's
 `name`, and `hasPedestrianSignals`, which the controller writes on export.

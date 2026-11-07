@@ -30,6 +30,15 @@ describe('cycleBounds', () => {
     expect(cycleBounds(intersection, true).maximum.cycle - cycleBounds(intersection).maximum.cycle).toBe(200);
   });
 
+  it('adds red+amber before every vehicle phase, and counts the green flash as green', () => {
+    const intersection = standardEightPhase();
+    const before = cycleBounds(intersection).minimum.cycle;
+    intersection.redAmber = 20;
+    intersection.greenFlash = 30;
+    // Two phases per ring in each of two groups: 4 × 2 s.
+    expect(cycleBounds(intersection).minimum.cycle - before).toBe(80);
+  });
+
   it('ignores disabled phases', () => {
     const intersection = standardEightPhase();
     for (const n of [3, 7]) intersection.phases.find((p) => p.number === n)!.enabled = false;

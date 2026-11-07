@@ -31,6 +31,8 @@ Project
 │   │                   clearanceBasis? { approachSpeed, gradePercent, intersectionWidth,
 │   │                   vehicleLength, crossingDistance, walkingSpeed }
 │   ├── rings[]         { groups: [[phase, …], …] }   one list per barrier group
+│   ├── redAmber, greenFlash   tenths: red+amber before every vehicle green; the flashing
+│   │                   end of every green (0 = off)
 │   ├── overlaps[]      id, type, includedPhases, modifierPhases, trail timing
 │   ├── preempts[]      track clearance, dwell and exit phases
 │   ├── patterns[]      id, name, mode, cycle, offset, offsetReference, coordinatedPhases,
@@ -106,7 +108,7 @@ and refuses a file with a newer version rather than misreading it.
 | 1 | First format; corridors were a placeholder list of intersection ids |
 | 2 | Corridors gain stops (distance, speeds, through phases), an outbound direction and timing plans; CSM units. Version 1 corridors load as stops with 300 m links at 13.4 m/s and no plans |
 | 3 | Intersections gain capacity settings, lane groups and volume sets; patterns gain `volumeSetId`. Version 2 intersections load with a 1900 pc/h/g/ln base, no lane groups or counts, and unlinked patterns |
-| 4 | Phases gain `exclusions`, the phases they must never time beside (a pair is excluded when either lists the other). Version 3 phases load with none |
+| 4 | Phases gain `exclusions`, the phases they must never time beside (a pair is excluded when either lists the other). Intersections gain `redAmber` and `greenFlash`. Version 3 phases load with no exclusions and intersections with neither |
 
 ## Validation rules
 
@@ -148,8 +150,8 @@ reject or run incorrectly; **warnings** are legal but unusual.
 | `pattern.coord-different-barriers` | error | Coordinated phases share a barrier group |
 | `pattern.split-missing` | error | Every enabled phase has a split |
 | `pattern.split-for-disabled-phase` | warning | Disabled phases have no split |
-| `pattern.split-below-minimum` | error | Split ≥ minimum green + yellow + red clearance |
-| `pattern.split-below-pedestrian` | error with pedestrian recall, otherwise warning | Split ≥ walk + pedestrian clearance + yellow + red clearance |
+| `pattern.split-below-minimum` | error | Split ≥ red+amber (vehicle phases) + minimum green + yellow + red clearance |
+| `pattern.split-below-pedestrian` | error with pedestrian recall, otherwise warning | Split ≥ red+amber (vehicle phases) + walk + pedestrian clearance + yellow + red clearance |
 | `pattern.barrier-misaligned` | error | In each barrier group, every ring with phases there has the same split total |
 | `pattern.cycle-sum` | error | The barrier group totals add up to the cycle |
 | `pattern.excluded-phases-concurrent` | error | The splits of two excluded phases do not overlap in time |

@@ -159,6 +159,23 @@ describe('importCsm', () => {
     expect(again).not.toHaveProperty('priority');
   });
 
+  it('exports red+amber and green flash in ticks, limited to the controller choices, and imports them back', () => {
+    const intersection = standardEightPhase();
+    intersection.redAmber = 15;
+    intersection.greenFlash = 25;
+    expect(codes(intersection)).toEqual(['csm.red-amber-value', 'csm.green-flash-value']);
+    intersection.redAmber = 20;
+    intersection.greenFlash = 30;
+    const plan = exported(intersection);
+    expect([plan.redAmber, plan.greenFlash]).toEqual([40, 60]);
+    const imported = importCsm(plan, { id: 'x' });
+    if (!imported.ok) throw new Error('import failed');
+    expect([imported.intersection.redAmber, imported.intersection.greenFlash]).toEqual([20, 30]);
+    const { redAmber: _r, greenFlash: _g, ...without } = plan;
+    const plain = importCsm(without, { id: 'x' });
+    expect(plain.ok && [plain.intersection.redAmber, plain.intersection.greenFlash]).toEqual([0, 0]);
+  });
+
   it('exports phase exclusions from both sides of each pair and imports them back', () => {
     const intersection = standardEightPhase();
     intersection.phases[0]!.exclusions = [6]; // only phase 1 lists the pair

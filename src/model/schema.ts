@@ -12,7 +12,8 @@ import { z } from 'zod';
 /**
  * 2: corridors gained stops, directions and timing plans; CSM units.
  * 3: intersections gained lane groups, capacity settings and volume count sets; patterns link a count.
- * 4: phases gained exclusions (phases they must not time beside).
+ * 4: phases gained exclusions (phases they must not time beside); intersections gained red+amber and
+ *    green flash times.
  */
 export const PROJECT_SCHEMA_VERSION = 4;
 
@@ -244,6 +245,10 @@ export const intersectionSchema = z.object({
   notes: z.string().max(10_000),
   phases: z.array(phaseSchema).max(MAX_PHASES),
   rings: z.array(ringSchema).min(1).max(MAX_RINGS),
+  /** Red and amber shown together before every green, after any delayed green. 0 = off. */
+  redAmber: tenthsSchema,
+  /** The last part of every green, flashing, before its yellow; taken out of the green. 0 = off. */
+  greenFlash: tenthsSchema,
   overlaps: z.array(overlapSchema).max(16),
   preempts: z.array(preemptSchema).max(10),
   patterns: z.array(patternSchema),

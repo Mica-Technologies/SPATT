@@ -52,6 +52,14 @@ interface RingRuntime {
   barrierWaiting: boolean;
   /** Idle only because its next called phase is excluded beside the other ring's phase (§0.7). */
   exclusionWait: boolean;
+  /** Red+amber after any delay, with the green clocks held (§0.8). */
+  raActive: boolean;
+  raStart: number;
+  /** No leading walk: the walk starts with the green, not with the red+amber. */
+  raDefersWalk: boolean;
+  /** The green has been told to end and flashes before its yellow (§0.8). */
+  gfActive: boolean;
+  gfStart: number;
 }
 
 const DEFAULT_WALK = 140;
@@ -83,6 +91,11 @@ function newRing(): RingRuntime {
     yieldedFor: 0,
     barrierWaiting: false,
     exclusionWait: false,
+    raActive: false,
+    raStart: 0,
+    raDefersWalk: false,
+    gfActive: false,
+    gfStart: 0,
   };
 }
 
@@ -133,12 +146,18 @@ export class CsmController implements ControllerModel {
   private localCycle = 0;
   private cycleTime = 0;
 
+  /** Controller-wide red+amber and green flash, ticks (`tcRaT`, `tcGfT`). */
+  private readonly redAmber: number;
+  private readonly greenFlash: number;
+
   private readonly display = new Map<number, PhaseSignal>();
   private readonly lastPed = new Map<number, PedDisplay>();
   private terminations: { phase: number; reason: Termination; tick: number }[] = [];
 
   constructor(plan: CsmPlan) {
     for (const p of plan.phases) this.phase.set(p.number, p);
+    this.redAmber = Math.max(0, plan.redAmber ?? 0);
+    this.greenFlash = Math.max(0, plan.greenFlash ?? 0);
     this.sequences = [plan.rings[0], plan.rings[1]];
     const pattern = plan.patterns.find((p) => p.slot === 0) ?? plan.patterns[0];
     this.coordinated = pattern?.mode === 'COORDINATED';
@@ -458,6 +477,10 @@ export class CsmController implements ControllerModel {
       pedServing: ped,
       pedStart: this.now,
       delayActive: ped && delayedGreen > 0,
+      raActive: this.redAmber > 0,
+      raStart: this.now,
+      raDefersWalk: !(ped && delayedGreen > 0),
+      gfActive: false,
       delayStart: this.now,
       walkHold: ped ? Math.max(this.walk(p), delayedGreen) : this.walk(p),
       queueAtStart: this.vehicleCount(n),
@@ -474,7 +497,7 @@ export class CsmController implements ControllerModel {
     if (r.activePhase !== 0) {
       const p = this.phase.get(r.activePhase);
       if (!p || p.barrier !== this.currentBarrier) return false;
-      if (r.interval === 'GREEN') return true;
+      if (r.interval === 'GREEN' && !r.gfActive) return true; // a flashing green is ending, not working
     }
     if (this.peekNextWithinBarrier(ringNum) !== 0) return true;
     if (this.nextBarrierWithDemand() === this.currentBarrier) {
@@ -521,12 +544,26 @@ export class CsmController implements ControllerModel {
     }
 
     // GREEN (§4.3 a-p)
+    // Green flash: the green has already been told to end; flash out its time, then yellow.
+    if (r.gfActive) {
+      if (now - r.gfStart >= this.greenFlash) Object.assign(r, { gfActive: false, interval: 'YELLOW', intervalStart: now });
+      return;
+    }
     if (r.delayActive) {
       if (now - r.delayStart < (p.delayedGreen ?? 0)) {
         r.lastActuation = now;
         return;
       }
-      Object.assign(r, { delayActive: false, greenStart: now, intervalStart: now, lastActuation: now });
+      Object.assign(r, { delayActive: false, greenStart: now, intervalStart: now, lastActuation: now, raStart: now });
+    }
+    // Red+amber follows any delay and holds the green clocks the same way.
+    if (r.raActive) {
+      if (now - r.raStart < this.redAmber) {
+        r.lastActuation = now;
+        return;
+      }
+      Object.assign(r, { raActive: false, greenStart: now, intervalStart: now, lastActuation: now });
+      if (r.raDefersWalk) r.pedStart = now;
     }
     // MAXIMUM recall is a constant call that also extends, as a vehicle in the zone would (§4.3.c).
     if (this.vehicleCount(n) > 0 || p.recall === 'MAXIMUM') r.lastActuation = now;
@@ -539,7 +576,7 @@ export class CsmController implements ControllerModel {
     const walkHold = r.walkHold;
     const pedClear = this.pedClear(p);
     const pedRemaining = !r.pedServing ? 0 : r.resting ? pedClear : Math.max(0, r.pedStart + walkHold + pedClear - now);
-    const coordClearance = p.yellow + p.redClear + pedRemaining;
+    const coordClearance = p.yellow + p.redClear + pedRemaining + this.greenFlash;
 
     if (isCoord && !r.dualEntry && r.coordYieldFor === 0) r.coordYieldFor = this.conflictingWindowOpening(n, ringNum, coordClearance);
     if (r.coordYieldFor !== 0 && !this.tickRawCalled.has(r.coordYieldFor)) r.coordYieldFor = 0;
@@ -556,8 +593,9 @@ export class CsmController implements ControllerModel {
     const greenElapsed = now - r.greenStart;
     const addedInit = p.addedInitial <= 0 || r.queueAtStart <= 0 ? 0 : p.maxInitial > 0 ? Math.min(r.queueAtStart * p.addedInitial, p.maxInitial) : r.queueAtStart * p.addedInitial;
     // Bike minimum green needs a bike call from a protected detection zone, which is not simulated.
-    const effMin = Math.max(p.minGreen, addedInit);
-    const effMax = this.coordinated && p.maxGreen2 > 0 ? p.maxGreen2 : p.maxGreen;
+    // The green flash is the last part of the green, so the green is told to end that much sooner.
+    const effMin = Math.max(0, Math.max(p.minGreen, addedInit) - this.greenFlash);
+    const effMax = Math.max(0, (this.coordinated && p.maxGreen2 > 0 ? p.maxGreen2 : p.maxGreen) - this.greenFlash);
     const effPassage = effectivePassage(p.passage, p.minGap, p.timeBeforeReduce, p.timeToReduce, greenElapsed);
 
     const minMet = greenElapsed >= effMin;
@@ -577,7 +615,7 @@ export class CsmController implements ControllerModel {
     // Any non-coordinated phase maxes out, resting or not (CSM #317); force-off keeps its rest exemption.
     const maxOut = !isCoord && r.maxStart >= 0 && now - r.maxStart >= effMax && pedDone;
     const gapOut = now - r.lastActuation >= effPassage;
-    const forceOff = this.coordinated && !isCoord && !r.resting && !r.dualEntry && this.pastYieldPoint(n, p.yellow + p.redClear) && pedDone;
+    const forceOff = this.coordinated && !isCoord && !r.resting && !r.dualEntry && this.pastYieldPoint(n, p.yellow + p.redClear + this.greenFlash) && pedDone;
     // A dual-entry companion need not gap out: with no demand of its own, only MAX recall extends
     // it, and that would hold it green for good once its companion has finished.
     const gapDone = gapOut || r.dualEntry;
@@ -602,7 +640,8 @@ export class CsmController implements ControllerModel {
         r.yieldedFor = windowOpeningFor;
       }
       if (forceOff) this.windowAccepted.delete(n);
-      Object.assign(r, { interval: 'YELLOW', intervalStart: now, pedServing: false });
+      if (this.greenFlash > 0) Object.assign(r, { gfActive: true, gfStart: now, pedServing: false });
+      else Object.assign(r, { interval: 'YELLOW', intervalStart: now, pedServing: false });
       this.terminations.push({ phase: n, reason: maxOut ? 'max-out' : forceOff ? 'force-off' : coordYieldDue ? 'yield' : 'gap-out', tick: now });
     } else if (p.restInWalk && !conflict) {
       const clearanceInProgress = r.pedServing && !pedDone && now - r.pedStart >= r.walkHold;
@@ -748,14 +787,17 @@ export class CsmController implements ControllerModel {
       if (r.activePhase === 0) return;
       const p = this.phase.get(r.activePhase)!;
       let ped: PedDisplay = 'NONE';
-      if (r.pedServing && r.interval === 'GREEN') {
+      const redAmber = r.raActive && !r.delayActive && r.interval === 'GREEN';
+      if (redAmber && r.pedServing && r.raDefersWalk) {
+        ped = 'DONT_WALK'; // no leading walk: the walk waits for the green
+      } else if (r.pedServing && r.interval === 'GREEN') {
         if (r.resting && p.restInWalk) ped = 'WALK';
         else {
           const elapsed = this.now - r.pedStart;
           ped = elapsed < r.walkHold ? 'WALK' : elapsed < r.walkHold + this.pedClear(p) ? 'FDW' : 'DONT_WALK';
         }
       }
-      const vehicle = r.delayActive ? 'RED' : r.interval;
+      const vehicle = r.delayActive || redAmber ? 'RED' : r.interval;
       this.display.set(p.number, {
         vehicle: vehicle === 'GREEN' ? 'green' : vehicle === 'YELLOW' ? 'yellow' : 'red',
         pedestrian: ped === 'WALK' ? 'walk' : ped === 'FDW' ? 'clearance' : 'dont-walk',

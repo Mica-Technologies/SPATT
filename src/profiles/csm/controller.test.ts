@@ -232,6 +232,28 @@ describe('CSM ASC-3 controller', () => {
   });
 });
 
+describe('CSM ASC-3 controller with red+amber and green flash', () => {
+  it('runs red+amber before each green and takes the green flash out of it', () => {
+    // As the NEMA controller: 2 s red+amber + 10 s green + 4 + 2, twice.
+    const i = twoPhase();
+    for (const p of i.phases) p.recall = 'minimum';
+    i.redAmber = 20;
+    i.greenFlash = 30;
+    const result = simulate(i, settings(null), csm(i, null));
+    expect(Math.round(result.cycle.mean!)).toBe(36);
+    expect(result.phases.map((p) => Math.round(p.green.mean!))).toEqual([10, 10, 10, 10]);
+  });
+
+  it('holds the red+amber before a coordinated phase too and keeps the cycle', () => {
+    const i = standardEightPhase();
+    for (const p of i.phases) if (![2, 6].includes(p.number)) p.recall = 'minimum';
+    i.redAmber = 20;
+    i.greenFlash = 40;
+    const result = simulate(i, settings('am-peak'), csm(i, 'am-peak'));
+    expect(result.cycle).toMatchObject({ min: 90, max: 90 });
+  });
+});
+
 describe('CSM ASC-3 controller with phase exclusions', () => {
   // PhaseExclusionTest: lefts 1 and 5 with their throughs 2 and 6, all on barrier A, all called.
   const boulevard = (ex1: number[], ex5: number[], ring2 = [5, 6]) => {

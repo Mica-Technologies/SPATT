@@ -27,6 +27,8 @@ import {
 import {
   CSM_FORMAT,
   CSM_FORMAT_VERSION,
+  CSM_GREEN_FLASH_TICKS,
+  CSM_RED_AMBER_TICKS,
   CSM_MAX_TICKS,
   CSM_PACKET_LIMIT_BYTES,
   CSM_PHASE_COUNT,
@@ -123,6 +125,13 @@ export function checkCsm(intersection: Intersection): Issue[] {
     }
   });
 
+  const choices = (list: readonly number[]) => list.map((t) => `${t / 20} s`).join(', ');
+  if (!(CSM_RED_AMBER_TICKS as readonly number[]).includes(tenthsToTicks(intersection.redAmber))) {
+    issues.push(error('csm.red-amber-value', `The controller's red+amber is ${choices(CSM_RED_AMBER_TICKS)}`, ['redAmber']));
+  }
+  if (!(CSM_GREEN_FLASH_TICKS as readonly number[]).includes(tenthsToTicks(intersection.greenFlash))) {
+    issues.push(error('csm.green-flash-value', `The controller's green flash is ${choices(CSM_GREEN_FLASH_TICKS)}`, ['greenFlash']));
+  }
   if (intersection.rings.length > 2) {
     issues.push(error('csm.too-many-rings', `The controller has two rings; this intersection has ${intersection.rings.length}`, ['rings']));
   }
@@ -259,6 +268,8 @@ export function exportCsm(intersection: Intersection, generator = 'SPATT'): CsmE
     rings: [sequence[0]?.groups.flat() ?? [], sequence[1]?.groups.flat() ?? []],
     patterns,
     schedule: { enabled: slots.scheduleEnabled, startHours: slots.startHours },
+    redAmber: tenthsToTicks(intersection.redAmber),
+    greenFlash: tenthsToTicks(intersection.greenFlash),
     ...(ext.overlaps ? { overlaps: ext.overlaps } : {}),
     ...(ext.preempts ? { preempts: ext.preempts } : {}),
     ...(ext.priorities ? { priorities: ext.priorities } : {}),

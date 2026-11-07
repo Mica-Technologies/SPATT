@@ -50,6 +50,10 @@ A generic dual-ring actuated controller built from SPATT's own plan:
   a ring that has no call in that group. A phase excluded beside the phase another ring is timing
   waits until that phase has cleared, and the other phase ends as soon as it can. The CSM ASC-3
   controller does the same.
+- **Red+amber and green flash.** Red+amber runs before each vehicle green and holds its timers
+  and its walk. The green flash is the end of the green: minimum and max green, force-offs and
+  coordinated yields come that much sooner, then the green flashes and turns yellow. The CSM ASC-3
+  controller does the same, running red+amber after any delayed green.
 - **Recalls.** Minimum recall places a constant call. Maximum recall also stops the phase gapping
   out. Soft recall calls only when nothing else is calling. Pedestrian recall calls the walk every
   time.

@@ -244,8 +244,30 @@ export default function PhasesTab({ intersection, intersectionIndex, issues, pha
   const phases = intersection.phases;
   const basePath = ['intersections', intersectionIndex, 'phases'];
 
+  const intersectionPath = ['intersections', intersectionIndex];
+  const controllerSetting = (key: 'redAmber' | 'greenFlash', label: string, hint: string) => (
+    <Box component="label" htmlFor={fieldId([...intersectionPath, key])} sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'text.secondary' }}>
+      {label}
+      <Box sx={{ width: 64 }}>
+        <SecondsInput
+          path={[...intersectionPath, key]}
+          label={label}
+          value={intersection[key]}
+          zeroAsBlank
+          issues={issuesFor(issues, [...intersectionPath, key])}
+          onCommit={(v) => editIntersection(label, (i) => (i[key] = v))}
+        />
+      </Box>
+      {hint}
+    </Box>
+  );
+
   return (
     <Box sx={{ p: 2 }}>
+      <Box sx={{ mb: 1.5, display: 'flex', gap: 3, alignItems: 'center', flexWrap: 'wrap', fontSize: 13 }}>
+        {controllerSetting('redAmber', 'Red+amber', 's before every green')}
+        {controllerSetting('greenFlash', 'Green flash', 's at the end of every green')}
+      </Box>
       <Box sx={{ overflowX: 'auto', width: 'fit-content', maxWidth: '100%', border: 1, borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper' }}>
         <Box component="table" sx={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: 13, minWidth: LABEL_WIDTH + phases.length * COLUMN_WIDTH }}>
           <thead>

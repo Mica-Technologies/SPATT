@@ -20,6 +20,10 @@ export const CSM_FORMAT = 'csm-asc3-plan';
 export const CSM_FORMAT_VERSION = 2;
 /** Transit priority plans the controller holds. */
 export const CSM_PRIORITY_COUNT = 4;
+/** The controller's red+amber choices (`tcRaT`), ticks. */
+export const CSM_RED_AMBER_TICKS = [0, 20, 40] as const;
+/** The controller's green flash choices (`tcGfT`), ticks. */
+export const CSM_GREEN_FLASH_TICKS = [0, 40, 60, 80] as const;
 
 /** Every controller time value is clamped to 0..12000 ticks (600 s) by the mod. */
 export const CSM_MAX_TICKS = 12_000;
@@ -119,6 +123,10 @@ export const csmPlanSchema = z.object({
     /** Start hour (0-23) of slots 0..3. */
     startHours: z.tuple([z.number().int().min(0).max(23), z.number().int().min(0).max(23), z.number().int().min(0).max(23), z.number().int().min(0).max(23)]),
   }),
+  /** Red and amber before every green, ticks: 0 (off), 20 or 40. A controller-wide setting. */
+  redAmber: ticks.optional(),
+  /** The flashing end of every green before its yellow, ticks: 0 (off), 40, 60 or 80. A controller-wide setting. */
+  greenFlash: ticks.optional(),
   // Optional, carried verbatim; absent = the controller keeps its own.
   overlaps: z.array(opaque).optional(),
   preempts: z.array(opaque).optional(),

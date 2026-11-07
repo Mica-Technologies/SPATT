@@ -313,6 +313,8 @@
           ]
         }
       ],
+      "redAmber": 0,
+      "greenFlash": 0,
       "overlaps": [],
       "preempts": [],
       "patterns": [

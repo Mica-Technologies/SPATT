@@ -97,9 +97,9 @@ describe('loadProject', () => {
     expect(load(v2)).toEqual({ ok: true, project: v3, issues: [] });
   });
 
-  it('migrates a version 3 file: phases gain an empty exclusion list', () => {
+  it('migrates a version 3 file: phases gain an empty exclusion list, intersections no red+amber or green flash', () => {
     const v4 = sampleProject();
-    const v3 = { ...v4, schemaVersion: 3, intersections: v4.intersections.map((i) => ({ ...i, phases: i.phases.map(({ exclusions: _e, ...p }) => p) })) };
+    const v3 = { ...v4, schemaVersion: 3, intersections: v4.intersections.map(({ redAmber: _r, greenFlash: _g, ...i }) => ({ ...i, phases: i.phases.map(({ exclusions: _e, ...p }) => p) })) };
     expect(load(v3)).toEqual({ ok: true, project: v4, issues: [] });
   });
 

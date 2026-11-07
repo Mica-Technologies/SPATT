@@ -191,6 +191,8 @@ function convertPlan(plan: CsmPlan, options: CsmImportOptions): CsmImportResult 
     notes: '',
     phases,
     rings,
+    redAmber: plan.redAmber === undefined ? 0 : tenths(plan.redAmber, ['redAmber']),
+    greenFlash: plan.greenFlash === undefined ? 0 : tenths(plan.greenFlash, ['greenFlash']),
     overlaps: [],
     preempts: [],
     patterns,
