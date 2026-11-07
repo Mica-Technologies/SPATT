@@ -2,12 +2,14 @@
  * The live ring-barrier diagram docked beside the editor, with the cycle clock, the pattern's
  * offset, force-offs and the free-operation cycle bounds.
  */
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
 import { convertOffset, cycleBounds, projectCycle, toLocal } from '../../engine';
 import { formatSeconds, tenthsToTicks, type Intersection } from '../../model';
@@ -15,6 +17,7 @@ import CycleClock from '../diagram/CycleClock';
 import { flaggedPhases } from '../diagram/flags';
 import { REFERENCE_LABEL } from '../diagram/diagramText';
 import RingBarrierDiagram from '../diagram/RingBarrierDiagram';
+import IntersectionView from '../intersection/IntersectionView';
 import { fontFamilyMono } from '../theme/themePrimitives';
 import { useWorkspace } from '../state/workspace';
 
@@ -37,6 +40,7 @@ export default function DiagramPanel({ intersection, patternId }: { intersection
   const result = useMemo(() => (pattern ? projectCycle(intersection, pattern.id) : null), [intersection, pattern]);
   const bounds = useMemo(() => cycleBounds(intersection, pattern?.maxGreen === 'max2'), [intersection, pattern]);
   const errors = result?.ok ? result.issues.length : 0;
+  const [view, setView] = useState<'diagram' | 'intersection'>('diagram');
 
   return (
     <Box component="aside" aria-label="Ring-barrier diagram" sx={{ borderLeft: 1, borderColor: 'divider', bgcolor: 'background.paper', p: 2, overflowY: 'auto' }}>
@@ -44,6 +48,14 @@ export default function DiagramPanel({ intersection, patternId }: { intersection
         <Typography variant="subtitle2" component="h2">
           Ring-barrier diagram
         </Typography>
+        <ToggleButtonGroup size="small" exclusive fullWidth value={view} onChange={(_, next: typeof view | null) => next && setView(next)} aria-label="Diagram">
+          <ToggleButton value="diagram" sx={{ py: 0.25 }}>
+            Ring-barrier
+          </ToggleButton>
+          <ToggleButton value="intersection" sx={{ py: 0.25 }}>
+            Intersection
+          </ToggleButton>
+        </ToggleButtonGroup>
         {pattern ? (
           <TextField select size="small" label="Pattern" value={pattern.id} onChange={(e) => selectPattern(e.target.value)}>
             {intersection.patterns.map((p) => (
@@ -59,7 +71,8 @@ export default function DiagramPanel({ intersection, patternId }: { intersection
           </Typography>
         )}
 
-        {result && result.ok ? (
+        {view === 'intersection' ? <IntersectionView intersection={intersection} result={result} /> : null}
+        {view === 'diagram' && result && result.ok ? (
           <>
             {errors > 0 ? (
               <Alert severity="warning" variant="outlined">
@@ -95,7 +108,7 @@ export default function DiagramPanel({ intersection, patternId }: { intersection
           </>
         ) : null}
 
-        {result && !result.ok ? (
+        {view === 'diagram' && result && !result.ok ? (
           result.issues[0]?.code === 'projection.free-pattern' ? (
             <Typography variant="body2" sx={{ color: 'text.secondary' }}>
               This pattern runs free, so it has no fixed cycle to draw.
