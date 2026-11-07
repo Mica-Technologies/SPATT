@@ -18,7 +18,7 @@ The simulation needs lane groups and a count, both set up on the **Volumes** tab
 - **Pushbutton calls per hour** for each phase with pedestrian service. Phases on pedestrian
   recall are called every cycle regardless.
 
-**Run** simulates in the background. An hour takes well under a second.
+**Run** (or ++ctrl+enter++) simulates in the background. An hour takes well under a second. A count\nwhose volumes are all zero has no traffic to simulate: the tab says so and links to the Volumes tab.
 
 ## What is simulated
 
@@ -108,6 +108,8 @@ and time-of-day pattern changes are not simulated.
 ## Playback
 
 The playback draws each ring's phases over a three-minute window: green and yellow bars on red,
-with walk and pedestrian clearance as a thin strip underneath. Drag the slider, or press play at 1,
-5, 20 or 60 times real time. Under the diagram are each phase's signal and each lane group's queue
-at the cursor.
+with walk and pedestrian clearance as a strip underneath. Drag the slider, or press play (or
+++space++) at 1, 5, 20 or 60 times real time. When the system asks for reduced motion, playing
+steps once a second instead of scrolling smoothly. Under the diagram are each phase's signal and
+each lane group's queue at the cursor, the queue bar coloured by its phase's signal and scaled to
+the longest queue of the run.

@@ -62,11 +62,11 @@ function PhaseToggles({ intersection, value, onChange, label, path, issues }: { 
       value={value}
       onChange={(_, next: number[]) => onChange([...next].sort((a, b) => a - b))}
       aria-label={label}
-      sx={{ flexWrap: 'wrap', ...(flagged ? { outline: 2, outlineColor: 'error.main', outlineStyle: 'solid', borderRadius: 1 } : {}) }}
+      sx={{ flexWrap: 'nowrap', ...(flagged ? { outline: 2, outlineColor: 'error.main', outlineStyle: 'solid', borderRadius: 1 } : {}) }}
     >
       {enabled.map((phase) => (
         <Tooltip key={phase.number} title={`${phase.label || `Phase ${phase.number}`}${phase.movement.approach ? ` · ${phase.movement.approach}B ${phase.movement.kind}` : ''}`}>
-          <ToggleButton value={phase.number} aria-label={`Phase ${phase.number}`} sx={{ minWidth: 30, px: 0.75, py: 0.25 }}>
+          <ToggleButton value={phase.number} aria-label={`Phase ${phase.number}`} sx={{ minWidth: 26, height: 28, px: 0.5, py: 0, fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>
             {phase.number}
           </ToggleButton>
         </Tooltip>

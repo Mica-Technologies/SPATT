@@ -72,17 +72,17 @@ export default function ProblemsPanel() {
             <li key={`${issue.code}-${issue.path.join('.')}-${index}`}>
               <ButtonBase
                 onClick={() => navigateTo(issue.path)}
-                sx={{ width: '100%', justifyContent: 'flex-start', textAlign: 'left', gap: 1.5, px: 2, py: 0.75, '&:hover': { bgcolor: 'action.hover' } }}
+                sx={{ width: '100%', justifyContent: 'flex-start', textAlign: 'left', columnGap: 1.5, rowGap: 0, flexWrap: { xs: 'wrap', sm: 'nowrap' }, px: 2, py: 0.4, '&:hover': { bgcolor: 'action.hover' } }}
               >
                 {issue.severity === 'error' ? (
                   <ErrorOutlineRoundedIcon sx={{ fontSize: 16, color: 'error.main', flexShrink: 0 }} />
                 ) : (
                   <WarningAmberRoundedIcon sx={{ fontSize: 16, color: 'warning.main', flexShrink: 0 }} />
                 )}
-                <Typography variant="body2" sx={{ flexGrow: 1 }}>
+                <Typography variant="body2" sx={{ flex: '1 1 0', minWidth: 0, fontSize: 13, lineHeight: 1.4 }}>
                   {issue.message}
                 </Typography>
-                <Typography variant="caption" sx={{ color: 'text.secondary', whiteSpace: 'nowrap' }}>
+                <Typography variant="caption" sx={{ color: 'text.secondary', whiteSpace: 'nowrap', ml: { xs: 3.5, sm: 0 }, flexBasis: { xs: '100%', sm: 'auto' } }}>
                   {location(issue)}
                 </Typography>
               </ButtonBase>

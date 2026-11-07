@@ -8,7 +8,7 @@
 import { useRef, useState, type PointerEvent } from 'react';
 import Box from '@mui/material/Box';
 import { useTheme } from '@mui/material/styles';
-import type { Band, Direction, Progression } from '../../engine';
+import { toSystem, type Band, type Direction, type Progression } from '../../engine';
 import { formatSeconds } from '../../model';
 import { fontFamilyMono } from '../theme/themePrimitives';
 
@@ -69,7 +69,7 @@ export default function TimeSpaceDiagram({ progression, cycles, labels, onDrag, 
       const left = order.map(({ stop, k }) => `${x(start + band.arrival[k]!)},${y(stop.position, k)}`);
       const right = [...order].reverse().map(({ stop, k }) => `${x(start + width + band.arrival[k]!)},${y(stop.position, k)}`);
       polygons.push(
-        <polygon key={`${direction}-${r}`} points={[...left, ...right].join(' ')} fill={bandColor[direction]} fillOpacity={0.18} stroke={bandColor[direction]} strokeWidth={1.2} strokeDasharray={direction === 'inbound' ? '5 3' : undefined} />,
+        <polygon key={`${direction}-${r}`} points={[...left, ...right].join(' ')} fill={bandColor[direction]} fillOpacity={0.26} stroke={bandColor[direction]} strokeWidth={1.2} strokeDasharray={direction === 'inbound' ? '5 3' : undefined} />,
       );
     }
     return polygons;
@@ -127,6 +127,15 @@ export default function TimeSpaceDiagram({ progression, cycles, labels, onDrag, 
       <text x={WIDTH - RIGHT} y={height - 2} fontSize={10} textAnchor="end" fill={palette.text.secondary}>
         system time, s
       </text>
+      {progression.cycle !== null
+        ? (['outbound', 'inbound'] as const)
+            .filter((direction) => !((progression.bands[direction].bandwidth ?? 0) > 0))
+            .map((direction, k) => (
+              <text key={direction} x={LEFT + k * 240} y={TOP - 10} fontSize={11} fontWeight={600} fill={palette.text.secondary} fontFamily={theme.typography.fontFamily}>
+                No {labels[direction]} band at these offsets
+              </text>
+            ))
+        : null}
 
       <g clipPath="url(#tsd-plot)">
         {progression.cycle !== null ? (
@@ -143,14 +152,33 @@ export default function TimeSpaceDiagram({ progression, cycles, labels, onDrag, 
         const repeats = Math.ceil(span / stopCycle);
         // While dragging, the parent re-analyses with the moved offset, so the bars are already moved.
         const dragging = drag?.id === stop.intersectionId;
+        // The yellow and red clearance after each green: the phase whose yellow starts where the green ends.
+        const projection = stop.projection;
+        const clearance = (end: number) => {
+          const interval = projection?.rings.flat().find((i) => toSystem(projection, i.yellowStart) === end % stopCycle);
+          return interval ? { yellow: interval.redClearStart - interval.yellowStart, red: interval.splitEnd - interval.redClearStart } : null;
+        };
+        const length = (tenths: number) => Math.max(0, (tenths / span) * plot);
         const bar = (direction: Direction, top: number) => (
           <g>
-            <rect x={LEFT} y={top} width={plot} height={BAR} fill={stop.projection ? palette.error.main : palette.action.hover} fillOpacity={stop.projection ? 0.85 : 1} />
+            <rect x={LEFT} y={top} width={plot} height={BAR} fill={stop.projection ? palette.error.main : palette.action.hover} fillOpacity={stop.projection ? 0.55 : 1} />
             {stop.projection
               ? Array.from({ length: repeats + 2 }, (_, r) => r - 1).flatMap((r) =>
-                  stop.green[direction].map(([from, to]) => (
-                    <rect key={`${r}-${from}`} x={x(from + r * stopCycle)} y={top} width={Math.max(0, x(to) - x(from))} height={BAR} fill={palette.success.main} />
-                  )),
+                  stop.green[direction].map(([from, to]) => {
+                    const after = clearance(to);
+                    const end = to + r * stopCycle;
+                    return (
+                      <g key={`${r}-${from}`}>
+                        <rect x={x(from + r * stopCycle)} y={top} width={Math.max(0, x(to) - x(from))} height={BAR} fill={palette.success.main} />
+                        {after ? (
+                          <>
+                            <rect x={x(end)} y={top} width={length(after.yellow)} height={BAR} fill={palette.warning.main} />
+                            <rect x={x(end + after.yellow)} y={top} width={length(after.red)} height={BAR} fill={palette.error.main} />
+                          </>
+                        ) : null}
+                      </g>
+                    );
+                  }),
                 )
               : null}
           </g>
@@ -160,7 +188,7 @@ export default function TimeSpaceDiagram({ progression, cycles, labels, onDrag, 
             <text x={LEFT - 10} y={cy - 2} fontSize={12} fontWeight={600} textAnchor="end" fill={stop.projection ? palette.text.primary : palette.text.disabled} fontFamily={theme.typography.fontFamily}>
               {stop.name.length > 22 ? `${stop.name.slice(0, 21)}…` : stop.name}
             </text>
-            <text x={LEFT - 10} y={cy + 11} fontSize={9} textAnchor="end" fill={palette.text.secondary}>
+            <text x={LEFT - 10} y={cy + 13} fontSize={11} textAnchor="end" fill={palette.text.secondary}>
               {stop.projection ? `${labels.outbound} ▲  ${labels.inbound} ▼` : stop.reason === 'free' ? 'runs free' : 'not in plan'}
             </text>
             <g clipPath="url(#tsd-plot)">
