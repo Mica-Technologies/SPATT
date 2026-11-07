@@ -1,7 +1,8 @@
 import type { FieldPath } from '../fields/paths';
 import { useWorkspace, type WorkspaceTab } from '../state/workspace';
 
-const TAB_FOR_SECTION: Record<string, WorkspaceTab> = {
+/** The intersection tab that edits each top-level section of an intersection. */
+export const TAB_FOR_SECTION: Record<string, WorkspaceTab> = {
   phases: 'phases',
   overlaps: 'phases',
   preempts: 'phases',

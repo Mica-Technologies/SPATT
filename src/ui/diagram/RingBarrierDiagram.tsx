@@ -32,22 +32,29 @@ export interface RingBarrierDiagramProps {
   /** Phases to outline as having errors. */
   flagged?: ReadonlySet<number>;
   legend?: boolean;
+  /**
+   * The pattern's entered cycle when the splits do not add up to it: the drawing then spans both,
+   * marks the entered cycle and hatches the overrun (or the unfilled remainder) in the error colour.
+   */
+  cycleMark?: number | null;
 }
 
 const s = formatSeconds;
 
-export default function RingBarrierDiagram({ projection, intersection, width = 340, interactive = true, flagged, legend = false }: RingBarrierDiagramProps) {
+export default function RingBarrierDiagram({ projection, intersection, width = 340, interactive = true, flagged, legend = false, cycleMark = null }: RingBarrierDiagramProps) {
   const theme = useTheme();
   const palette = (theme.vars || theme).palette;
   const { cycle } = projection;
   const plot = width - LEFT - RIGHT;
-  const scale = plot / cycle;
+  const mismatch = cycleMark !== null && cycleMark !== cycle;
+  const span = mismatch ? Math.max(cycle, cycleMark) : cycle;
+  const scale = plot / span;
   const x = (t: number) => LEFT + t * scale;
   const lane = BAR + 2 + PED + LANE_GAP;
   const lanesBottom = TOP + projection.rings.length * lane - LANE_GAP;
   const height = lanesBottom + AXIS + (legend ? LEGEND : 0);
   const labels = new Map(intersection.phases.map((p) => [p.number, p.label]));
-  const step = tickStep(cycle, plot);
+  const step = tickStep(span, plot);
   const charWidth = 6.4;
 
   const phaseGroup = (interval: PhaseInterval, y: number) => {
@@ -134,7 +141,7 @@ export default function RingBarrierDiagram({ projection, intersection, width = 3
       component="svg"
       viewBox={`0 0 ${width} ${height}`}
       role="img"
-      aria-label={`Ring-barrier diagram, ${s(cycle)} s cycle`}
+      aria-label={mismatch ? `Ring-barrier diagram: splits total ${s(cycle)} s against a ${s(cycleMark)} s cycle` : `Ring-barrier diagram, ${s(cycle)} s cycle`}
       sx={{ width: '100%', height: 'auto', display: 'block', fontFamily: fontFamilyMono, overflow: 'visible' }}
     >
       {projection.rings.map((ring, r) => {
@@ -150,6 +157,24 @@ export default function RingBarrierDiagram({ projection, intersection, width = 3
         );
       })}
 
+      {mismatch ? (
+        <g>
+          <defs>
+            <pattern id="rbd-overrun" width={6} height={6} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+              <rect width={6} height={6} fill={palette.error.main} fillOpacity={0.12} />
+              <line x1={0} x2={0} y1={0} y2={6} stroke={palette.error.main} strokeWidth={2.5} />
+            </pattern>
+          </defs>
+          <rect x={x(Math.min(cycle, cycleMark))} y={TOP - 4} width={Math.abs(cycle - cycleMark) * scale} height={lanesBottom - TOP + 4} fill="url(#rbd-overrun)" fillOpacity={cycle > cycleMark ? 0.85 : 0.6}>
+            <title>{cycle > cycleMark ? `Splits run ${s(cycle - cycleMark)} s past the cycle` : `${s(cycleMark - cycle)} s of the cycle has no split`}</title>
+          </rect>
+          <line x1={x(cycleMark)} x2={x(cycleMark)} y1={TOP - 12} y2={lanesBottom + 4} stroke={palette.error.main} strokeWidth={2} strokeDasharray="4 2" />
+          <text x={x(cycleMark) + (cycleMark > span * 0.7 ? -4 : 4)} y={TOP - 14} fontSize={10} fontWeight={600} textAnchor={cycleMark > span * 0.7 ? 'end' : 'start'} fill={palette.error.main}>
+            cycle {s(cycleMark)} s
+          </text>
+        </g>
+      ) : null}
+
       {projection.barriers.slice(0, -1).map((t) => (
         <line key={t} x1={x(t)} x2={x(t)} y1={TOP - 6} y2={lanesBottom} stroke={palette.text.primary} strokeWidth={2.5} />
       ))}
@@ -164,7 +189,7 @@ export default function RingBarrierDiagram({ projection, intersection, width = 3
         </text>
       ) : null}
 
-      {Array.from({ length: Math.floor(cycle / step) + 1 }, (_, i) => i * step).map((t) => (
+      {Array.from({ length: Math.floor(span / step) + 1 }, (_, i) => i * step).map((t) => (
         <g key={t}>
           <line x1={x(t)} x2={x(t)} y1={lanesBottom + 4} y2={lanesBottom + 8} stroke={palette.text.secondary} />
           <text x={x(t)} y={lanesBottom + 18} fontSize={9} textAnchor="middle" fill={palette.text.secondary}>

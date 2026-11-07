@@ -9,6 +9,7 @@ import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import ScrollArea from '../../components/ScrollArea';
 import { MOVEMENT_LABEL, MOVEMENTS, newVolumeSet, randomId, removeVolumeSet, uniqueName, zeroVolumes, type Intersection, type Issue, type VolumeSet } from '../../../model';
 import { NumberInput, TextInput } from '../../fields/GridInputs';
 import { issuesFor, type FieldPath } from '../../fields/paths';
@@ -99,7 +100,7 @@ export default function CountsSection({ intersection, basePath, issues }: Counts
               Add lane groups to enter volumes.
             </Typography>
           ) : (
-            <Box sx={{ overflowX: 'auto', border: 1, borderColor: 'divider', borderRadius: 1 }}>
+            <ScrollArea sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}>
               <Box component="table" aria-label={`Volumes in ${set.name || 'count'}`} sx={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: 13, width: '100%', minWidth: 520 }}>
                 <thead>
                   <tr>
@@ -155,7 +156,7 @@ export default function CountsSection({ intersection, basePath, issues }: Counts
                   })}
                 </tbody>
               </Box>
-            </Box>
+            </ScrollArea>
           )}
         </Box>
       )}

@@ -12,7 +12,7 @@ import { tickStep } from './diagramText';
 
 const LEFT = 30;
 const RIGHT = 10;
-const TOP = 16;
+const TOP = 20;
 const STRIP = 12;
 
 export default function CycleClock({ projection, width = 340 }: { projection: CycleProjection; width?: number }) {
@@ -50,8 +50,8 @@ export default function CycleClock({ projection, width = 340 }: { projection: Cy
       )}
       <line x1={x(zero)} x2={x(zero)} y1={TOP - 2} y2={bottom + 2} stroke={palette.primary.main} strokeWidth={2} />
       <path d={`M ${x(zero)} ${TOP - 2} l -5 -8 h 10 z`} fill={palette.primary.main} />
-      <text x={x(zero) + (zero > cycle * 0.6 ? -8 : 8)} y={TOP - 5} fontSize={9} textAnchor={zero > cycle * 0.6 ? 'end' : 'start'} fill={palette.primary.main}>
-        local zero at {formatSeconds(zero)} s
+      <text x={x(zero) + (zero > cycle * 0.6 ? -8 : 8)} y={TOP - 6} fontSize={11} fontWeight={500} textAnchor={zero > cycle * 0.6 ? 'end' : 'start'} fill={palette.text.primary} fontFamily={theme.typography.fontFamily}>
+        Local zero at {formatSeconds(zero)} s
       </text>
       {Array.from({ length: Math.floor(cycle / step) + 1 }, (_, i) => i * step).map((t) => (
         <g key={t}>

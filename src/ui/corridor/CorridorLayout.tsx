@@ -24,7 +24,6 @@ import {
   fromMetres,
   fromMetresPerSecond,
   LENGTH_LABEL,
-  newCorridorStop,
   oppositeDirection,
   SPEED_LABEL,
   suggestThroughPhases,
@@ -36,6 +35,8 @@ import {
   type Issue,
   type Project,
 } from '../../model';
+import ScrollArea from '../components/ScrollArea';
+import { defaultLink, newStop } from './linkDefaults';
 import { MeasureInput } from '../fields/GridInputs';
 import { APPROACHES } from '../fields/phaseOptions';
 import { fieldId, issuesFor, type FieldPath } from '../fields/paths';
@@ -61,11 +62,11 @@ function PhaseToggles({ intersection, value, onChange, label, path, issues }: { 
       value={value}
       onChange={(_, next: number[]) => onChange([...next].sort((a, b) => a - b))}
       aria-label={label}
-      sx={{ flexWrap: 'wrap', ...(flagged ? { outline: 2, outlineColor: 'error.main', outlineStyle: 'solid', borderRadius: 1 } : {}) }}
+      sx={{ flexWrap: 'nowrap', ...(flagged ? { outline: 2, outlineColor: 'error.main', outlineStyle: 'solid', borderRadius: 1 } : {}) }}
     >
       {enabled.map((phase) => (
         <Tooltip key={phase.number} title={`${phase.label || `Phase ${phase.number}`}${phase.movement.approach ? ` · ${phase.movement.approach}B ${phase.movement.kind}` : ''}`}>
-          <ToggleButton value={phase.number} aria-label={`Phase ${phase.number}`} sx={{ minWidth: 30, px: 0.75, py: 0.25 }}>
+          <ToggleButton value={phase.number} aria-label={`Phase ${phase.number}`} sx={{ minWidth: 26, height: 28, px: 0.5, py: 0, fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>
             {phase.number}
           </ToggleButton>
         </Tooltip>
@@ -93,7 +94,7 @@ export default function CorridorLayout({ project, corridor, corridorIndex, issue
       // The first stop has no link before it; a stop that was first gets a default link.
       c.stops.forEach((s, k) => {
         if (k === 0) s.distance = 0;
-        else if (s.distance === 0) s.distance = 300;
+        else if (s.distance === 0) s.distance = defaultLink(units).distance;
       });
     });
   };
@@ -144,7 +145,7 @@ export default function CorridorLayout({ project, corridor, corridorIndex, issue
         </Tooltip>
       </Stack>
 
-      <Box sx={{ overflowX: 'auto', border: 1, borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper' }}>
+      <ScrollArea sx={{ border: 1, borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper' }}>
         <Box component="table" sx={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%', fontSize: 13 }}>
           <thead>
             <tr>
@@ -268,7 +269,7 @@ export default function CorridorLayout({ project, corridor, corridorIndex, issue
             No intersections yet. Add them in travel order.
           </Typography>
         ) : null}
-      </Box>
+      </ScrollArea>
 
       <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
         <TextField select size="small" label="Intersection" value={adding} onChange={(e) => setAdding(e.target.value)} sx={{ minWidth: 240 }} disabled={available.length === 0}>
@@ -287,7 +288,7 @@ export default function CorridorLayout({ project, corridor, corridorIndex, issue
             const intersection = intersections.get(adding);
             if (!intersection) return;
             editCorridor(`Add ${intersection.name} to corridor`, (c) => {
-              c.stops.push(newCorridorStop(intersection, c.outbound, c.stops.length === 0));
+              c.stops.push(newStop(intersection, c.outbound, c.stops.length === 0, units));
               for (const plan of c.plans) plan.patterns[intersection.id] = intersection.patterns.find((p) => p.mode === 'coordinated')?.id ?? null;
             });
             setAdding('');

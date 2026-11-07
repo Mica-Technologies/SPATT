@@ -22,6 +22,7 @@ import {
   type Issue,
   type Phase,
 } from '../../model';
+import ScrollArea from '../components/ScrollArea';
 import { CheckboxInput, PhaseListInput, SecondsInput, SelectInput, TextInput } from '../fields/GridInputs';
 import { APPROACHES, MOVEMENTS, RECALLS } from '../fields/phaseOptions';
 import { fieldId, issuesFor, type FieldPath } from '../fields/paths';
@@ -268,7 +269,7 @@ export default function PhasesTab({ intersection, intersectionIndex, issues, pha
         {controllerSetting('redAmber', 'Red+amber', 's before every green')}
         {controllerSetting('greenFlash', 'Green flash', 's at the end of every green')}
       </Box>
-      <Box sx={{ overflowX: 'auto', width: 'fit-content', maxWidth: '100%', border: 1, borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper' }}>
+      <ScrollArea sx={{ width: 'fit-content', maxWidth: '100%', border: 1, borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper' }}>
         <Box component="table" sx={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: 13, minWidth: LABEL_WIDTH + phases.length * COLUMN_WIDTH }}>
           <thead>
             <tr>
@@ -323,9 +324,9 @@ export default function PhasesTab({ intersection, intersectionIndex, issues, pha
             ))}
           </tbody>
         </Box>
-      </Box>
+      </ScrollArea>
 
-      <Box sx={{ mt: 1.5, display: 'flex', alignItems: 'center', gap: 2 }}>
+      <Box sx={{ mt: 1.5, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
         <Button
           size="small"
           variant="outlined"

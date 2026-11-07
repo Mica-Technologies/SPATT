@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import MoreVertRoundedIcon from '@mui/icons-material/MoreVertRounded';
 import Box from '@mui/material/Box';
@@ -17,30 +17,15 @@ import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import {
-  csmDefault,
-  leadLagEightPhase,
-  randomId,
-  removeIntersectionFromCorridors,
-  splitPhaseSideStreet,
-  standardEightPhase,
-  twoPhase,
-  uniqueName,
-  type Intersection,
-} from '../../model';
+import { randomId, removeIntersectionFromCorridors, uniqueName, type Intersection } from '../../model';
 import AddCorridorDialog from '../corridor/AddCorridorDialog';
 import CsmExportDialog from '../dialogs/CsmExportDialog';
 import CsmImportDialog from '../dialogs/CsmImportDialog';
 import { useIssues } from '../state/useIssues';
 import { useWorkspace } from '../state/workspace';
-
-const TEMPLATES: { label: string; build: (id: string) => Intersection }[] = [
-  { label: 'Standard eight-phase', build: standardEightPhase },
-  { label: 'Eight-phase, lead-lag', build: leadLagEightPhase },
-  { label: 'Split-phase side street', build: splitPhaseSideStreet },
-  { label: 'Two-phase', build: twoPhase },
-  { label: 'CSM ASC-3 default', build: csmDefault },
-];
+import { addTemplateIntersection } from './addIntersection';
+import TemplateSketch from './TemplateSketch';
+import { TEMPLATES } from './templates';
 
 type Kind = 'intersection' | 'corridor';
 interface Target {
@@ -62,11 +47,15 @@ export default function Sidebar() {
   const [csmExport, setCsmExport] = useState<string | null>(null);
   const [csmImportId, setCsmImportId] = useState<string | null>(null);
   const [addingCorridor, setAddingCorridor] = useState(false);
+  // Opened once the add menu has closed, so the menu handing focus back does not take it from the dialog.
+  const pendingRename = useRef<Target | null>(null);
+  const renameInput = useRef<HTMLInputElement>(null);
 
   const add = (build: (id: string) => Intersection) => {
-    const id = randomId('i');
-    insert(build(id));
     setAddAnchor(null);
+    const added = addTemplateIntersection(build);
+    // Another intersection already has the template's name: ask for one rather than leave a numbered copy.
+    if (added.renamed) pendingRename.current = { kind: 'intersection', id: added.id, name: added.name };
   };
 
   const insert = (intersection: Intersection) => {
@@ -161,16 +150,38 @@ export default function Sidebar() {
         })}
       </List>
       <Box sx={{ px: 1.5, pb: 2 }}>
-        <Button size="small" variant="outlined" fullWidth startIcon={<AddRoundedIcon />} onClick={() => setAddingCorridor(true)} disabled={project.intersections.length === 0}>
+        <Button size="small" variant="outlined" fullWidth startIcon={<AddRoundedIcon />} onClick={() => setAddingCorridor(true)} disabled={project.intersections.length === 0} aria-describedby={project.intersections.length < 2 ? 'add-corridor-hint' : undefined}>
           Add corridor
         </Button>
+        {project.intersections.length < 2 ? (
+          <Typography id="add-corridor-hint" variant="caption" component="p" sx={{ color: 'text.secondary', mt: 0.75, px: 0.5 }}>
+            {project.intersections.length === 0 ? 'A corridor links intersections: add one first.' : 'A corridor links two or more intersections in travel order.'}
+          </Typography>
+        ) : null}
       </Box>
 
-      <Menu anchorEl={addAnchor} open={addAnchor !== null} onClose={() => setAddAnchor(null)}>
+      <Menu
+        anchorEl={addAnchor}
+        open={addAnchor !== null}
+        onClose={() => setAddAnchor(null)}
+        slotProps={{
+          transition: {
+            onExited: () => {
+              if (pendingRename.current) setRenaming(pendingRename.current);
+              pendingRename.current = null;
+            },
+          },
+        }}
+      >
         <ListSubheader sx={{ lineHeight: '32px' }}>Start from</ListSubheader>
-        {TEMPLATES.map((template) => (
-          <MenuItem key={template.label} onClick={() => add(template.build)}>
-            {template.label}
+        {TEMPLATES.map((template, k) => (
+          <MenuItem key={template.label} aria-label={template.label} aria-describedby={`template-description-${k}`} onClick={() => add(template.build)} sx={{ gap: 1.5, alignItems: 'center', maxWidth: 400 }}>
+            <TemplateSketch template={template} width={56} />
+            <ListItemText
+              primary={template.label}
+              secondary={template.description}
+              slotProps={{ secondary: { id: `template-description-${k}`, sx: { whiteSpace: 'normal' } } }}
+            />
           </MenuItem>
         ))}
         <Divider />
@@ -211,7 +222,21 @@ export default function Sidebar() {
         }}
       />
 
-      <Dialog open={renaming !== null} onClose={() => setRenaming(null)} fullWidth maxWidth="xs">
+      <Dialog
+        open={renaming !== null}
+        onClose={() => setRenaming(null)}
+        fullWidth
+        maxWidth="xs"
+        // Focus once shown: a closing menu may hand focus back to its button after autoFocus ran.
+        slotProps={{
+          transition: {
+            onEntered: () => {
+              renameInput.current?.focus();
+              renameInput.current?.select();
+            },
+          },
+        }}
+      >
         <form
           onSubmit={(event) => {
             event.preventDefault();
@@ -228,7 +253,7 @@ export default function Sidebar() {
         >
           <DialogTitle>Rename {renaming?.kind}</DialogTitle>
           <DialogContent>
-            <TextField autoFocus fullWidth label="Name" value={renaming?.name ?? ''} onChange={(e) => setRenaming((r) => (r ? { ...r, name: e.target.value } : r))} sx={{ mt: 1 }} slotProps={{ htmlInput: { maxLength: 120 } }} />
+            <TextField autoFocus inputRef={renameInput} fullWidth label="Name" value={renaming?.name ?? ''} onFocus={(e) => e.target.select()} onChange={(e) => setRenaming((r) => (r ? { ...r, name: e.target.value } : r))} sx={{ mt: 1 }} slotProps={{ htmlInput: { maxLength: 120 } }} />
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setRenaming(null)}>Cancel</Button>

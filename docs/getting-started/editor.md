@@ -28,10 +28,16 @@ in version control. The format is documented in [Project File Format](../develop
 
 - **Sidebar.** The project's intersections. **Add intersection** starts from a template: a
   standard eight-phase intersection, eight-phase with a lagging left, a split-phased side street,
-  two-phase, or the CSM ASC-3 controller's defaults, or imports a plan from that controller.
-  Each intersection's menu renames, duplicates, exports for the controller, or deletes it (see
-  [CSM ASC-3](../profiles/csm-asc3.md)).
-- **Tabs.** Phases, Rings & Barriers, Patterns, Schedule and Volumes, described below.
+  two-phase, or the CSM ASC-3 controller's defaults, or imports a plan from that controller. An
+  empty project offers the same templates in the main area. A template whose name is already
+  taken asks for a new name. Each intersection's menu renames, duplicates, exports for the
+  controller, or deletes it (see [CSM ASC-3](../profiles/csm-asc3.md)). On narrow windows the
+  sidebar is a drawer, opened with the menu button at the left of the header.
+- **Header.** Undo and redo, then the timing sheet, **Export**, the diagram toggle, project
+  **Settings** and **All projects** (back to the library). Wide windows label these buttons;
+  narrower ones show icons with tooltips, and phones put them in the **More actions** menu.
+- **Tabs.** Phases, Rings & Barriers, Patterns, Schedule, Volumes and Simulate, described below
+  and in [Simulation](simulation.md). A tab with problems shows their count.
 - **Ring-barrier diagram.** Docked on the right on wide windows (toggle it from the header). See
   [The ring-barrier diagram](#the-ring-barrier-diagram) below. The same panel switches to
   [the intersection view](#the-intersection-view).
@@ -41,7 +47,25 @@ in version control. The format is documented in [Project File Format](../develop
   the cursor is not in a text field.
 
 Values are entered in seconds and stored to the tenth. Grid fields commit when you press
-++enter++ or leave the field; ++esc++ puts the old value back.
+++enter++ or leave the field; ++esc++ puts the old value back. A grid wider than the window
+scrolls sideways inside its own panel; a fade and an arrow at the edge show there is more.
+
+### Keyboard shortcuts
+
+Press ++"?"++ (or the keyboard button in the header) for this list in the app. Apart from
+++ctrl+enter++, shortcuts do nothing while you are typing in a field.
+
+| Keys | Does |
+|---|---|
+| ++ctrl+z++ | Undo |
+| ++ctrl+y++ or ++ctrl+shift+z++ | Redo |
+| ++alt+1++ to ++alt+6++ | Go to a tab: Phases to Simulate, or a corridor's tabs |
+| ++ctrl+enter++ | Simulate tab: run the simulation |
+| ++space++ | Simulate tab: play or pause the playback |
+| ++"?"++ | Show the shortcuts |
+
+On a Mac use ++cmd++ for ++ctrl++ and ++option++ for ++alt++. The first ++tab++ on a page offers
+**Skip to editor**, which jumps past the header.
 
 ## Phases
 
@@ -156,9 +180,12 @@ the offset, and the coordinated phases' green is shaded where it falls. Two inte
 same cycle whose coordinated greens line up on this strip turn green together.
 
 A pattern with timing errors, such as a split shorter than minimum green, is still drawn with the
-affected phases outlined in red. When the layout itself is undefined (rings that would miss a
-barrier, splits that do not add up to the cycle, no coordinated phase, a split too short for its
-own yellow and red clearance) the panel asks you to fix those problems first.
+affected phases outlined in red. When the splits do not add up to the cycle, the diagram is drawn
+over the splits' total with the entered cycle marked by a dashed red line, and the overrun (or the
+part of the cycle no split covers) hatched in red; the cycle clock and force-offs return once the
+two match. When the layout itself is undefined (rings that would miss a barrier, no coordinated
+phase, a split too short for its own yellow and red clearance) the panel asks you to fix those
+problems first.
 
 ## The intersection view
 

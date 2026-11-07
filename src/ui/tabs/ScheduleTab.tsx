@@ -22,6 +22,7 @@ import {
   type Intersection,
   type ScheduleEntry,
 } from '../../model';
+import ScrollArea from '../components/ScrollArea';
 import { SelectInput } from '../fields/GridInputs';
 import { issuesFor } from '../fields/paths';
 import { TimeOfDayInput } from '../fields/TimeOfDayInput';
@@ -198,7 +199,7 @@ export default function ScheduleTab({ intersection, intersectionIndex, issues }:
         <Timeline intersection={intersection} />
       </Box>
 
-      <Box sx={{ overflowX: 'auto', border: 1, borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper' }}>
+      <ScrollArea sx={{ border: 1, borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper' }}>
         <Box component="table" sx={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: 13, width: '100%', minWidth: 560 }}>
           <thead>
             <tr>
@@ -282,7 +283,7 @@ export default function ScheduleTab({ intersection, intersectionIndex, issues }:
             })}
           </tbody>
         </Box>
-      </Box>
+      </ScrollArea>
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
         <Button size="small" variant="outlined" startIcon={<AddRoundedIcon />} onClick={addEntry}>

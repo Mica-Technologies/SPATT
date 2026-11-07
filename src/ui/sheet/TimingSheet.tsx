@@ -31,27 +31,27 @@ import { REFERENCE_LABEL } from '../diagram/diagramText';
 import { flaggedPhases } from '../diagram/flags';
 import RingBarrierDiagram from '../diagram/RingBarrierDiagram';
 import { APPROACHES, MOVEMENTS, RECALLS, optionLabel } from '../fields/phaseOptions';
-import { Facts, Section, SheetFooter, SheetHeader, Table } from './sheetParts';
+import { Alarm, Facts, Mono, Section, SheetFooter, SheetHeader, Table } from './sheetParts';
 
 const DIAGRAM_WIDTH = 720;
 const s = formatSeconds;
 const sec = (tenths: number) => (tenths === 0 ? '—' : s(tenths));
-const yes = (value: boolean) => (value ? 'Yes' : '');
+const yes = (value: boolean) => (value ? 'Yes' : 'No');
 function PhaseTable({ phases }: { phases: Phase[] }) {
-  const row = (label: string, value: (phase: Phase) => ReactNode) => ({ label, cells: phases.map((p) => (p.enabled ? value(p) : '')) });
+  const row = (label: string, value: (phase: Phase) => ReactNode, text = false) => ({ label, text, cells: phases.map((p) => (p.enabled ? value(p) : '')) });
   const hasVolumeDensity = phases.some((p) => Object.values(p.volumeDensity).some((v) => v > 0));
   const vd = (key: keyof Phase['volumeDensity']) => (p: Phase) => sec(p.volumeDensity[key]);
   const ped = (value: (phase: Phase) => ReactNode) => (p: Phase) => (p.pedestrian.enabled ? value(p) : '—');
   const rows = [
-    { label: 'Label', cells: phases.map((p) => (p.enabled ? p.label : 'Disabled')) },
-    row('Direction', (p) => `${p.movement.approach ? optionLabel(APPROACHES, p.movement.approach) : '—'} ${optionLabel(MOVEMENTS, p.movement.kind)}`),
+    { label: 'Label', text: true, cells: phases.map((p) => (p.enabled ? p.label : 'Disabled')) },
+    row('Direction', (p) => `${p.movement.approach ? optionLabel(APPROACHES, p.movement.approach) : '—'} ${optionLabel(MOVEMENTS, p.movement.kind)}`, true),
     row('Min green', (p) => s(p.minGreen)),
     row('Passage', (p) => s(p.passage)),
     row('Max 1', (p) => s(p.maxGreen1)),
     row('Max 2', (p) => sec(p.maxGreen2)),
     row('Yellow', (p) => s(p.yellow)),
     row('Red clear', (p) => s(p.redClear)),
-    row('Recall', (p) => optionLabel(RECALLS, p.recall)),
+    row('Recall', (p) => optionLabel(RECALLS, p.recall), true),
     row('Walk', ped((p) => s(p.pedestrian.walk))),
     row('Ped clear', ped((p) => s(p.pedestrian.clearance))),
     row('Ped recall', ped((p) => yes(p.pedestrian.recall))),
@@ -95,7 +95,12 @@ function PatternBlock({ intersection, pattern }: { intersection: Intersection; p
   const facts = coordinated
     ? [
         ['Cycle', `${s(pattern.cycle)} s`],
-        ['Offset', `${s(pattern.offset)} s to ${REFERENCE_LABEL[pattern.offsetReference]}`],
+        [
+          'Offset',
+          <>
+            <Mono>{s(pattern.offset)} s</Mono> to {REFERENCE_LABEL[pattern.offsetReference]}
+          </>,
+        ],
         ['Coordinated', pattern.coordinatedPhases.join(', ') || '—'],
         ['Max green', pattern.maxGreen === 'max2' ? 'Max 2' : 'Max 1'],
         ['Force-off', pattern.forceOffMode === 'fixed' ? 'Fixed' : 'Floating'],
@@ -109,7 +114,7 @@ function PatternBlock({ intersection, pattern }: { intersection: Intersection; p
       <Typography variant="subtitle2" component="h4">
         {pattern.name}
       </Typography>
-      <Facts facts={facts as [string, string][]} />
+      <Facts facts={facts as [string, ReactNode][]} />
       {coordinated ? (
         <>
           <Table
@@ -152,6 +157,7 @@ function CapacityTables({ intersection, lengthUnit }: { intersection: Intersecti
       </Typography>
       <Table
         firstColumnLabel="Lane group"
+        columns={['number', 'text']}
         head={['Phase', 'Movements', 'Lanes', `Width (${LENGTH_LABEL[lengthUnit]})`, 'Heavy veh. %', 'Grade %', 'Sat. flow (veh/h)']}
         rows={groups.map((g, k) => ({
           label: label(k),
@@ -196,10 +202,23 @@ function CapacityTables({ intersection, lengthUnit }: { intersection: Intersecti
             <Table
               firstColumnLabel="Lane group"
               head={['v (veh/h)', 's (veh/h)', 'g (s)', 'c (veh/h)', 'v/c', 'Delay (s)', 'LOS']}
-              rows={analysis.laneGroups.map((g, k) => ({
-                label: label(k),
-                cells: [g.flow.toFixed(0), g.saturation.value.toFixed(0), g.effectiveGreen.toFixed(1), g.capacity.toFixed(0), Number.isFinite(g.volumeToCapacity) ? g.volumeToCapacity.toFixed(2) : '—', g.delay?.toFixed(1) ?? '—', g.los ?? '—'],
-              }))}
+              rows={analysis.laneGroups.map((g, k) => {
+                // No traffic: there is no delay to grade, whatever the formula gives for an empty approach.
+                const idle = g.flow === 0;
+                const vc = Number.isFinite(g.volumeToCapacity) ? g.volumeToCapacity.toFixed(2) : '—';
+                return {
+                  label: label(k),
+                  cells: [
+                    g.flow.toFixed(0),
+                    g.saturation.value.toFixed(0),
+                    g.effectiveGreen.toFixed(1),
+                    g.capacity.toFixed(0),
+                    g.volumeToCapacity > 1 ? <Alarm key="vc">{vc}</Alarm> : vc,
+                    idle ? '—' : (g.delay?.toFixed(1) ?? '—'),
+                    idle ? '—' : g.los === 'F' ? <Alarm key="los">F</Alarm> : (g.los ?? '—'),
+                  ],
+                };
+              })}
             />
           </Box>
         );
@@ -250,6 +269,9 @@ export default function TimingSheet({ project, intersection, printedAt }: { proj
         ) : (
           <Table
             firstColumnLabel="Start"
+            numericLabels
+            compact
+            columns={['number', 'number', 'text']}
             head={['Ends', 'Duration', 'Pattern']}
             rows={scheduleSpans(intersection.schedule).map((span) => ({
               label: formatClock(span.startMinute),

@@ -71,6 +71,9 @@ export default function PatternSettings({ intersection, pattern, path, issues, p
     });
 
   const minimumCycle = cycleBounds(intersection).minimumWithPedestrians.cycle;
+  // The splits not filling the cycle is reported on the splits; mark the cycle too, since either may be the one to change.
+  const cycleSum = issues.filter((i) => i.code === 'pattern.cycle-sum' && i.path.length === path.length + 1 && path.every((part, k) => i.path[k] === part));
+  const belowMinimum = !free && pattern.cycle > 0 && pattern.cycle < minimumCycle;
 
   const changeReference = (to: OffsetReference) => {
     const toLabel = OFFSET_REFERENCES.find((r) => r.value === to)!.short;
@@ -106,13 +109,18 @@ export default function PatternSettings({ intersection, pattern, path, issues, p
         <Field label="Mode" path={p('mode')}>
           <SelectInput path={p('mode')} label="Mode" value={pattern.mode} options={MODES} issues={issuesFor(issues, p('mode'))} onCommit={(v) => update(`Pattern mode ${v}`, (x) => (x.mode = v))} />
         </Field>
-        <Field label="Cycle" path={p('cycle')} hint={free ? undefined : `Minimum with pedestrians ${formatSeconds(minimumCycle)} s`}>
+        <Field label="Cycle" path={p('cycle')}>
           <Box sx={{ width: 96 }}>
-            <SecondsInput path={p('cycle')} label="Cycle length" value={pattern.cycle} disabled={free} issues={issuesFor(issues, p('cycle'))} onCommit={(v) => update('Cycle length', (x) => (x.cycle = v))} />
+            <SecondsInput path={p('cycle')} label="Cycle length" value={pattern.cycle} disabled={free} issues={[...issuesFor(issues, p('cycle')), ...cycleSum]} onCommit={(v) => update('Cycle length', (x) => (x.cycle = v))} />
           </Box>
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
             s
           </Typography>
+          {free ? null : (
+            <Typography variant="caption" sx={{ color: cycleSum.length > 0 ? 'error.main' : belowMinimum ? 'warning.main' : 'text.secondary', lineHeight: 1.3, minWidth: 0 }}>
+              {cycleSum.length > 0 ? 'Splits do not fill this cycle' : belowMinimum ? `Below the ${formatSeconds(minimumCycle)} s minimum with pedestrians` : `Min. with pedestrians ${formatSeconds(minimumCycle)} s`}
+            </Typography>
+          )}
         </Field>
         <Field label="Offset" path={p('offset')}>
           <Box sx={{ width: 96 }}>

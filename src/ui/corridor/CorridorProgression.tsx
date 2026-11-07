@@ -12,6 +12,7 @@ import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import ScrollArea from '../components/ScrollArea';
 import { analyzeProgression, mod, shiftCoordinatedGreen, type Direction, type OffsetOverrides } from '../../engine';
 import { formatSeconds, oppositeDirection, type Corridor, type Project } from '../../model';
 import { REFERENCE_LABEL } from '../diagram/diagramText';
@@ -152,7 +153,7 @@ export default function CorridorProgression({ project, corridor }: { project: Pr
 
       <OptimizeDialog open={optimizing} onClose={() => setOptimizing(false)} project={project} corridor={corridor} plan={plan} labels={labels} />
 
-      <Box sx={{ overflowX: 'auto', border: 1, borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper' }}>
+      <ScrollArea sx={{ border: 1, borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper' }}>
         <Box component="table" sx={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%', fontSize: 13 }}>
           <thead>
             <tr>
@@ -196,7 +197,7 @@ export default function CorridorProgression({ project, corridor }: { project: Pr
             })}
           </tbody>
         </Box>
-      </Box>
+      </ScrollArea>
     </Stack>
   );
 }

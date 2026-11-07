@@ -18,6 +18,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import InputAdornment from '@mui/material/InputAdornment';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import ScrollArea from '../components/ScrollArea';
 import { CLEARANCE_DEFAULTS, pedestrianClearance, pedestrianTotalMinimum, redClearance, yellowChange, type UnitSystem } from '../../engine/clearance';
 import { formatSeconds, LENGTH_LABEL, SPEED_LABEL, type ClearanceBasis, type Intersection, type Phase, type Project, type Tenths } from '../../model';
 import { useWorkspace } from '../state/workspace';
@@ -280,7 +281,7 @@ export default function ClearanceDialog({ open, onClose, intersectionIndex, phas
           </Box>
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-            <Box sx={{ overflowX: 'auto', border: 1, borderColor: 'divider', borderRadius: 2 }}>
+            <ScrollArea sx={{ border: 1, borderColor: 'divider', borderRadius: 2 }}>
               <Box component="table" sx={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: 13 }}>
                 <thead>
                   <tr>
@@ -335,7 +336,7 @@ export default function ClearanceDialog({ open, onClose, intersectionIndex, phas
                   })}
                 </tbody>
               </Box>
-            </Box>
+            </ScrollArea>
 
             <PushbuttonCheck phase={phase} pedClearance={results.pedClearance} minimum={pushbuttonMinimum} lengthUnit={lengthUnit} />
 
