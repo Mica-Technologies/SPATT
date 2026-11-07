@@ -16,7 +16,7 @@ In the sidebar, open an intersection's menu and choose **Export for CSM ASC-3**.
 
 - **problems that block the export**, such as a phase numbered above 8 or a schedule entry that
   does not start on the hour, and SPATT's own validation errors;
-- **differences** the controller will make, such as treating maximum recall as minimum recall.
+- **differences** the controller will make, such as using only fixed force-offs.
 
 Click an item to jump to the field. **Download** saves a `.csm.json` file; **Copy plan** puts the
 plan on the clipboard for pasting into the controller.
@@ -44,7 +44,7 @@ sidebar marks **CSM**, and are written back when you export it again.
 | Times | Game ticks (20 per second), up to 600 s per value | Longer values block export |
 | Patterns | 4 slots | More than 4 patterns without a schedule blocks export |
 | Schedule | One start hour per slot, whole hours only | More than 4 entries, or a start off the hour, blocks export |
-| Recall | None, minimum, soft; maximum recall behaves like minimum recall | Maximum recall is a warning |
+| Recall | None, minimum, maximum, soft | |
 | Force-offs | Fixed only | Floating force-offs are a warning |
 | Max green in coordination | Max 2 whenever a phase has one | A pattern set to Max 1 with Max 2 phases is a warning |
 | Overlaps and preempts | Tied to signal circuits | SPATT-side overlaps and preempts are not exported (warning) |

@@ -69,7 +69,9 @@ windows and their rounding are the controller's own. Where it differs from the N
 - **Timing.** The controller runs every 2 ticks (0.1 s), and every interval lasts at least one run.
 - **Detection and the max timer.** Detection is presence only. The max timer starts on the first
   green run that sees a conflicting call, and resets if the call goes away.
-- **Recalls.** Maximum recall behaves like minimum recall. The pedestrian recall setting adds a
+- **Recalls.** Maximum recall extends the green as a waiting vehicle would, so the phase runs to
+  its max green when a conflicting call is waiting. A dual-entry phase riding beside the other
+  ring does not wait to gap out. The pedestrian recall setting adds a
   walk to a phase that runs anyway, but does not call the phase; recall mode *Pedestrian* does.
 - **Calls during coordination.** A non-coordinated phase's call is only accepted inside its window,
   up to its force-off point, and then latches. When a green ends, every waiting conflicting call is

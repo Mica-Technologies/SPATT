@@ -1,14 +1,15 @@
 /**
  * The City Super Mod ASC-3 ("advanced" ring-barrier) controller, ported rule for rule for the
- * simulator from the mod's `RingBarrierState` (surveyed read-only at CSM commit 136abc1f6; the
- * section numbers in comments refer to that survey's specification).
+ * simulator from the mod's `RingBarrierState` (surveyed read-only at CSM commit 268e2f383 and
+ * brought up to 0b29bfef1; the section numbers in comments refer to that survey's specification).
  *
  * It runs on the plan SPATT would export to the controller (`exportCsm`), so offsets, windows and
  * barriers are the controller's own. Faithful quirks include: the engine runs every 2 ticks and
  * every interval lasts at least one run; presence-only detection; the max timer starts on the first
- * green run with a conflicting call and resets when the call drops; MAXIMUM recall acts as MINIMUM;
- * `pedRecall` adds a walk but places no call; calls on non-coordinated phases are accepted only
- * inside their windows and latch; waiting conflicting calls are committed when a green ends;
+ * green run with a conflicting call and resets when the call drops; MAXIMUM recall extends the
+ * green like a vehicle in the zone; `pedRecall` adds a walk but places no call; calls on
+ * non-coordinated phases are accepted only inside their windows and latch; waiting conflicting
+ * calls are committed when a green ends;
  * coordinated phases yield from their green start, dwell when late, and yield early for a window
  * about to open; within-barrier wrap; conditional service without a time check; rest preferring the
  * coordinated phases even when free.
@@ -45,6 +46,8 @@ interface RingRuntime {
   serviceSeq: number;
   clearedAlongside: number;
   coordYieldFor: number;
+  /** The phase this ring's coordinated green last yielded early for, or 0 (the wrap in fillIdleRing). */
+  yieldedFor: number;
 }
 
 const DEFAULT_WALK = 140;
@@ -73,6 +76,7 @@ function newRing(): RingRuntime {
     serviceSeq: 0,
     clearedAlongside: -1,
     coordYieldFor: 0,
+    yieldedFor: 0,
   };
 }
 
@@ -415,6 +419,7 @@ export class CsmController implements ControllerModel {
       maxStart: -1,
       dualEntry: false,
       coordYieldFor: 0,
+      yieldedFor: 0,
     } satisfies Partial<RingRuntime>);
   }
 
@@ -477,7 +482,8 @@ export class CsmController implements ControllerModel {
       }
       Object.assign(r, { delayActive: false, greenStart: now, intervalStart: now, lastActuation: now });
     }
-    if (this.vehicleCount(n) > 0) r.lastActuation = now;
+    // MAXIMUM recall is a constant call that also extends, as a vehicle in the zone would (§4.3.c).
+    if (this.vehicleCount(n) > 0 || p.recall === 'MAXIMUM') r.lastActuation = now;
     if (r.dualEntry && (this.vehicleCount(n) > 0 || this.pedRequests.has(n))) r.dualEntry = false;
 
     let conflict = this.demandConflictsWith(n, ringNum, this.called);
@@ -525,12 +531,18 @@ export class CsmController implements ControllerModel {
     const maxOut = !r.resting && !isCoord && r.maxStart >= 0 && now - r.maxStart >= effMax && pedDone;
     const gapOut = now - r.lastActuation >= effPassage;
     const forceOff = this.coordinated && !isCoord && !r.resting && !r.dualEntry && this.pastYieldPoint(n, p.yellow + p.redClear) && pedDone;
-    const gapTerminate = !coordHold && minMet && pedDone && gapOut && conflict;
+    // A dual-entry companion need not gap out: with no demand of its own, only MAX recall extends
+    // it, and that would hold it green for good once its companion has finished.
+    const gapDone = gapOut || r.dualEntry;
+    const gapTerminate = !coordHold && minMet && pedDone && gapDone && conflict;
     const terminate = maxOut || forceOff || (coordYieldDue && pedDone) || gapTerminate;
 
     if (terminate && minMet) {
       this.commitConflictingCalls(n, ringNum);
-      if (windowOpeningFor !== 0 && coordYieldDue) this.committedCalls.add(windowOpeningFor);
+      if (windowOpeningFor !== 0 && coordYieldDue) {
+        this.committedCalls.add(windowOpeningFor);
+        r.yieldedFor = windowOpeningFor;
+      }
       if (forceOff) this.windowAccepted.delete(n);
       Object.assign(r, { interval: 'YELLOW', intervalStart: now, pedServing: false });
       this.terminations.push({ phase: n, reason: maxOut ? 'max-out' : forceOff ? 'force-off' : coordYieldDue ? 'yield' : 'gap-out', tick: now });
@@ -566,6 +578,18 @@ export class CsmController implements ControllerModel {
       const idx = seq.findIndex((m) => this.active(m) && this.phase.get(m)!.barrier === this.currentBarrier && this.called.has(m) && !this.isActiveInEitherRing(m));
       if (idx >= 0) {
         this.startGreen(ringNum, seq[idx]!);
+        r.sequencePos = idx;
+        return;
+      }
+    }
+    // Wrap to the one phase this ring's coordinated green yielded for, while the other ring still
+    // works the barrier: the wrap above is closed whenever another barrier calls.
+    if (r.yieldedFor !== 0 && this.ringWorkingBarrier(ringNum === 1 ? 2 : 1)) {
+      const target = r.yieldedFor;
+      r.yieldedFor = 0;
+      const idx = seq.indexOf(target);
+      if (idx >= 0 && this.active(target) && this.phase.get(target)!.barrier === this.currentBarrier && this.called.has(target) && !this.isActiveInEitherRing(target)) {
+        this.startGreen(ringNum, target);
         r.sequencePos = idx;
       }
     }

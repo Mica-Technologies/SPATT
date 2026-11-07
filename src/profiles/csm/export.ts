@@ -117,9 +117,6 @@ export function checkCsm(intersection: Intersection): Issue[] {
         }
       }
     }
-    if (phase.recall === 'maximum') {
-      issues.push(warning('csm.max-recall', `Phase ${phase.number}: the controller treats maximum recall like minimum recall`, ['phases', index, 'recall']));
-    }
   });
 
   if (intersection.rings.length > 2) {

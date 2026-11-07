@@ -83,11 +83,10 @@ describe('checkCsm', () => {
   it('reports what the controller cannot express', () => {
     const intersection = standardEightPhase();
     intersection.phases[1]!.maxGreen1 = 6010; // 601 s
-    intersection.phases[2]!.recall = 'maximum';
     intersection.schedule.push({ startMinute: 12 * 60 + 30, patternId: 'am-peak' });
     intersection.patterns[0]!.forceOffMode = 'floating';
     intersection.phases[3]!.maxGreen2 = 400;
-    expect(codes(intersection).sort()).toEqual(['csm.floating-force-off', 'csm.max-recall', 'csm.max2-in-coordination', 'csm.schedule-not-on-the-hour', 'csm.value-too-long'].sort());
+    expect(codes(intersection).sort()).toEqual(['csm.floating-force-off','csm.max2-in-coordination', 'csm.schedule-not-on-the-hour', 'csm.value-too-long'].sort());
     expect(checkCsm(intersection).find((i) => i.code === 'csm.value-too-long')?.path).toEqual(['phases', 1, 'maxGreen1']);
   });
 
