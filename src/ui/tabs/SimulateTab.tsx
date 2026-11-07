@@ -11,6 +11,7 @@ import LinearProgress from '@mui/material/LinearProgress';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import ScrollArea from '../components/ScrollArea';
 import { analyzePattern, DEFAULT_SIMULATION, type SimulationResult, type Stat } from '../../engine';
 import { effectiveSequence } from '../../model';
 import { fontFamilyMono } from '../theme/themePrimitives';
@@ -184,7 +185,7 @@ export default function SimulateTab({ intersection }: TabProps) {
                 {card('Simulated', `${((result.result.ticks - result.result.warmUpTicks) / 20 / 60).toFixed(0)} min`, `after ${(result.result.warmUpTicks / 20 / 60).toFixed(0)} min warm-up`)}
               </Box>
 
-              <Box sx={{ overflowX: 'auto', border: 1, borderColor: 'divider', borderRadius: 1 }}>
+              <ScrollArea sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}>
                 <Box component="table" aria-label="Phase results" sx={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: 13, width: '100%', minWidth: 680 }}>
                   <thead>
                     <tr>
@@ -220,9 +221,9 @@ export default function SimulateTab({ intersection }: TabProps) {
                     ))}
                   </tbody>
                 </Box>
-              </Box>
+              </ScrollArea>
 
-              <Box sx={{ overflowX: 'auto', border: 1, borderColor: 'divider', borderRadius: 1 }}>
+              <ScrollArea sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}>
                 <Box component="table" aria-label="Lane group results" sx={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: 13, width: '100%', minWidth: 620 }}>
                   <thead>
                     <tr>
@@ -253,7 +254,7 @@ export default function SimulateTab({ intersection }: TabProps) {
                     })}
                   </tbody>
                 </Box>
-              </Box>
+              </ScrollArea>
               <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                 Delay is time spent queued at the stop bar, from arrival to departure. The HCM column is the Volumes tab&apos;s analysis of the same pattern and count, which assumes the splits run as programmed. Cycles are counted between
                 {pattern?.mode === 'coordinated' ? ' yields of the coordinated phases' : ' returns to the first barrier group'}. A growing queue at the end means demand exceeds what the phase serves.

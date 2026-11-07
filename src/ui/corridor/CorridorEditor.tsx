@@ -27,13 +27,13 @@ export default function CorridorEditor({ project, corridor }: { project: Project
         <Typography variant="h6" component="h2" noWrap>
           {corridor.name}
         </Typography>
-        <Tabs value={tab} onChange={(_, value: CorridorTab) => setTab(value)} sx={{ minHeight: 40 }}>
+        <Tabs value={tab} onChange={(_, value: CorridorTab) => setTab(value)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile sx={{ minHeight: 40 }}>
           <Tab value="layout" label="Layout" sx={{ minHeight: 40 }} />
           <Tab value="plans" label="Timing plans" sx={{ minHeight: 40 }} />
           <Tab value="progression" label="Time-space diagram" sx={{ minHeight: 40 }} />
         </Tabs>
       </Box>
-      <Box sx={{ flexGrow: 1, overflow: 'auto', minHeight: 0 }}>
+      <Box sx={{ flexGrow: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0, position: 'relative' }}>
         {tab === 'layout' ? <CorridorLayout project={project} corridor={corridor} corridorIndex={corridorIndex} issues={issues} /> : null}
         {tab === 'plans' ? <CorridorPlans project={project} corridor={corridor} corridorIndex={corridorIndex} issues={issues} /> : null}
         {tab === 'progression' ? <CorridorProgression project={project} corridor={corridor} /> : null}

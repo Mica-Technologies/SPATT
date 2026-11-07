@@ -11,6 +11,7 @@ import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import ScrollArea from '../../components/ScrollArea';
 import { analyzePattern, suggestedPattern, suggestTiming, type SuggestedTiming } from '../../../engine';
 import { formatSeconds, uniqueName, type Intersection, type Issue } from '../../../model';
 import { SelectInput } from '../../fields/GridInputs';
@@ -142,7 +143,7 @@ export default function AnalysisSection({ intersection, basePath, issues }: Anal
               {stat('Cycle', `${analysis.cycle.toFixed(0)} s`)}
               {stat('Webster cycle', analysis.critical.webster === null ? 'none' : `${formatSeconds(analysis.critical.webster)} s`)}
             </Box>
-            <Box sx={{ overflowX: 'auto', border: 1, borderColor: 'divider', borderRadius: 1 }}>
+            <ScrollArea sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}>
               <Box component="table" aria-label="Lane group analysis" sx={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: 13, width: '100%', minWidth: 680 }}>
                 <thead>
                   <tr>
@@ -192,7 +193,7 @@ export default function AnalysisSection({ intersection, basePath, issues }: Anal
                   })}
                 </tbody>
               </Box>
-            </Box>
+            </ScrollArea>
             <Typography variant="caption" sx={{ color: 'text.secondary' }}>
               HCM 2000 method, simplified: effective green is the split less yellow and red clearance; delay is uniform plus incremental delay with random arrivals (no progression adjustment) over a 15-minute analysis period. Suggest timing adds a new pattern with Webster&apos;s cycle and splits in proportion to critical flow ratios, raised to each phase&apos;s minimum including its pedestrian interval.
             </Typography>

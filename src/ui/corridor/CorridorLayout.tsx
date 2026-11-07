@@ -36,6 +36,7 @@ import {
   type Issue,
   type Project,
 } from '../../model';
+import ScrollArea from '../components/ScrollArea';
 import { MeasureInput } from '../fields/GridInputs';
 import { APPROACHES } from '../fields/phaseOptions';
 import { fieldId, issuesFor, type FieldPath } from '../fields/paths';
@@ -144,7 +145,7 @@ export default function CorridorLayout({ project, corridor, corridorIndex, issue
         </Tooltip>
       </Stack>
 
-      <Box sx={{ overflowX: 'auto', border: 1, borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper' }}>
+      <ScrollArea sx={{ border: 1, borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper' }}>
         <Box component="table" sx={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%', fontSize: 13 }}>
           <thead>
             <tr>
@@ -268,7 +269,7 @@ export default function CorridorLayout({ project, corridor, corridorIndex, issue
             No intersections yet. Add them in travel order.
           </Typography>
         ) : null}
-      </Box>
+      </ScrollArea>
 
       <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
         <TextField select size="small" label="Intersection" value={adding} onChange={(e) => setAdding(e.target.value)} sx={{ minWidth: 240 }} disabled={available.length === 0}>
