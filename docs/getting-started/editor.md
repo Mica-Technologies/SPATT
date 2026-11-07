@@ -33,7 +33,8 @@ in version control. The format is documented in [Project File Format](../develop
   [CSM ASC-3](../profiles/csm-asc3.md)).
 - **Tabs.** Phases, Rings & Barriers, Patterns, Schedule and Volumes, described below.
 - **Ring-barrier diagram.** Docked on the right on wide windows (toggle it from the header). See
-  [The ring-barrier diagram](#the-ring-barrier-diagram) below.
+  [The ring-barrier diagram](#the-ring-barrier-diagram) below. The same panel switches to
+  [the intersection view](#the-intersection-view).
 - **Problems.** Every validation error and warning in the project. Click one to jump to the field
   it is about. A plan with errors still opens and saves, so it can be fixed.
 - **Undo and redo.** Every edit is one step: the header buttons, or ++ctrl+z++ and ++ctrl+y++ when
@@ -158,6 +159,42 @@ A pattern with timing errors, such as a split shorter than minimum green, is sti
 affected phases outlined in red. When the layout itself is undefined (rings that would miss a
 barrier, splits that do not add up to the cycle, no coordinated phase, a split too short for its
 own yellow and red clearance) the panel asks you to fix those problems first.
+
+## The intersection view
+
+Switch the diagram panel from **Ring-barrier** to **Intersection** to see the selected pattern as
+signals on a drawing of the intersection. **Plan** draws it from above; **Oblique** draws the same
+layout from above the south-east corner, with the signal poles and heads standing up.
+
+Every vehicle head and the stop bar in front of its lanes show the phase's interval: green, yellow,
+or red (red clearance included). Pedestrian heads at each end of a crosswalk show walk (white)
+or don't walk (orange); the hand flashes during pedestrian clearance while the cycle plays. Drag
+the **cycle time** slider (arrow keys step 0.1 s, Page Up and Page Down 5 s) or press **Play** to
+run through the cycle in real time. With reduced motion turned on in your system, playback steps
+once a second and nothing flashes. The time is local time, measured from the pattern's offset
+reference, as on the ring-barrier diagram.
+
+The drawing is schematic, inferred from what the plan already holds:
+
+- **Legs** come from the phases' directions of travel. A leg is drawn on every side traffic arrives
+  from, and every side a through movement leaves on, so a T intersection has three legs. Phases
+  with no direction are placed by standard NEMA numbering (2 and 6 eastbound and westbound, 4 and
+  8 southbound and northbound, the odd phases their opposing lefts), and the view says so.
+- **Lanes** come from the lane groups on the Volumes tab: their lane counts, widths and movements,
+  left turns nearest the centre line. An approach without lane groups gets one lane per turn phase
+  and two through lanes. Opposite a left-turn lane, a painted median keeps the through lanes in
+  line.
+- **Size.** When a through phase has an intersection width in its clearance calculation, its stop
+  bar is set back to match; when a pedestrian phase has a crossing distance and the leg has no lane
+  groups, its lanes are sized to fit.
+- **Crosswalks** are drawn for phases with pedestrian service, across the leg on the right of the
+  phase's traffic (the eastbound phase's walk crosses the south leg), or on its left when that leg
+  does not exist. A pedestrian phase with no direction crosses every leg.
+- **Signal heads**: one per phase on each approach, on a mast arm over the lanes it serves, with
+  the phase number painted on those lanes. Overlaps are not drawn.
+
+A free pattern has no fixed cycle, and a pattern with problems that stop the ring-barrier diagram
+cannot be projected either; the intersection is still drawn, with every head dark.
 
 ## Timing sheets
 

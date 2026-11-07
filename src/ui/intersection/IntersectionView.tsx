@@ -86,7 +86,7 @@ export default function IntersectionView({ intersection, result }: IntersectionV
             min={0}
             max={Math.max(0, cycle - 1)}
             step={1}
-            shiftStep={10}
+            shiftStep={50}
             onChange={(_, value) => player.setTime(value as number)}
             getAriaValueText={(value) => `${formatSeconds(value)} s`}
             sx={{ flex: 1, mx: 1 }}

@@ -40,6 +40,9 @@ Scripts are Node or Rust, never shell-specific, so every command works on every 
 turns a pattern into interval times; the ring-barrier diagram, the cycle clock and the timing
 sheet (`src/ui/diagram`, `src/ui/sheet`) only draw what it returns. It refuses layouts it cannot
 draw honestly and passes the remaining errors along, so every view agrees on what is drawable.
+The intersection view follows the same split: `src/engine/scene` infers the geometry
+(`buildScene`, metres, x east and y south), reads each phase's interval from a projection
+(`headStatesAt`) and holds the isometric projection; `src/ui/intersection` only draws it.
 
 **Printing is the browser's.** The timing sheet is ordinary HTML with print CSS (`@page` size,
 page breaks, a forced light colour scheme) and `window.print()`. That opens the print dialog in a
