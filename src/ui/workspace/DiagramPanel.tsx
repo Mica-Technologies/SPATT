@@ -9,12 +9,13 @@ import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { convertOffset, cycleBounds, projectCycle, toLocal } from '../../engine';
+import { convertOffset, cycleBounds, toLocal } from '../../engine';
 import { formatSeconds, tenthsToTicks, type Intersection } from '../../model';
 import CycleClock from '../diagram/CycleClock';
 import { flaggedPhases } from '../diagram/flags';
 import { REFERENCE_LABEL } from '../diagram/diagramText';
 import RingBarrierDiagram from '../diagram/RingBarrierDiagram';
+import { projectForDiagram } from '../diagram/sketch';
 import { fontFamilyMono } from '../theme/themePrimitives';
 import { useWorkspace } from '../state/workspace';
 
@@ -34,7 +35,10 @@ function Row({ label, value }: { label: string; value: string }) {
 export default function DiagramPanel({ intersection, patternId }: { intersection: Intersection; patternId: string | null }) {
   const selectPattern = useWorkspace((s) => s.selectPattern);
   const pattern = intersection.patterns.find((p) => p.id === patternId) ?? intersection.patterns[0] ?? null;
-  const result = useMemo(() => (pattern ? projectCycle(intersection, pattern.id) : null), [intersection, pattern]);
+  const drawn = useMemo(() => (pattern ? projectForDiagram(intersection, pattern.id) : null), [intersection, pattern]);
+  const result = drawn?.result ?? null;
+  // Set when the splits do not fill the cycle and the drawing spans the splits instead.
+  const enteredCycle = drawn?.enteredCycle ?? null;
   const bounds = useMemo(() => cycleBounds(intersection, pattern?.maxGreen === 'max2'), [intersection, pattern]);
   const errors = result?.ok ? result.issues.length : 0;
 
@@ -61,12 +65,18 @@ export default function DiagramPanel({ intersection, patternId }: { intersection
 
         {result && result.ok ? (
           <>
-            {errors > 0 ? (
+            {enteredCycle !== null ? (
+              <Alert severity="error" variant="outlined">
+                The splits total {formatSeconds(result.projection.cycle)} s but the cycle is {formatSeconds(enteredCycle)} s. The hatched part shows the {result.projection.cycle > enteredCycle ? 'overrun' : 'time no split covers'}; the clock and force-offs return once they match.
+              </Alert>
+            ) : errors > 0 ? (
               <Alert severity="warning" variant="outlined">
                 This pattern has {errors} error{errors === 1 ? '' : 's'}. The diagram shows the timing as entered; outlined phases need attention.
               </Alert>
             ) : null}
-            <RingBarrierDiagram projection={result.projection} intersection={intersection} flagged={flaggedPhases(intersection, result.issues)} />
+            <RingBarrierDiagram projection={result.projection} intersection={intersection} flagged={flaggedPhases(intersection, result.issues)} cycleMark={enteredCycle} />
+            {enteredCycle !== null ? null : (
+            <>
             <Box>
               <Typography variant="overline" sx={{ color: 'text.secondary' }}>
                 Cycle clock
@@ -92,6 +102,8 @@ export default function DiagramPanel({ intersection, patternId }: { intersection
                   ))}
               </Stack>
             </Box>
+            </>
+            )}
           </>
         ) : null}
 
