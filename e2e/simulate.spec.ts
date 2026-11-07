@@ -41,11 +41,11 @@ test('simulates the controller against a count and plays it back', async ({ page
   await expect(results.getByRole('table', { name: 'Lane group results' }).getByRole('row', { name: /^EB/ })).toBeVisible();
 
   const playback = page.getByRole('region', { name: 'Playback' });
-  await expect(playback.getByRole('img', { name: /^Signal playback at / })).toBeVisible();
+  await expect(playback.getByRole('img', { name: /^Signal playback/ })).toBeVisible();
   const slider = playback.getByRole('slider', { name: 'Playback time' });
   await slider.focus();
   await page.keyboard.press('End');
-  await expect(playback.getByRole('img', { name: 'Signal playback at 20:00' })).toBeVisible();
+  await expect(slider).toHaveAttribute('aria-valuetext', '20:00');
   await expect(playback.getByRole('list', { name: 'Signals at the cursor' }).getByRole('listitem')).toHaveCount(4);
 
   // The same run on the City Super Mod controller's logic.

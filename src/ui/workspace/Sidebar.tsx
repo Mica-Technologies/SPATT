@@ -15,6 +15,7 @@ import ListItemText from '@mui/material/ListItemText';
 import ListSubheader from '@mui/material/ListSubheader';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
+import Snackbar from '@mui/material/Snackbar';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { randomId, removeIntersectionFromCorridors, uniqueName, type Intersection } from '../../model';
@@ -47,15 +48,15 @@ export default function Sidebar() {
   const [csmExport, setCsmExport] = useState<string | null>(null);
   const [csmImportId, setCsmImportId] = useState<string | null>(null);
   const [addingCorridor, setAddingCorridor] = useState(false);
-  // Opened once the add menu has closed, so the menu handing focus back does not take it from the dialog.
-  const pendingRename = useRef<Target | null>(null);
+  // An added template whose name was taken: offered for renaming without interrupting the user.
+  const [numbered, setNumbered] = useState<Target | null>(null);
   const renameInput = useRef<HTMLInputElement>(null);
 
   const add = (build: (id: string) => Intersection) => {
     setAddAnchor(null);
     const added = addTemplateIntersection(build);
-    // Another intersection already has the template's name: ask for one rather than leave a numbered copy.
-    if (added.renamed) pendingRename.current = { kind: 'intersection', id: added.id, name: added.name };
+    // Another intersection already has the template's name: offer a rename rather than leave a numbered copy unnoticed.
+    setNumbered(added.renamed ? { kind: 'intersection', id: added.id, name: added.name } : null);
   };
 
   const insert = (intersection: Intersection) => {
@@ -164,14 +165,6 @@ export default function Sidebar() {
         anchorEl={addAnchor}
         open={addAnchor !== null}
         onClose={() => setAddAnchor(null)}
-        slotProps={{
-          transition: {
-            onExited: () => {
-              if (pendingRename.current) setRenaming(pendingRename.current);
-              pendingRename.current = null;
-            },
-          },
-        }}
       >
         <ListSubheader sx={{ lineHeight: '32px' }}>Start from</ListSubheader>
         {TEMPLATES.map((template, k) => (
@@ -204,6 +197,24 @@ export default function Sidebar() {
         </MenuItem>
       </Menu>
 
+      <Snackbar
+        open={numbered !== null}
+        autoHideDuration={8000}
+        onClose={(_, reason) => reason !== 'clickaway' && setNumbered(null)}
+        message={numbered ? `Added as “${numbered.name}”: that name was taken.` : ''}
+        action={
+          <Button
+            color="inherit"
+            size="small"
+            onClick={() => {
+              setRenaming(numbered);
+              setNumbered(null);
+            }}
+          >
+            Rename
+          </Button>
+        }
+      />
       <CsmExportDialog
         open={csmExport !== null}
         onClose={() => setCsmExport(null)}
@@ -225,6 +236,7 @@ export default function Sidebar() {
       <Dialog
         open={renaming !== null}
         onClose={() => setRenaming(null)}
+        aria-labelledby="rename-dialog-title"
         fullWidth
         maxWidth="xs"
         // Focus once shown: a closing menu may hand focus back to its button after autoFocus ran.
@@ -251,7 +263,7 @@ export default function Sidebar() {
             setRenaming(null);
           }}
         >
-          <DialogTitle>Rename {renaming?.kind}</DialogTitle>
+          <DialogTitle id="rename-dialog-title">Rename {renaming?.kind}</DialogTitle>
           <DialogContent>
             <TextField autoFocus inputRef={renameInput} fullWidth label="Name" value={renaming?.name ?? ''} onFocus={(e) => e.target.select()} onChange={(e) => setRenaming((r) => (r ? { ...r, name: e.target.value } : r))} sx={{ mt: 1 }} slotProps={{ htmlInput: { maxLength: 120 } }} />
           </DialogContent>
