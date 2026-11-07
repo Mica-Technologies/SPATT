@@ -72,10 +72,11 @@ export default function SplitGrid({ intersection, pattern, path, issues }: Split
 
   const cell = (n: number, phase: Phase) => {
     const cellPath = [...splitsPath, String(n)];
-    const min = splitMinimums(phase);
+    const min = splitMinimums(phase, intersection.redAmber);
+    const ra = intersection.redAmber > 0 && phase.movement.kind !== 'pedestrian' ? 'red+amber + ' : '';
     const minTip =
-      `Minimum ${phase.movement.kind === 'pedestrian' ? 'yellow + red clear' : 'green + yellow + red clear'}: ${s(min.vehicle)} s` +
-      (min.pedestrian === null ? '' : `\nWalk + pedestrian clearance + yellow + red clear: ${s(min.pedestrian)} s${phase.pedestrian.recall ? ' (pedestrian recall)' : ''}`);
+      `Minimum ${phase.movement.kind === 'pedestrian' ? 'yellow + red clear' : `${ra}green + yellow + red clear`}: ${s(min.vehicle)} s` +
+      (min.pedestrian === null ? '' : `\n${ra ? 'Red+amber + walk' : 'Walk'} + pedestrian clearance + yellow + red clear: ${s(min.pedestrian)} s${phase.pedestrian.recall ? ' (pedestrian recall)' : ''}`);
     return (
       <>
         <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.5, px: 0.5 }}>

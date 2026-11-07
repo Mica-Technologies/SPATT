@@ -16,7 +16,7 @@ In the sidebar, open an intersection's menu and choose **Export for CSM ASC-3**.
 
 - **problems that block the export**, such as a phase numbered above 8 or a schedule entry that
   does not start on the hour, and SPATT's own validation errors;
-- **differences** the controller will make, such as treating maximum recall as minimum recall.
+- **differences** the controller will make, such as using only fixed force-offs.
 
 Click an item to jump to the field. **Download** saves a `.csm.json` file; **Copy plan** puts the
 plan on the clipboard for pasting into the controller.
@@ -44,10 +44,12 @@ sidebar marks **CSM**, and are written back when you export it again.
 | Times | Game ticks (20 per second), up to 600 s per value | Longer values block export |
 | Patterns | 4 slots | More than 4 patterns without a schedule blocks export |
 | Schedule | One start hour per slot, whole hours only | More than 4 entries, or a start off the hour, blocks export |
-| Recall | None, minimum, soft; maximum recall behaves like minimum recall | Maximum recall is a warning |
+| Recall | None, minimum, maximum, soft | |
+| Phase exclusions | Any; a pair is excluded when either phase lists the other | |
 | Force-offs | Fixed only | Floating force-offs are a warning |
 | Max green in coordination | Max 2 whenever a phase has one | A pattern set to Max 1 with Max 2 phases is a warning |
 | Overlaps and preempts | Tied to signal circuits | SPATT-side overlaps and preempts are not exported (warning) |
+| Red+amber, green flash | Red+amber 0, 1.0 or 2.0 s; green flash 0, 2.0, 3.0 or 4.0 s; set for the whole controller | Other values block export |
 | Clock | World time, shared by every controller in the world | |
 
 ## How a plan is converted
@@ -84,14 +86,14 @@ controller (which stores its own movement). An imported phase without one is a t
 
 ## Plan format
 
-The format is `csm-asc3-plan`, version 1. The JSON Schema is
+The format is `csm-asc3-plan`, version 2. The JSON Schema is
 [csm-asc3-plan.schema.json](csm-asc3-plan.schema.json); example plans for every SPATT template are
 in the repository under `test/fixtures/csm/`. An excerpt (one phase, part of the splits):
 
 ```json
 {
   "format": "csm-asc3-plan",
-  "formatVersion": 1,
+  "formatVersion": 2,
   "generator": "SPATT",
   "name": "Main St & Side St",
   "phases": [
@@ -101,7 +103,7 @@ in the repository under `test/fixtures/csm/`. An excerpt (one phase, part of the
       "yellow": 80, "redClear": 40,
       "addedInitial": 0, "maxInitial": 0, "minGap": 0, "timeBeforeReduce": 0, "timeToReduce": 0,
       "recall": "NONE", "pedRecall": false, "restInWalk": false,
-      "dualEntry": false, "conditionalService": false, "lockCall": false,
+      "dualEntry": false, "conditionalService": false, "lockCall": false, "exclusions": [],
       "walk": 140, "pedClear": 360, "label": "EB Thru"
     }
   ],
@@ -120,7 +122,7 @@ the plan does not list is disabled. Enum values are the controller's own constan
 | Field | Values |
 |---|---|
 | `recall` | `NONE`, `MINIMUM`, `MAXIMUM`, `PEDESTRIAN`, `SOFT` |
-| `movement` | `THROUGH`, `LEFT`, `PROTECTED_LEFT`, `RIGHT`, `PED` |
+| `movement` | `THROUGH`, `LEFT`, `PROTECTED_LEFT`, `RIGHT`, `PED`, `PROTECTED` (a bus, train or bike lane phase; imports as an *other* movement) |
 | `flash` | `AUTO`, `YELLOW`, `RED`, `DARK` |
 | pattern `mode` | `FREE`, `COORDINATED` |
 
@@ -128,11 +130,14 @@ Optional fields, which the controller keeps its own values for when a plan leave
 
 | Where | Fields |
 |---|---|
-| Phase | `walk`, `pedClear`, `movement`, `circuit` (0-based, −1 none), `flash`, `delayedGreen`, `bikeMinGreen`, `permissivePhase` (flashing yellow arrow; 0 = protected only) |
-| Plan | `patterns` entries (slots not listed are kept), `overlaps`, `preempts`, `priority` (carried verbatim) |
+| Phase | `exclusions` (phases it must never time beside; SPATT always writes it), `walk`, `pedClear`, `movement`, `circuit` (0-based, −1 none), `flash`, `delayedGreen`, `bikeMinGreen`, `permissivePhase` (flashing yellow arrow; 0 = protected only) |
+| Plan | `redAmber` (0, 20 or 40 ticks) and `greenFlash` (0, 40, 60 or 80 ticks), the controller-wide settings, which SPATT always writes; `patterns` entries (slots not listed are kept), `overlaps`, `preempts` and `priorities` (up to four transit priority plans), carried verbatim |
 
 Informational fields the controller ignores: `generator`, `name`, a phase's `label`, a pattern's
 `name`, and `hasPedestrianSignals`, which the controller writes on export.
+
+SPATT still imports version 1 plans. Version 1 had a single `priority` plan where version 2 has
+the `priorities` list; on import it becomes the first entry, and SPATT exports version 2.
 
 ## Green waves in CSM
 

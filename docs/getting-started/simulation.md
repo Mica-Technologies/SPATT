@@ -47,7 +47,13 @@ A generic dual-ring actuated controller built from SPATT's own plan:
   Pedestrian walk and clearance follow when called, then yellow and red clearance.
 - **Choosing the next phase.** Phases without a call are skipped. Rings cross a barrier together,
   once every ring in the group is ready, to the next group with a call. A dual-entry phase times in
-  a ring that has no call in that group.
+  a ring that has no call in that group. A phase excluded beside the phase another ring is timing
+  waits until that phase has cleared, and the other phase ends as soon as it can. The CSM ASC-3
+  controller does the same.
+- **Red+amber and green flash.** Red+amber runs before each vehicle green and holds its timers
+  and its walk. The green flash is the end of the green: minimum and max green, force-offs and
+  coordinated yields come that much sooner, then the green flashes and turns yellow. The CSM ASC-3
+  controller does the same, running red+amber after any delayed green.
 - **Recalls.** Minimum recall places a constant call. Maximum recall also stops the phase gapping
   out. Soft recall calls only when nothing else is calling. Pedestrian recall calls the walk every
   time.
@@ -69,10 +75,16 @@ windows and their rounding are the controller's own. Where it differs from the N
 - **Timing.** The controller runs every 2 ticks (0.1 s), and every interval lasts at least one run.
 - **Detection and the max timer.** Detection is presence only. The max timer starts on the first
   green run that sees a conflicting call, and resets if the call goes away.
-- **Recalls.** Maximum recall behaves like minimum recall. The pedestrian recall setting adds a
-  walk to a phase that runs anyway, but does not call the phase; recall mode *Pedestrian* does.
+- **Recalls.** Maximum recall extends the green as a waiting vehicle would, so the phase runs to
+  its max green when a conflicting call is waiting. The pedestrian recall setting adds a walk to a
+  phase that runs anyway, but does not call the phase; recall mode *Pedestrian* does.
+- **Barrier hold.** A green whose only opposing calls are across the barrier holds while the other
+  ring still has work in the barrier group, then both rings end together. Force-offs and
+  coordinated yields are not held. A dual-entry phase riding beside the other ring ends with it,
+  without waiting to gap out.
 - **Calls during coordination.** A non-coordinated phase's call is only accepted inside its window,
-  up to its force-off point, and then latches. When a green ends, every waiting conflicting call is
+  up to its force-off point, and then latches. A phase whose ring skipped the phases ahead of it in
+  the barrier group (they had no call) takes their time: its window starts where theirs did. When a green ends, every waiting conflicting call is
   committed and will be served.
 - **Coordinated phases.** They yield when their green has run to the yield point, measured from
   where the green started. A coordinated green that starts late holds for most of a cycle. It can
@@ -80,14 +92,16 @@ windows and their rounding are the controller's own. Where it differs from the N
 - **Pedestrian and conditional service.** A press during walk is lost when the flashing don't walk
   starts. Conditional service has no time check.
 - **Rest.** With no calls anywhere, the controller rests on the coordinated phases even when free.
+  A resting phase still maxes out once a conflicting call is waiting, but is not forced off.
 
 !!! warning "A return to the main street before a side-street through"
-    With coordination, a phase that ends before the next phase's window opens leaves its barrier
-    with no accepted call, because calls only register inside windows. A typical case is a
-    side-street left turn gapping out at its minimum. The controller goes back to the coordinated
-    phases for their minimum green and then clears to the side street again. The background cycle
-    holds, but main-street traffic gets an extra stop and the side street waits longer. The NEMA
-    controller starts the next phase early instead. This follows the mod's code and is waiting to be
+    With coordination, a phase that is served but ends before the next phase's window opens leaves
+    its barrier with no accepted call, because calls only register inside windows. A typical case
+    is a side-street left turn gapping out at its minimum. The controller goes back to the
+    coordinated phases for their minimum green and then clears to the side street again. The
+    background cycle holds, but main-street traffic gets an extra stop and the side street waits
+    longer. The NEMA controller starts the next phase early instead. A left with no call does not
+    cause this: the through takes its time. This follows the mod's code and is waiting to be
     confirmed in the game.
 
 Simplifications: every phase has its own detector and pushbutton, so there are no calls from

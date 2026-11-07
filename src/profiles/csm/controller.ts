@@ -1,14 +1,15 @@
 /**
  * The City Super Mod ASC-3 ("advanced" ring-barrier) controller, ported rule for rule for the
- * simulator from the mod's `RingBarrierState` (surveyed read-only at CSM commit 136abc1f6; the
- * section numbers in comments refer to that survey's specification).
+ * simulator from the mod's `RingBarrierState` (surveyed read-only at CSM commit 268e2f383 and
+ * brought up to 0b29bfef1; the section numbers in comments refer to that survey's specification).
  *
  * It runs on the plan SPATT would export to the controller (`exportCsm`), so offsets, windows and
  * barriers are the controller's own. Faithful quirks include: the engine runs every 2 ticks and
  * every interval lasts at least one run; presence-only detection; the max timer starts on the first
- * green run with a conflicting call and resets when the call drops; MAXIMUM recall acts as MINIMUM;
- * `pedRecall` adds a walk but places no call; calls on non-coordinated phases are accepted only
- * inside their windows and latch; waiting conflicting calls are committed when a green ends;
+ * green run with a conflicting call and resets when the call drops; MAXIMUM recall extends the
+ * green like a vehicle in the zone; `pedRecall` adds a walk but places no call; calls on
+ * non-coordinated phases are accepted only inside their windows and latch; waiting conflicting
+ * calls are committed when a green ends;
  * coordinated phases yield from their green start, dwell when late, and yield early for a window
  * about to open; within-barrier wrap; conditional service without a time check; rest preferring the
  * coordinated phases even when free.
@@ -45,6 +46,20 @@ interface RingRuntime {
   serviceSeq: number;
   clearedAlongside: number;
   coordYieldFor: number;
+  /** The phase this ring's coordinated green last yielded early for, or 0 (the wrap in fillIdleRing). */
+  yieldedFor: number;
+  /** Held at the barrier: finished, but the other ring still works this barrier (§4.3). */
+  barrierWaiting: boolean;
+  /** Idle only because its next called phase is excluded beside the other ring's phase (§0.7). */
+  exclusionWait: boolean;
+  /** Red+amber after any delay, with the green clocks held (§0.8). */
+  raActive: boolean;
+  raStart: number;
+  /** No leading walk: the walk starts with the green, not with the red+amber. */
+  raDefersWalk: boolean;
+  /** The green has been told to end and flashes before its yellow (§0.8). */
+  gfActive: boolean;
+  gfStart: number;
 }
 
 const DEFAULT_WALK = 140;
@@ -73,6 +88,14 @@ function newRing(): RingRuntime {
     serviceSeq: 0,
     clearedAlongside: -1,
     coordYieldFor: 0,
+    yieldedFor: 0,
+    barrierWaiting: false,
+    exclusionWait: false,
+    raActive: false,
+    raStart: 0,
+    raDefersWalk: false,
+    gfActive: false,
+    gfStart: 0,
   };
 }
 
@@ -123,12 +146,18 @@ export class CsmController implements ControllerModel {
   private localCycle = 0;
   private cycleTime = 0;
 
+  /** Controller-wide red+amber and green flash, ticks (`tcRaT`, `tcGfT`). */
+  private readonly redAmber: number;
+  private readonly greenFlash: number;
+
   private readonly display = new Map<number, PhaseSignal>();
   private readonly lastPed = new Map<number, PedDisplay>();
   private terminations: { phase: number; reason: Termination; tick: number }[] = [];
 
   constructor(plan: CsmPlan) {
     for (const p of plan.phases) this.phase.set(p.number, p);
+    this.redAmber = Math.max(0, plan.redAmber ?? 0);
+    this.greenFlash = Math.max(0, plan.greenFlash ?? 0);
     this.sequences = [plan.rings[0], plan.rings[1]];
     const pattern = plan.patterns.find((p) => p.slot === 0) ?? plan.patterns[0];
     this.coordinated = pattern?.mode === 'COORDINATED';
@@ -192,6 +221,18 @@ export class CsmController implements ControllerModel {
     return p.pedClear ?? DEFAULT_PED_CLEAR;
   }
 
+  /** Whether phases `a` and `b` are excluded from timing together (`PLAN.excludes`). */
+  private excludes(a: number, b: number): boolean {
+    if (a === b) return false;
+    return (this.phase.get(a)?.exclusions ?? []).includes(b) || (this.phase.get(b)?.exclusions ?? []).includes(a);
+  }
+
+  /** Whether `n` may not start in `ringNum` because the other ring serves (in any interval) a phase excluded beside it. */
+  private excludedByOtherRing(ringNum: number, n: number): boolean {
+    const other = this.ring(ringNum === 1 ? 2 : 1);
+    return other.activePhase !== 0 && this.excludes(n, other.activePhase);
+  }
+
   private isActiveInEitherRing(n: number): boolean {
     return this.rings[0].activePhase === n || this.rings[1].activePhase === n;
   }
@@ -219,6 +260,9 @@ export class CsmController implements ControllerModel {
     }
     this.advanceRing(1);
     this.advanceRing(2);
+    // Ring 1 cannot see a ring 2 that finishes with the barrier this run, so a ring 1 green held
+    // only for the barrier re-decides once ring 2 has moved, and a concurrent pair ends together.
+    if (this.rings[0].barrierWaiting && this.rings[0].interval === 'GREEN') this.advanceRing(1);
     this.fillIdleRing(1);
     this.fillIdleRing(2);
     this.fillDualEntry(1, 2);
@@ -281,11 +325,13 @@ export class CsmController implements ControllerModel {
   private conflicts(activeN: number, activeRing: number, n: number): boolean {
     const active = this.phase.get(activeN);
     if (!active) return true;
+    if (this.excludes(activeN, n)) return true; // barred from timing together, whatever the rings say
     const other = this.phase.get(n);
     if (!other || other.barrier !== active.barrier) return true;
     const otherRing = this.ringOf(n);
     if (otherRing === 0 || otherRing === activeRing) return true;
-    return (other.permissivePhase ?? 0) === active.number || (active.permissivePhase ?? 0) === n;
+    // The flashing yellow arrow pair conflicts; a PROTECTED (bus, train, bike) phase is never its left.
+    return (other.movement !== 'PROTECTED' && (other.permissivePhase ?? 0) === active.number) || (active.movement !== 'PROTECTED' && (active.permissivePhase ?? 0) === n);
   }
 
   private demandConflictsWith(phaseN: number, ring: number, calls: ReadonlySet<number>): boolean {
@@ -342,24 +388,46 @@ export class CsmController implements ControllerModel {
     return (this.windowEnd.get(n) ?? 0) - (this.windowStart.get(n) ?? 0);
   }
 
-  private windowPos(n: number): number {
-    return mod(this.localCycle - (this.windowStart.get(n) ?? 0), this.cycle);
+  /** The local cycle's position in a window beginning at `start`; it wraps, so outside is past the end. */
+  private windowPos(start: number): number {
+    return mod(this.localCycle - start, this.cycle);
   }
 
   private windowInstance(n: number): number {
     return Math.floor((this.cycleTime - (this.windowStart.get(n) ?? 0)) / this.cycle);
   }
 
+  /**
+   * Where a phase is actually served from (§5.4): its window start, walked back over each phase
+   * just ahead of it in its ring on the same barrier that was not served in its current window
+   * instance. A skipped phase's time belongs to the phase that took it.
+   */
+  private effectiveWindowStart(n: number): number {
+    let start = this.windowStart.get(n) ?? 0;
+    const p = this.phase.get(n);
+    const ring = this.ringOf(n);
+    if (!this.coordinated || !p || ring === 0) return start;
+    const onBarrier = this.seq(ring).filter((m) => this.active(m) && this.phase.get(m)!.barrier === p.barrier);
+    for (let i = onBarrier.indexOf(n) - 1; i >= 0; i--) {
+      const earlier = onBarrier[i]!;
+      if (this.servedWindow.get(earlier) === this.windowInstance(earlier)) break;
+      start = this.windowStart.get(earlier) ?? 0;
+    }
+    return start;
+  }
+
   private acceptanceOpen(n: number, clearance: number): boolean {
-    const len = this.windowLen(n);
+    const start = this.effectiveWindowStart(n);
+    const len = (this.windowEnd.get(n) ?? 0) - start;
     if (len <= 0) return false;
-    return this.windowPos(n) < Math.max(1, len - Math.max(0, clearance));
+    return this.windowPos(start) < Math.max(1, len - Math.max(0, clearance));
   }
 
   private pastYieldPoint(n: number, clearance: number): boolean {
-    const len = this.windowLen(n);
+    const start = this.effectiveWindowStart(n);
+    const len = (this.windowEnd.get(n) ?? 0) - start;
     if (len <= 0) return true;
-    return this.windowPos(n) >= Math.max(0, len - Math.max(0, clearance));
+    return this.windowPos(start) >= Math.max(0, len - Math.max(0, clearance));
   }
 
   private coordYieldReached(n: number, clearance: number, greenElapsed: number): boolean {
@@ -373,7 +441,7 @@ export class CsmController implements ControllerModel {
   }
 
   private conflictingWindowOpening(n: number, ring: number, clearance: number): number {
-    if (this.windowPos(n) < this.windowLen(n)) return 0;
+    if (this.windowPos(this.windowStart.get(n) ?? 0) < this.windowLen(n)) return 0;
     let best = 0;
     let bestArc = Number.POSITIVE_INFINITY;
     for (const m of PHASES) {
@@ -409,12 +477,18 @@ export class CsmController implements ControllerModel {
       pedServing: ped,
       pedStart: this.now,
       delayActive: ped && delayedGreen > 0,
+      raActive: this.redAmber > 0,
+      raStart: this.now,
+      raDefersWalk: !(ped && delayedGreen > 0),
+      gfActive: false,
       delayStart: this.now,
       walkHold: ped ? Math.max(this.walk(p), delayedGreen) : this.walk(p),
       queueAtStart: this.vehicleCount(n),
       maxStart: -1,
       dualEntry: false,
       coordYieldFor: 0,
+      yieldedFor: 0,
+      barrierWaiting: false,
     } satisfies Partial<RingRuntime>);
   }
 
@@ -423,7 +497,7 @@ export class CsmController implements ControllerModel {
     if (r.activePhase !== 0) {
       const p = this.phase.get(r.activePhase);
       if (!p || p.barrier !== this.currentBarrier) return false;
-      if (r.interval === 'GREEN') return true;
+      if (r.interval === 'GREEN' && !r.gfActive) return true; // a flashing green is ending, not working
     }
     if (this.peekNextWithinBarrier(ringNum) !== 0) return true;
     if (this.nextBarrierWithDemand() === this.currentBarrier) {
@@ -470,14 +544,29 @@ export class CsmController implements ControllerModel {
     }
 
     // GREEN (§4.3 a-p)
+    // Green flash: the green has already been told to end; flash out its time, then yellow.
+    if (r.gfActive) {
+      if (now - r.gfStart >= this.greenFlash) Object.assign(r, { gfActive: false, interval: 'YELLOW', intervalStart: now });
+      return;
+    }
     if (r.delayActive) {
       if (now - r.delayStart < (p.delayedGreen ?? 0)) {
         r.lastActuation = now;
         return;
       }
-      Object.assign(r, { delayActive: false, greenStart: now, intervalStart: now, lastActuation: now });
+      Object.assign(r, { delayActive: false, greenStart: now, intervalStart: now, lastActuation: now, raStart: now });
     }
-    if (this.vehicleCount(n) > 0) r.lastActuation = now;
+    // Red+amber follows any delay and holds the green clocks the same way.
+    if (r.raActive) {
+      if (now - r.raStart < this.redAmber) {
+        r.lastActuation = now;
+        return;
+      }
+      Object.assign(r, { raActive: false, greenStart: now, intervalStart: now, lastActuation: now });
+      if (r.raDefersWalk) r.pedStart = now;
+    }
+    // MAXIMUM recall is a constant call that also extends, as a vehicle in the zone would (§4.3.c).
+    if (this.vehicleCount(n) > 0 || p.recall === 'MAXIMUM') r.lastActuation = now;
     if (r.dualEntry && (this.vehicleCount(n) > 0 || this.pedRequests.has(n))) r.dualEntry = false;
 
     let conflict = this.demandConflictsWith(n, ringNum, this.called);
@@ -487,7 +576,7 @@ export class CsmController implements ControllerModel {
     const walkHold = r.walkHold;
     const pedClear = this.pedClear(p);
     const pedRemaining = !r.pedServing ? 0 : r.resting ? pedClear : Math.max(0, r.pedStart + walkHold + pedClear - now);
-    const coordClearance = p.yellow + p.redClear + pedRemaining;
+    const coordClearance = p.yellow + p.redClear + pedRemaining + this.greenFlash;
 
     if (isCoord && !r.dualEntry && r.coordYieldFor === 0) r.coordYieldFor = this.conflictingWindowOpening(n, ringNum, coordClearance);
     if (r.coordYieldFor !== 0 && !this.tickRawCalled.has(r.coordYieldFor)) r.coordYieldFor = 0;
@@ -504,8 +593,9 @@ export class CsmController implements ControllerModel {
     const greenElapsed = now - r.greenStart;
     const addedInit = p.addedInitial <= 0 || r.queueAtStart <= 0 ? 0 : p.maxInitial > 0 ? Math.min(r.queueAtStart * p.addedInitial, p.maxInitial) : r.queueAtStart * p.addedInitial;
     // Bike minimum green needs a bike call from a protected detection zone, which is not simulated.
-    const effMin = Math.max(p.minGreen, addedInit);
-    const effMax = this.coordinated && p.maxGreen2 > 0 ? p.maxGreen2 : p.maxGreen;
+    // The green flash is the last part of the green, so the green is told to end that much sooner.
+    const effMin = Math.max(0, Math.max(p.minGreen, addedInit) - this.greenFlash);
+    const effMax = Math.max(0, (this.coordinated && p.maxGreen2 > 0 ? p.maxGreen2 : p.maxGreen) - this.greenFlash);
     const effPassage = effectivePassage(p.passage, p.minGap, p.timeBeforeReduce, p.timeToReduce, greenElapsed);
 
     const minMet = greenElapsed >= effMin;
@@ -522,17 +612,36 @@ export class CsmController implements ControllerModel {
       r.maxStart = -1;
     }
 
-    const maxOut = !r.resting && !isCoord && r.maxStart >= 0 && now - r.maxStart >= effMax && pedDone;
+    // Any non-coordinated phase maxes out, resting or not (CSM #317); force-off keeps its rest exemption.
+    const maxOut = !isCoord && r.maxStart >= 0 && now - r.maxStart >= effMax && pedDone;
     const gapOut = now - r.lastActuation >= effPassage;
-    const forceOff = this.coordinated && !isCoord && !r.resting && !r.dualEntry && this.pastYieldPoint(n, p.yellow + p.redClear) && pedDone;
-    const gapTerminate = !coordHold && minMet && pedDone && gapOut && conflict;
-    const terminate = maxOut || forceOff || (coordYieldDue && pedDone) || gapTerminate;
+    const forceOff = this.coordinated && !isCoord && !r.resting && !r.dualEntry && this.pastYieldPoint(n, p.yellow + p.redClear + this.greenFlash) && pedDone;
+    // A dual-entry companion need not gap out: with no demand of its own, only MAX recall extends
+    // it, and that would hold it green for good once its companion has finished.
+    const gapDone = gapOut || r.dualEntry;
+    const gapTerminate = !coordHold && minMet && pedDone && gapDone && conflict;
+    let terminate = maxOut || forceOff || (coordYieldDue && pedDone) || gapTerminate;
+
+    // Barrier hold: when everything still calling against this green is on another barrier and the
+    // other ring still works this one, ending would release nothing, so the green holds (the max
+    // timer keeps running). Not for force-off or the coordinated yield, which are timed against the
+    // cycle, nor beside a dual-entry companion. A held ring flags itself so the two rings cannot
+    // hold each other.
+    const otherNum = ringNum === 1 ? 2 : 1;
+    const companion = this.ring(otherNum);
+    const barrierHold = terminate && minMet && !forceOff && !coordYieldDue && !r.dualEntry && !companion.dualEntry && !this.withinBarrierConflict(n, ringNum, this.called) && this.ringWorkingBarrier(otherNum) && !companion.barrierWaiting;
+    r.barrierWaiting = barrierHold;
+    if (barrierHold) terminate = false;
 
     if (terminate && minMet) {
       this.commitConflictingCalls(n, ringNum);
-      if (windowOpeningFor !== 0 && coordYieldDue) this.committedCalls.add(windowOpeningFor);
+      if (windowOpeningFor !== 0 && coordYieldDue) {
+        this.committedCalls.add(windowOpeningFor);
+        r.yieldedFor = windowOpeningFor;
+      }
       if (forceOff) this.windowAccepted.delete(n);
-      Object.assign(r, { interval: 'YELLOW', intervalStart: now, pedServing: false });
+      if (this.greenFlash > 0) Object.assign(r, { gfActive: true, gfStart: now, pedServing: false });
+      else Object.assign(r, { interval: 'YELLOW', intervalStart: now, pedServing: false });
       this.terminations.push({ phase: n, reason: maxOut ? 'max-out' : forceOff ? 'force-off' : coordYieldDue ? 'yield' : 'gap-out', tick: now });
     } else if (p.restInWalk && !conflict) {
       const clearanceInProgress = r.pedServing && !pedDone && now - r.pedStart >= r.walkHold;
@@ -544,18 +653,25 @@ export class CsmController implements ControllerModel {
   private fillIdleRing(ringNum: number): void {
     const r = this.ring(ringNum);
     if (r.activePhase !== 0) return;
+    r.exclusionWait = false;
     const seq = this.seq(ringNum);
     for (let idx = r.sequencePos + 1; idx < seq.length; idx++) {
-      r.sequencePos = idx;
       const n = seq[idx]!;
-      if (!this.active(n) || this.phase.get(n)!.barrier !== this.currentBarrier) continue;
+      const onBarrier = this.active(n) && this.phase.get(n)!.barrier === this.currentBarrier;
+      if (onBarrier && this.called.has(n) && this.excludedByOtherRing(ringNum, n)) {
+        // Called but excluded beside the other ring's phase: wait at this slot until it clears.
+        r.exclusionWait = true;
+        return;
+      }
+      r.sequencePos = idx;
+      if (!onBarrier) continue;
       if (this.called.has(n)) {
         this.startGreen(ringNum, n);
         return;
       }
     }
     if (!r.condServiceUsed) {
-      const n = seq.find((m) => this.active(m) && this.phase.get(m)!.barrier === this.currentBarrier && this.phase.get(m)!.conditionalService && this.called.has(m));
+      const n = seq.find((m) => this.active(m) && this.phase.get(m)!.barrier === this.currentBarrier && this.phase.get(m)!.conditionalService && this.called.has(m) && !this.excludedByOtherRing(ringNum, m));
       if (n !== undefined) {
         this.startGreen(ringNum, n);
         r.condServiceUsed = true;
@@ -563,9 +679,21 @@ export class CsmController implements ControllerModel {
       }
     }
     if (this.nextBarrierWithDemand() === this.currentBarrier) {
-      const idx = seq.findIndex((m) => this.active(m) && this.phase.get(m)!.barrier === this.currentBarrier && this.called.has(m) && !this.isActiveInEitherRing(m));
+      const idx = seq.findIndex((m) => this.active(m) && this.phase.get(m)!.barrier === this.currentBarrier && this.called.has(m) && !this.isActiveInEitherRing(m) && !this.excludedByOtherRing(ringNum, m));
       if (idx >= 0) {
         this.startGreen(ringNum, seq[idx]!);
+        r.sequencePos = idx;
+        return;
+      }
+    }
+    // Wrap to the one phase this ring's coordinated green yielded for, while the other ring still
+    // works the barrier: the wrap above is closed whenever another barrier calls.
+    if (r.yieldedFor !== 0 && this.ringWorkingBarrier(ringNum === 1 ? 2 : 1)) {
+      const target = r.yieldedFor;
+      r.yieldedFor = 0;
+      const idx = seq.indexOf(target);
+      if (idx >= 0 && this.active(target) && this.phase.get(target)!.barrier === this.currentBarrier && this.called.has(target) && !this.isActiveInEitherRing(target) && !this.excludedByOtherRing(ringNum, target)) {
+        this.startGreen(ringNum, target);
         r.sequencePos = idx;
       }
     }
@@ -575,14 +703,14 @@ export class CsmController implements ControllerModel {
   private fillDualEntry(idleNum: number, otherNum: number): void {
     const idle = this.ring(idleNum);
     const other = this.ring(otherNum);
-    if (idle.activePhase !== 0 || other.activePhase === 0 || other.dualEntry || other.serviceSeq === idle.clearedAlongside) return;
+    if (idle.activePhase !== 0 || other.activePhase === 0 || other.dualEntry || idle.exclusionWait || other.serviceSeq === idle.clearedAlongside) return;
     const otherPhase = this.phase.get(other.activePhase);
     if (!otherPhase || otherPhase.barrier !== this.currentBarrier || other.interval !== 'GREEN') return;
     const seq = this.seq(idleNum);
     for (let idx = 0; idx < seq.length; idx++) {
       const n = seq[idx]!;
       const p = this.phase.get(n);
-      if (!p || !this.active(n) || p.barrier !== this.currentBarrier || !p.dualEntry || this.withinBarrierConflict(n, idleNum, this.called)) continue;
+      if (!p || !this.active(n) || p.barrier !== this.currentBarrier || !p.dualEntry || this.withinBarrierConflict(n, idleNum, this.called) || this.excludedByOtherRing(idleNum, n)) continue;
       this.startGreen(idleNum, n);
       idle.dualEntry = true;
       idle.sequencePos = idx;
@@ -626,14 +754,15 @@ export class CsmController implements ControllerModel {
     return n === undefined ? 0 : this.phase.get(n)!.barrier;
   }
 
-  private restPhaseForRing(ringNum: number, barrier: number | null): number {
-    const candidates = this.seq(ringNum).filter((n) => this.active(n) && (barrier === null || this.phase.get(n)!.barrier === barrier));
+  /** The rest phase for a ring, on `barrier` if given, passing over any phase excluded beside `beside`. */
+  private restPhaseForRing(ringNum: number, barrier: number | null, beside = 0): number {
+    const candidates = this.seq(ringNum).filter((n) => this.active(n) && (barrier === null || this.phase.get(n)!.barrier === barrier) && !this.excludes(n, beside));
     return candidates.find((n) => this.restPreference.includes(n)) ?? candidates.find((n) => this.phase.get(n)!.recall === 'SOFT') ?? candidates[0] ?? 0;
   }
 
   private restInGreen(): void {
     const rest1 = this.restPhaseForRing(1, null);
-    const rest2 = this.restPhaseForRing(2, rest1 !== 0 ? this.phase.get(rest1)!.barrier : null);
+    const rest2 = this.restPhaseForRing(2, rest1 !== 0 ? this.phase.get(rest1)!.barrier : null, rest1);
     for (const [ringNum, n] of [
       [1, rest1],
       [2, rest2],
@@ -658,14 +787,17 @@ export class CsmController implements ControllerModel {
       if (r.activePhase === 0) return;
       const p = this.phase.get(r.activePhase)!;
       let ped: PedDisplay = 'NONE';
-      if (r.pedServing && r.interval === 'GREEN') {
+      const redAmber = r.raActive && !r.delayActive && r.interval === 'GREEN';
+      if (redAmber && r.pedServing && r.raDefersWalk) {
+        ped = 'DONT_WALK'; // no leading walk: the walk waits for the green
+      } else if (r.pedServing && r.interval === 'GREEN') {
         if (r.resting && p.restInWalk) ped = 'WALK';
         else {
           const elapsed = this.now - r.pedStart;
           ped = elapsed < r.walkHold ? 'WALK' : elapsed < r.walkHold + this.pedClear(p) ? 'FDW' : 'DONT_WALK';
         }
       }
-      const vehicle = r.delayActive ? 'RED' : r.interval;
+      const vehicle = r.delayActive || redAmber ? 'RED' : r.interval;
       this.display.set(p.number, {
         vehicle: vehicle === 'GREEN' ? 'green' : vehicle === 'YELLOW' ? 'yellow' : 'red',
         pedestrian: ped === 'WALK' ? 'walk' : ped === 'FDW' ? 'clearance' : 'dont-walk',

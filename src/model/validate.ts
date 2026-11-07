@@ -5,6 +5,7 @@
  * values worth a second look. Every rule has a stable code and a test in validate.test.ts.
  */
 import { validateCapacity } from './capacity';
+import { phasesExclude } from './exclusions';
 import { error, warning, type Issue } from './issues';
 import { formatClock } from './schedule';
 import type { Intersection, Pattern, Phase, Ring } from './schema';
@@ -35,6 +36,8 @@ export function validateIntersection(intersection: Intersection): Issue[] {
 
   issues.push(...validateRings(intersection.rings, phases, ['rings']));
   const structureOk = !issues.some((i) => i.severity === 'error' && (i.code.startsWith('ring.') || i.code.startsWith('barrier.')));
+  issues.push(...validateExclusions(intersection, phases, structureOk));
+  const excluded = (a: number, b: number) => phasesExclude(intersection.phases, a, b);
 
   intersection.overlaps.forEach((overlap, index) => {
     const path = ['overlaps', index];
@@ -60,6 +63,10 @@ export function validateIntersection(intersection: Intersection): Issue[] {
           issues.push(error('preempt.unknown-phase', `Preempt ${preempt.number} refers to phase ${n}, which is not defined`, ['preempts', index, field]));
         }
       }
+      const pair = excludedPair(preempt[field], excluded);
+      if (pair) {
+        issues.push(error('preempt.excluded-phases', `Preempt ${preempt.number} times phases ${pair[0]} and ${pair[1]} together, but they are excluded from timing together`, ['preempts', index, field]));
+      }
     }
   });
 
@@ -71,7 +78,7 @@ export function validateIntersection(intersection: Intersection): Issue[] {
     }
     patternIds.add(pattern.id);
     if (structureOk) {
-      issues.push(...validatePattern(pattern, intersection.rings, phases, path));
+      issues.push(...validatePattern(pattern, intersection.rings, phases, excluded, intersection.redAmber, path));
     }
   });
 
@@ -178,7 +185,7 @@ export function effectiveSequence(pattern: Pattern, rings: Ring[]): Ring[] {
   return pattern.sequence ?? rings;
 }
 
-function validatePattern(pattern: Pattern, rings: Ring[], phases: Map<number, Phase>, path: (string | number)[]): Issue[] {
+function validatePattern(pattern: Pattern, rings: Ring[], phases: Map<number, Phase>, excluded: (a: number, b: number) => boolean, redAmber: Tenths, path: (string | number)[]): Issue[] {
   const issues: Issue[] = [];
   const name = `Pattern "${pattern.name}"`;
 
@@ -245,15 +252,18 @@ function validatePattern(pattern: Pattern, rings: Ring[], phases: Map<number, Ph
       continue;
     }
     const clearance = phase.yellow + phase.redClear;
-    const vehicleMinimum = phase.movement.kind === 'pedestrian' ? clearance : phase.minGreen + clearance;
+    // Red+amber comes before a vehicle phase's green (and its walk), inside its split.
+    const before = phase.movement.kind === 'pedestrian' ? 0 : redAmber;
+    const withRedAmber = before > 0 ? 'red+amber + ' : '';
+    const vehicleMinimum = phase.movement.kind === 'pedestrian' ? clearance : before + phase.minGreen + clearance;
     if (value < vehicleMinimum) {
-      issues.push(error('pattern.split-below-minimum', `${name}: phase ${n} split of ${s(value)} s is shorter than minimum green + yellow + red clear (${s(vehicleMinimum)} s)`, splitPath));
+      issues.push(error('pattern.split-below-minimum', `${name}: phase ${n} split of ${s(value)} s is shorter than ${withRedAmber}minimum green + yellow + red clear (${s(vehicleMinimum)} s)`, splitPath));
     }
     const ped = phase.pedestrian;
     if (ped.enabled) {
-      const pedMinimum = ped.walk + ped.clearance + clearance;
+      const pedMinimum = before + ped.walk + ped.clearance + clearance;
       if (value < pedMinimum) {
-        const message = `${name}: phase ${n} split of ${s(value)} s is shorter than walk + pedestrian clearance + yellow + red clear (${s(pedMinimum)} s)`;
+        const message = `${name}: phase ${n} split of ${s(value)} s is shorter than ${withRedAmber}walk + pedestrian clearance + yellow + red clear (${s(pedMinimum)} s)`;
         issues.push(ped.recall ? error('pattern.split-below-pedestrian', message, splitPath) : warning('pattern.split-below-pedestrian', `${message}; the pedestrian interval cannot be served in coordination`, splitPath));
       }
     }
@@ -282,6 +292,62 @@ function validatePattern(pattern: Pattern, rings: Ring[], phases: Map<number, Ph
   if (cycleTotal !== pattern.cycle) {
     issues.push(error('pattern.cycle-sum', `${name}: splits total ${s(cycleTotal)} s across the barrier groups, not the ${s(pattern.cycle)} s cycle`, [...path, 'splits']));
   }
+
+  // Excluded phases in different rings of one barrier group must not share split time.
+  for (let g = 0; g < groupCount; g++) {
+    const spans = sequence.map((ring, r) => {
+      let start = 0;
+      return (ring.groups[g] ?? []).filter(enabled).map((n) => {
+        const span = { r, n, start, end: start + split(n) };
+        start = span.end;
+        return span;
+      });
+    }).flat();
+    for (const a of spans) {
+      for (const b of spans) {
+        if (a.r < b.r && a.start < b.end && b.start < a.end && excluded(a.n, b.n)) {
+          issues.push(error('pattern.excluded-phases-concurrent', `${name}: phases ${a.n} and ${b.n} are excluded from timing together, but their splits overlap in barrier group ${g + 1}`, [...path, 'splits']));
+        }
+      }
+    }
+  }
+  return issues;
+}
+
+function excludedPair(list: readonly number[], excluded: (a: number, b: number) => boolean): [number, number] | null {
+  for (let i = 0; i < list.length; i++) {
+    for (let j = i + 1; j < list.length; j++) {
+      if (excluded(list[i]!, list[j]!)) return [list[i]!, list[j]!];
+    }
+  }
+  return null;
+}
+
+function validateExclusions(intersection: Intersection, phases: Map<number, Phase>, structureOk: boolean): Issue[] {
+  const issues: Issue[] = [];
+  const reported = new Set<string>();
+  intersection.phases.forEach((phase, index) => {
+    const path = ['phases', index, 'exclusions'];
+    for (const n of phase.exclusions) {
+      if (n === phase.number) {
+        issues.push(error('phase.exclusion-self', `Phase ${n} is listed as a phase it must not time beside`, path));
+        continue;
+      }
+      const other = phases.get(n);
+      if (!other) {
+        issues.push(error('phase.exclusion-unknown', `Phase ${phase.number} must not time beside phase ${n}, which is not defined`, path));
+        continue;
+      }
+      const key = [Math.min(n, phase.number), Math.max(n, phase.number)].join('-');
+      if (!structureOk || !phase.enabled || !other.enabled || reported.has(key)) continue;
+      reported.add(key);
+      const a = locate(intersection.rings, phase.number);
+      const b = locate(intersection.rings, n);
+      if (a && b && (a.ring === b.ring || a.group !== b.group)) {
+        issues.push(warning('phase.exclusion-redundant', `Phases ${phase.number} and ${n} never time together anyway (${a.ring === b.ring ? 'same ring' : 'different barrier groups'}), so the exclusion has no effect`, path));
+      }
+    }
+  });
   return issues;
 }
 

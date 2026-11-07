@@ -5,6 +5,8 @@ import type { Intersection } from './schema';
 import { intersectionSchema } from './schema';
 import { csmDefault, leadLagEightPhase, splitPhaseSideStreet, standardEightPhase, twoPhase } from './templates';
 import { validateIntersection } from './validate';
+import { exclusionsOf, setExclusions } from './exclusions';
+import { removePhase } from './edits';
 
 const TEMPLATES: [string, () => Intersection][] = [
   ['standard eight-phase', () => standardEightPhase()],
@@ -228,6 +230,14 @@ describe('pattern rules', () => {
     expect(issues[0]?.message).toContain('10.0 s');
   });
 
+  it('counts red+amber in every vehicle phase split minimum', () => {
+    // Phase 1 has 15 s: 1.0 red+amber + 5.0 + 3.5 + 1.5 fits (as do 4 and 8's walks), 6.0 + 10 = 16 s does not.
+    expect(issuesAfter((i) => (i.redAmber = 10))).toEqual([]);
+    const issues = issuesAfter((i) => (i.redAmber = 60));
+    expect(codes(issues).filter((c) => c.endsWith('split-below-minimum'))).toContain('error:pattern.split-below-minimum');
+    expect(issues.find((i) => i.path.join() === 'patterns,0,splits,1')?.message).toContain('red+amber + minimum green');
+  });
+
   it('warns when the pedestrian interval does not fit and there is no pedestrian recall', () => {
     // Phase 4 needs 7 + 14 + 4 + 2 = 27 s; give it 26 s and phase 3 13 s.
     const issues = issuesAfter((i) => {
@@ -272,6 +282,47 @@ describe('pattern rules', () => {
   });
 });
 
+describe('phase exclusion rules', () => {
+  it('accepts an exclusion between concurrent phases whose splits do not overlap', () => {
+    // Ring 1 times 1 then 2, ring 2 times 5 then 6: 1 ends as 6 starts.
+    expect(issuesAfter((i) => setExclusions(i, 1, [6]))).toEqual([]);
+  });
+
+  it('flags an exclusion of the phase itself or of an undefined phase', () => {
+    expect(codes(issuesAfter((i) => (phase(i, 1).exclusions = [1])))).toEqual(['error:phase.exclusion-self']);
+    const unknown = issuesAfter((i) => (phase(i, 1).exclusions = [12]));
+    expect(codes(unknown)).toEqual(['error:phase.exclusion-unknown']);
+    expect(unknown[0]!.path).toEqual(['phases', 0, 'exclusions']);
+  });
+
+  it('warns about an exclusion the ring structure already enforces', () => {
+    expect(codes(issuesAfter((i) => setExclusions(i, 1, [2])))).toEqual(['warning:phase.exclusion-redundant']);
+    expect(codes(issuesAfter((i) => setExclusions(i, 1, [7])))).toEqual(['warning:phase.exclusion-redundant']);
+  });
+
+  it('flags a coordinated pattern whose splits time two excluded phases together', () => {
+    const issues = issuesAfter((i) => setExclusions(i, 1, [5]));
+    expect(codes(issues)).toEqual(['error:pattern.excluded-phases-concurrent']);
+    expect(issues[0]!.path).toEqual(['patterns', 0, 'splits']);
+  });
+
+  it('counts a pair as excluded when either phase lists the other', () => {
+    expect(codes(issuesAfter((i) => (phase(i, 5).exclusions = [1])))).toEqual(['error:pattern.excluded-phases-concurrent']);
+  });
+});
+
+describe('setExclusions', () => {
+  it('keeps both sides of each pair in step and drops unknown phases', () => {
+    const i = standardEightPhase();
+    setExclusions(i, 1, [6, 5, 12, 1]);
+    expect([phase(i, 1).exclusions, phase(i, 5).exclusions, phase(i, 6).exclusions]).toEqual([[5, 6], [1], [1]]);
+    setExclusions(i, 1, [6]);
+    expect([phase(i, 1).exclusions, phase(i, 5).exclusions, exclusionsOf(i.phases, 6)]).toEqual([[6], [], [1]]);
+    removePhase(i, 6);
+    expect(phase(i, 1).exclusions).toEqual([]);
+  });
+});
+
 describe('overlap, preempt and schedule rules', () => {
   const overlap = {
     id: 'A',
@@ -310,6 +361,17 @@ describe('overlap, preempt and schedule rules', () => {
       }),
     );
     expect(codes(issues)).toEqual(['error:preempt.unknown-phase']);
+  });
+
+  it('flags a preempt that times two excluded phases together', () => {
+    const issues = issuesAfter((i) => {
+      setExclusions(i, 2, [6]);
+      i.patterns = [];
+      i.schedule = [];
+      i.preempts.push({ number: 1, label: 'Railroad', enabled: true, kind: 'railroad', trackClearancePhases: [4], trackClearance: 150, dwellPhases: [2, 6], minDwell: 100, exitPhases: [2] });
+    });
+    expect(codes(issues)).toEqual(['error:preempt.excluded-phases']);
+    expect(issues[0]!.path).toEqual(['preempts', 0, 'dwellPhases']);
   });
 
   it('flags two schedule entries at the same time and unknown patterns', () => {

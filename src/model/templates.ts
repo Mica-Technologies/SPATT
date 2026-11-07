@@ -42,6 +42,7 @@ export function makePhase(number: number, options: PhaseOptions): Phase {
     lockingDetector: false,
     dualEntry: false,
     conditionalService: false,
+    exclusions: [],
   };
 }
 
@@ -90,6 +91,8 @@ function intersection(id: string, name: string, phases: Phase[], rings: Ring[], 
     notes: '',
     phases,
     rings,
+    redAmber: 0,
+    greenFlash: 0,
     overlaps: [],
     preempts: [],
     patterns,

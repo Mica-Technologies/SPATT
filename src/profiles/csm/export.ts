@@ -12,6 +12,7 @@ import { convertOffset, mod, projectCycle } from '../../engine';
 import {
   effectiveSequence,
   error,
+  exclusionsOf,
   hasErrors,
   tenthsToTicks,
   validateIntersection,
@@ -26,9 +27,12 @@ import {
 import {
   CSM_FORMAT,
   CSM_FORMAT_VERSION,
+  CSM_GREEN_FLASH_TICKS,
+  CSM_RED_AMBER_TICKS,
   CSM_MAX_TICKS,
   CSM_PACKET_LIMIT_BYTES,
   CSM_PHASE_COUNT,
+  CSM_PRIORITY_COUNT,
   csmFlashSchema,
   csmMovementSchema,
   type CsmPattern,
@@ -56,7 +60,8 @@ export interface CsmPhaseExtension {
 export interface CsmIntersectionExtension {
   overlaps?: Record<string, unknown>[];
   preempts?: Record<string, unknown>[];
-  priority?: Record<string, unknown>;
+  /** Transit priority plans (up to four). */
+  priorities?: Record<string, unknown>[];
 }
 
 const isTicks = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= 0 && (v as number) <= CSM_MAX_TICKS;
@@ -81,7 +86,8 @@ function intersectionExtension(intersection: Intersection): CsmIntersectionExten
   return {
     overlaps: Array.isArray(raw.overlaps) ? raw.overlaps.filter(isObject) : undefined,
     preempts: Array.isArray(raw.preempts) ? raw.preempts.filter(isObject) : undefined,
-    priority: isObject(raw.priority) ? raw.priority : undefined,
+    // An intersection imported from a version 1 plan holds one `priority` plan.
+    priorities: Array.isArray(raw.priorities) ? raw.priorities.filter(isObject).slice(0, CSM_PRIORITY_COUNT) : isObject(raw.priority) ? [raw.priority] : undefined,
   };
 }
 
@@ -117,11 +123,15 @@ export function checkCsm(intersection: Intersection): Issue[] {
         }
       }
     }
-    if (phase.recall === 'maximum') {
-      issues.push(warning('csm.max-recall', `Phase ${phase.number}: the controller treats maximum recall like minimum recall`, ['phases', index, 'recall']));
-    }
   });
 
+  const choices = (list: readonly number[]) => list.map((t) => `${t / 20} s`).join(', ');
+  if (!(CSM_RED_AMBER_TICKS as readonly number[]).includes(tenthsToTicks(intersection.redAmber))) {
+    issues.push(error('csm.red-amber-value', `The controller's red+amber is ${choices(CSM_RED_AMBER_TICKS)}`, ['redAmber']));
+  }
+  if (!(CSM_GREEN_FLASH_TICKS as readonly number[]).includes(tenthsToTicks(intersection.greenFlash))) {
+    issues.push(error('csm.green-flash-value', `The controller's green flash is ${choices(CSM_GREEN_FLASH_TICKS)}`, ['greenFlash']));
+  }
   if (intersection.rings.length > 2) {
     issues.push(error('csm.too-many-rings', `The controller has two rings; this intersection has ${intersection.rings.length}`, ['rings']));
   }
@@ -206,6 +216,7 @@ export function exportCsm(intersection: Intersection, generator = 'SPATT'): CsmE
         dualEntry: phase.dualEntry,
         conditionalService: phase.conditionalService,
         lockCall: phase.lockingDetector,
+        exclusions: exclusionsOf(intersection.phases, phase.number),
         label: phase.label || undefined,
       };
       if (ped.enabled) {
@@ -257,9 +268,11 @@ export function exportCsm(intersection: Intersection, generator = 'SPATT'): CsmE
     rings: [sequence[0]?.groups.flat() ?? [], sequence[1]?.groups.flat() ?? []],
     patterns,
     schedule: { enabled: slots.scheduleEnabled, startHours: slots.startHours },
+    redAmber: tenthsToTicks(intersection.redAmber),
+    greenFlash: tenthsToTicks(intersection.greenFlash),
     ...(ext.overlaps ? { overlaps: ext.overlaps } : {}),
     ...(ext.preempts ? { preempts: ext.preempts } : {}),
-    ...(ext.priority ? { priority: ext.priority } : {}),
+    ...(ext.priorities ? { priorities: ext.priorities } : {}),
   };
   const text = `${JSON.stringify(plan, null, 2)}\n`;
   if (new TextEncoder().encode(JSON.stringify(plan)).length > CSM_PACKET_LIMIT_BYTES) {

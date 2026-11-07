@@ -1,6 +1,6 @@
 {
   "app": "spatt",
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "id": "lead-lag-8-phase",
   "name": "Main St & Side St",
   "notes": "",
@@ -45,7 +45,8 @@
           },
           "lockingDetector": false,
           "dualEntry": false,
-          "conditionalService": false
+          "conditionalService": false,
+          "exclusions": []
         },
         {
           "number": 2,
@@ -78,7 +79,8 @@
           },
           "lockingDetector": false,
           "dualEntry": false,
-          "conditionalService": false
+          "conditionalService": false,
+          "exclusions": []
         },
         {
           "number": 3,
@@ -111,7 +113,8 @@
           },
           "lockingDetector": false,
           "dualEntry": false,
-          "conditionalService": false
+          "conditionalService": false,
+          "exclusions": []
         },
         {
           "number": 4,
@@ -144,7 +147,8 @@
           },
           "lockingDetector": false,
           "dualEntry": false,
-          "conditionalService": false
+          "conditionalService": false,
+          "exclusions": []
         },
         {
           "number": 5,
@@ -177,7 +181,8 @@
           },
           "lockingDetector": false,
           "dualEntry": false,
-          "conditionalService": false
+          "conditionalService": false,
+          "exclusions": []
         },
         {
           "number": 6,
@@ -210,7 +215,8 @@
           },
           "lockingDetector": false,
           "dualEntry": false,
-          "conditionalService": false
+          "conditionalService": false,
+          "exclusions": []
         },
         {
           "number": 7,
@@ -243,7 +249,8 @@
           },
           "lockingDetector": false,
           "dualEntry": false,
-          "conditionalService": false
+          "conditionalService": false,
+          "exclusions": []
         },
         {
           "number": 8,
@@ -276,7 +283,8 @@
           },
           "lockingDetector": false,
           "dualEntry": false,
-          "conditionalService": false
+          "conditionalService": false,
+          "exclusions": []
         }
       ],
       "rings": [
@@ -305,6 +313,8 @@
           ]
         }
       ],
+      "redAmber": 0,
+      "greenFlash": 0,
       "overlaps": [],
       "preempts": [],
       "patterns": [
