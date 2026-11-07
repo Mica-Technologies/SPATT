@@ -14,6 +14,7 @@ import Typography from '@mui/material/Typography';
 import ScrollArea from '../components/ScrollArea';
 import { analyzePattern, DEFAULT_SIMULATION, type SimulationResult, type Stat } from '../../engine';
 import { effectiveSequence } from '../../model';
+import { useWorkspace } from '../state/workspace';
 import { fontFamilyMono } from '../theme/themePrimitives';
 import { Section } from './patterns/Section';
 import Playback from './simulate/Playback';
@@ -29,6 +30,24 @@ const BEHAVIOURS: { value: ControllerBehaviour; label: string }[] = [
 
 const n1 = (v: number | null) => (v === null ? '—' : v.toFixed(1));
 const statText = (s: Stat) => (s.count === 0 ? '—' : `${n1(s.mean)} (${n1(s.min)}–${n1(s.max)})`);
+
+function EmptyCountNote({ name, after = false }: { name: string; after?: boolean }) {
+  const setTab = useWorkspace((s) => s.setTab);
+  return (
+    <Alert
+      severity={after ? 'warning' : 'info'}
+      variant="outlined"
+      action={
+        <Button size="small" color="inherit" onClick={() => setTab('volumes')}>
+          Open Volumes
+        </Button>
+      }
+    >
+      {after ? 'No vehicles arrived: the count is empty. ' : ''}
+      {name} has no volumes yet, so {after ? 'there was nothing to delay or queue' : 'a run would have no traffic'}. Enter turning volumes on the Volumes tab.
+    </Alert>
+  );
+}
 
 export default function SimulateTab({ intersection }: TabProps) {
   const [patternId, setPatternId] = useState<string>(intersection.patterns[0]?.id ?? FREE);
@@ -48,6 +67,8 @@ export default function SimulateTab({ intersection }: TabProps) {
   const set = intersection.volumeSets.find((s) => s.id === volumeSetId) ?? null;
   const pedestrianPhases = intersection.phases.filter((p) => p.enabled && p.pedestrian.enabled);
   const sequence = pattern ? effectiveSequence(pattern, intersection.rings) : intersection.rings;
+  // A count with every volume zero runs, but nothing arrives: say so rather than show only dashes.
+  const emptyCount = set !== null && Object.values(set.volumes).every((v) => v.left + v.through + v.right === 0);
   const blocked = intersection.laneGroups.length === 0 ? 'Add lane groups and a count on the Volumes tab to simulate traffic.' : !set ? 'Choose a count to simulate.' : null;
 
   const run = () => {
@@ -70,6 +91,22 @@ export default function SimulateTab({ intersection }: TabProps) {
     const request: SimulationRequest = { intersection, settings, behaviour };
     w.postMessage(request);
   };
+
+  // Ctrl/Cmd+Enter runs, from anywhere in the tab (including its fields).
+  const runRef = useRef(run);
+  useEffect(() => {
+    runRef.current = blocked === null && !running ? run : () => undefined;
+  });
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Enter' || !(event.ctrlKey || event.metaKey) || event.defaultPrevented) return;
+      if (event.target instanceof Element && event.target.closest('[role="dialog"]')) return;
+      event.preventDefault();
+      runRef.current();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   // HCM figures for the same pattern and count, where the pattern has a cycle.
   const hcm = useMemo(() => {
@@ -141,7 +178,7 @@ export default function SimulateTab({ intersection }: TabProps) {
             {number('Minutes', minutes, setMinutes, 1, 480, 100)}
             {number('Warm-up (min)', warmUp, setWarmUp, 0, 60, 120)}
             {number('Seed', seed, setSeed, 1, 1_000_000, 100)}
-            <Button variant="contained" startIcon={<PlayArrowRoundedIcon />} onClick={run} disabled={running || blocked !== null}>
+            <Button variant="contained" startIcon={<PlayArrowRoundedIcon />} onClick={run} disabled={running || blocked !== null} title="Run (Ctrl+Enter)">
               Run
             </Button>
           </Box>
@@ -167,6 +204,7 @@ export default function SimulateTab({ intersection }: TabProps) {
               {blocked}
             </Alert>
           ) : null}
+          {blocked === null && emptyCount ? <EmptyCountNote name={set.name || 'This count'} /> : null}
           {running ? <LinearProgress aria-label="Simulating" /> : null}
           {failure ? <Alert severity="error">{failure}</Alert> : null}
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
@@ -179,6 +217,7 @@ export default function SimulateTab({ intersection }: TabProps) {
         <>
           <Section title={`Results · ${result.result.controller}`}>
             <Box sx={{ p: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              {result.result.laneGroups.every((l) => l.arrivals === 0) ? <EmptyCountNote name={intersection.volumeSets.find((s) => s.id === result.volumeSetId)?.name || 'The count'} after /> : null}
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                 {card('Mean delay', result.result.meanDelay === null ? '—' : `${result.result.meanDelay.toFixed(1)} s`, hcm?.delay != null ? `HCM ${hcm.delay.toFixed(1)} s` : undefined)}
                 {card('Cycle', statText(result.result.cycle), `${result.result.cycle.count} cycles`)}
