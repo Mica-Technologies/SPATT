@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { boxFaces, isoDepth, isoProject, paintersOrder, planProject, projectedBounds, projectorFor } from './project';
+import { standardEightPhase } from '../../model';
+import { boxFaces, isoDepth, isoProject, paintersOrder, planProject, projectedBounds, projectorFor, sceneExtent } from './project';
+import { buildScene } from './scene';
 
 const COS30 = Math.cos(Math.PI / 6);
 
@@ -45,5 +47,18 @@ describe('projections', () => {
     expect(oblique.maxX).toBeCloseTo(20 * COS30);
     expect(oblique.minY).toBeCloseTo(-10 - 6);
     expect(oblique.maxY).toBeCloseTo(10);
+  });
+});
+
+describe('sceneExtent', () => {
+  it('fits the drawn scene more tightly than its rectangle in the oblique view, and takes in the poles', () => {
+    const scene = buildScene(standardEightPhase());
+    const plan = sceneExtent(scene, 'plan', 0);
+    expect(plan.minX).toBeCloseTo(Math.min(...scene.legs.flatMap((l) => l.surface.map((p) => p.x))));
+    const oblique = sceneExtent(scene, 'oblique', 0);
+    const loose = projectedBounds(scene.bounds, 'oblique');
+    expect(oblique.maxX - oblique.minX).toBeLessThan(loose.maxX - loose.minX);
+    const poleTops = scene.poles.map((p) => isoProject({ ...p.base, z: p.height }).y);
+    expect(oblique.minY).toBeLessThanOrEqual(Math.min(...poleTops));
   });
 });

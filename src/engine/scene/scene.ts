@@ -65,7 +65,10 @@ export interface SceneLeg {
   /** Unit vector across the leg toward its inbound lanes (an approaching driver's right). */
   across: ScenePoint;
   inboundWidth: number;
+  /** Includes the painted median. */
   outboundWidth: number;
+  /** A painted median between the centre line and the outbound lanes, as wide as the opposite approach's left-turn lanes so the through lanes line up across the intersection. */
+  median: number;
   /** Distance from the centre to the edge of the conflict area, where the crosswalk begins. */
   edge: number;
   /** Distance from the centre to the stop bar. */
@@ -74,6 +77,8 @@ export interface SceneLeg {
   end: number;
   /** The road surface from the conflict area's edge to the end of the leg. */
   surface: ScenePoint[];
+  /** The painted median, when there is one. */
+  medianArea: ScenePoint[] | null;
   inbound: SceneLane[];
   outbound: SceneLane[];
   markings: SceneMarking[];
@@ -147,7 +152,7 @@ const MAX_EDGE = 40;
 const CROSSWALK_SETBACK = 0.6;
 const CROSSWALK_WIDTH = 3;
 const STOP_BAR_SETBACK = 1.2;
-const APPROACH_LENGTH = 24;
+const APPROACH_LENGTH = 20;
 const CURB_RADIUS = 5;
 const MAX_FILLET_ANGLE = (135 * Math.PI) / 180;
 const STRIPE_WIDTH = 0.5;
@@ -288,6 +293,7 @@ interface LegDraft {
   outboundLaneWidth: number;
   inboundWidth: number;
   outboundWidth: number;
+  median: number;
   /** The widest through phase's clearance basis (metres), if any. */
   basisWidth: number | null;
   edge: number;
@@ -356,6 +362,7 @@ export function buildScene(intersection: Intersection, options: SceneOptions = {
       outboundLaneWidth: DEFAULT_LANE_WIDTH,
       inboundWidth: sum(inbound.map((l) => l.width)),
       outboundWidth: 0,
+      median: 0,
       basisWidth: basis.length > 0 ? Math.max(...basis) : null,
       edge: MIN_EDGE,
     };
@@ -376,7 +383,10 @@ export function buildScene(intersection: Intersection, options: SceneOptions = {
     const source = feeding.length > 0 ? feeding : throughLanes(draft.inbound);
     draft.outboundLanes = Math.max(1, source.length);
     draft.outboundLaneWidth = source.length > 0 ? sum(source.map((l) => l.width)) / source.length : DEFAULT_LANE_WIDTH;
-    draft.outboundWidth = draft.outboundLanes * draft.outboundLaneWidth;
+    // Opposite the other approach's left-turn bay, a painted median keeps the through lanes in line.
+    const opposite = draftBySide.get(oppositeSide(draft.side))?.inbound ?? [];
+    draft.median = sum(opposite.filter((l) => l.movements.length === 1 && l.movements[0] === 'left').map((l) => l.width));
+    draft.outboundWidth = draft.median + draft.outboundLanes * draft.outboundLaneWidth;
   }
 
   // Crosswalks: a phase with pedestrian service walks beside its traffic, across the leg on its
@@ -417,7 +427,7 @@ export function buildScene(intersection: Intersection, options: SceneOptions = {
     for (const lane of draft.inbound) lane.width = width;
     draft.outboundLaneWidth = width;
     draft.inboundWidth = width * draft.inbound.length;
-    draft.outboundWidth = width * draft.outboundLanes;
+    draft.outboundWidth = draft.median + width * draft.outboundLanes;
   }
 
   // How far each leg's conflict-area edge sits from the centre: clear of every crossing road.
@@ -554,7 +564,7 @@ function buildLeg(draft: LegDraft): SceneLeg {
     };
   });
   const outbound: SceneLane[] = Array.from({ length: draft.outboundLanes }, (_, index) => {
-    const centre = -(index + 0.5) * draft.outboundLaneWidth;
+    const centre = -(draft.median + (index + 0.5) * draft.outboundLaneWidth);
     return { direction: 'outbound', index, width: draft.outboundLaneWidth, offset: round(centre), centreline: [at(edge, centre), at(end, centre)], movements: [], phase: null, stopBar: null };
   });
 
@@ -563,6 +573,7 @@ function buildLeg(draft: LegDraft): SceneLeg {
   const markings: SceneMarking[] = [];
   if (inbound.length > 0 && outbound.length > 0) {
     markings.push({ kind: 'centre', from: at(stopBar, 0), to: at(end, 0) });
+    if (draft.median > 0) markings.push({ kind: 'centre', from: at(stopBar, -draft.median), to: at(end, -draft.median) });
   }
   let line = 0;
   inbound.slice(0, -1).forEach((lane) => {
@@ -570,10 +581,11 @@ function buildLeg(draft: LegDraft): SceneLeg {
     markings.push({ kind: 'lane', from: at(stopBar, line), to: at(end, line) });
   });
   outbound.slice(0, -1).forEach((lane, i) => {
-    markings.push({ kind: 'lane', from: at(edge, -(i + 1) * lane.width), to: at(end, -(i + 1) * lane.width) });
+    const offset = -(draft.median + (i + 1) * lane.width);
+    markings.push({ kind: 'lane', from: at(stopBar, offset), to: at(end, offset) });
   });
-  markings.push({ kind: 'edge', from: at(edge, inboundWidth), to: at(end, inboundWidth) });
-  markings.push({ kind: 'edge', from: at(edge, -outboundWidth), to: at(end, -outboundWidth) });
+  markings.push({ kind: 'edge', from: at(stopBar, inboundWidth), to: at(end, inboundWidth) });
+  markings.push({ kind: 'edge', from: at(stopBar, -outboundWidth), to: at(end, -outboundWidth) });
 
   const arrows = inbound.flatMap((lane) => lane.movements.map((movement) => laneArrow(axis, across, stopBar + 2, lane.offset, lane.width, movement)));
 
@@ -583,10 +595,12 @@ function buildLeg(draft: LegDraft): SceneLeg {
     across,
     inboundWidth,
     outboundWidth,
+    median: round(draft.median),
     edge: round(edge),
     stopBar: round(stopBar),
     end: round(end),
     surface: [at(edge, -outboundWidth), at(end, -outboundWidth), at(end, inboundWidth), at(edge, inboundWidth)],
+    medianArea: draft.median > 0 ? [at(stopBar, 0), at(end, 0), at(end, -draft.median), at(stopBar, -draft.median)] : null,
     inbound,
     outbound,
     markings,

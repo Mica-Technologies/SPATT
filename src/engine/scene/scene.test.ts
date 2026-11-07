@@ -49,9 +49,15 @@ describe('buildScene — standard eight-phase', () => {
       [2, ['through', 'right']],
     ]);
     expect(west.inboundWidth).toBeCloseTo(3 * DEFAULT_LANE_WIDTH);
-    // Outbound lanes match the through lanes arriving from the east.
+    // Outbound lanes match the through lanes arriving from the east, beside a median as wide as its left-turn bay.
     expect(west.outbound).toHaveLength(2);
-    expect(west.outboundWidth).toBeCloseTo(2 * DEFAULT_LANE_WIDTH);
+    expect(west.median).toBeCloseTo(DEFAULT_LANE_WIDTH);
+    expect(west.outboundWidth).toBeCloseTo(3 * DEFAULT_LANE_WIDTH);
+    // So eastbound through lanes line up across the intersection.
+    const east = leg(scene, 'E');
+    const ebIn = west.inbound.filter((l) => l.phase === 2).map((l) => l.centreline[0]!.y);
+    const ebOut = east.outbound.map((l) => l.centreline[0]!.y);
+    expect(ebOut).toEqual(ebIn);
     expect(scene.assumptions.join(' ')).toMatch(/No lane groups/);
   });
 

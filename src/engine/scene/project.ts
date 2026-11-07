@@ -6,7 +6,7 @@
  *   `x' = (x − y)·cos 30°`, `y' = (x + y)·sin 30° − z`. Larger `x + y` is nearer the viewer, so
  *   solids are painted in increasing `x + y` (painter's order).
  */
-import type { SceneBounds, ScenePoint, ScenePoint3 } from './scene';
+import type { IntersectionScene, SceneBounds, ScenePoint, ScenePoint3 } from './scene';
 
 export type SceneView = 'plan' | 'oblique';
 
@@ -78,5 +78,26 @@ export function projectedBounds(bounds: SceneBounds, view: SceneView, height = 0
     minY: Math.min(...points.map((p) => p.y)),
     maxX: Math.max(...points.map((p) => p.x)),
     maxY: Math.max(...points.map((p) => p.y)),
+  };
+}
+
+/**
+ * The projected bounding rectangle of what the scene draws: the road surfaces, the poles up to
+ * their tops and the heads, plus `pad` metres. Tighter than `projectedBounds` in the oblique view,
+ * where the corners of the scene's rectangle are empty ground.
+ */
+export function sceneExtent(scene: IntersectionScene, view: SceneView, pad = 2): SceneBounds {
+  const project = projectorFor(view);
+  const ground = [...scene.box, ...scene.legs.flatMap((l) => l.surface), ...scene.corners.flat()];
+  const raised = [...scene.poles.map((p) => ({ ...p.base, z: p.height })), ...scene.heads.map((h) => ({ ...h.position, z: h.position.z + 1.5 }))];
+  const points = [...ground, ...scene.poles.map((p) => p.base), ...raised].map((p) => project(p));
+  if (points.length === 0) {
+    return projectedBounds(scene.bounds, view);
+  }
+  return {
+    minX: Math.min(...points.map((p) => p.x)) - pad,
+    minY: Math.min(...points.map((p) => p.y)) - pad,
+    maxX: Math.max(...points.map((p) => p.x)) + pad,
+    maxY: Math.max(...points.map((p) => p.y)) + pad,
   };
 }
