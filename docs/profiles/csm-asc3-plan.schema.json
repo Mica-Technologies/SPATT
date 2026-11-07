@@ -120,6 +120,14 @@
           "lockCall": {
             "type": "boolean"
           },
+          "exclusions": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            }
+          },
           "walk": {
             "type": "integer",
             "minimum": 0,

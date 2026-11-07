@@ -107,6 +107,7 @@ function convertPlan(plan: CsmPlan, options: CsmImportOptions): CsmImportResult 
         lockingDetector: csm.lockCall,
         dualEntry: csm.dualEntry,
         conditionalService: csm.conditionalService,
+        exclusions: [...new Set(csm.exclusions ?? [])].filter((n) => n !== csm.number && numbers.has(n)).sort((a, b) => a - b),
       };
       if (Object.keys(ext).length > 0) phase.extensions = { csm: ext };
       return phase;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { NemaController, simulate, type SimulationSettings } from '../../engine';
-import { newLaneGroup, standardEightPhase, twoPhase, type Intersection } from '../../model';
+import { newLaneGroup, setExclusions, standardEightPhase, twoPhase, type Intersection } from '../../model';
 import { CsmController, csmControllerFor, effectivePassage } from './controller';
 import { CSM_FORMAT, CSM_FORMAT_VERSION, type CsmPattern, type CsmPhase, type CsmPlan } from './format';
 
@@ -229,5 +229,51 @@ describe('CSM ASC-3 controller', () => {
     i.rings[0]!.groups[0]!.push(9);
     const result = csmControllerFor(i, 'am-peak');
     expect(result.ok).toBe(false);
+  });
+});
+
+describe('CSM ASC-3 controller with phase exclusions', () => {
+  // PhaseExclusionTest: lefts 1 and 5 with their throughs 2 and 6, all on barrier A, all called.
+  const boulevard = (ex1: number[], ex5: number[], ring2 = [5, 6]) => {
+    const t = { minGreen: 100, passage: 40, maxGreen: 300 };
+    return new CsmController(csmPlan([csmPhase(1, 0, { ...t, exclusions: ex1 }), csmPhase(2, 0, t), csmPhase(5, 0, { ...t, exclusions: ex5 }), csmPhase(6, 0, t)], [[1, 2], ring2]));
+  };
+  function run(controller: CsmController) {
+    const up = (n: number) => controller.signal(n).vehicle !== 'red';
+    let served1 = false;
+    let served5 = false;
+    let together = false;
+    for (let t = 0; t < 4000; t++) {
+      controller.step({ tick: t, presence: new Set([1, 2, 5, 6]), actuations: new Set(), pedestrianPresses: new Set() });
+      served1 ||= up(1);
+      served5 ||= up(5);
+      together ||= up(1) && up(5);
+    }
+    return { served1, served5, together };
+  }
+
+  it('runs the two lefts together without an exclusion', () => {
+    expect(run(boulevard([], [])).together).toBe(true);
+  });
+
+  it('keeps excluded lefts apart, written on either phase, and serves both', () => {
+    expect(run(boulevard([5], []))).toEqual({ served1: true, served5: true, together: false });
+    expect(run(boulevard([], [1]))).toEqual({ served1: true, served5: true, together: false });
+  });
+
+  it('keeps them apart with a lead-lag ring order', () => {
+    expect(run(boulevard([5], [], [6, 5]))).toEqual({ served1: true, served5: true, together: false });
+  });
+
+  it('runs an intersection exclusion through the export', () => {
+    const i = standardEightPhase();
+    setExclusions(i, 1, [6]); // the pattern's splits keep 1 and 6 apart
+    const controller = csm(i, 'am-peak');
+    let together = false;
+    for (let t = 0; t < 1800 * 4; t++) {
+      controller.step({ tick: t, presence: new Set([1, 2, 3, 4, 5, 6, 7, 8]), actuations: new Set(), pedestrianPresses: new Set() });
+      together ||= controller.signal(1).vehicle !== 'red' && controller.signal(6).vehicle !== 'red';
+    }
+    expect(together).toBe(false);
   });
 });

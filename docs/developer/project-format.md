@@ -19,7 +19,7 @@ in `src/model/schema.ts`; this page explains it. Example files for every templat
 
 ```text
 Project
-├── app: "spatt", schemaVersion: 3, id, name, notes
+├── app: "spatt", schemaVersion: 4, id, name, notes
 ├── units: { length: ft | m | block, speed: mph | km/h | block/s }
 ├── intersections[]
 │   ├── id, name, notes
@@ -27,6 +27,7 @@ Project
 │   │                   minGreen, passage, maxGreen1, maxGreen2, yellow, redClear,
 │   │                   volumeDensity { … }, recall, pedestrian { enabled, walk, clearance,
 │   │                   recall, restInWalk }, lockingDetector, dualEntry, conditionalService,
+│   │                   exclusions [phase, …] (never time beside these),
 │   │                   clearanceBasis? { approachSpeed, gradePercent, intersectionWidth,
 │   │                   vehicleLength, crossingDistance, walkingSpeed }
 │   ├── rings[]         { groups: [[phase, …], …] }   one list per barrier group
@@ -105,6 +106,7 @@ and refuses a file with a newer version rather than misreading it.
 | 1 | First format; corridors were a placeholder list of intersection ids |
 | 2 | Corridors gain stops (distance, speeds, through phases), an outbound direction and timing plans; CSM units. Version 1 corridors load as stops with 300 m links at 13.4 m/s and no plans |
 | 3 | Intersections gain capacity settings, lane groups and volume sets; patterns gain `volumeSetId`. Version 2 intersections load with a 1900 pc/h/g/ln base, no lane groups or counts, and unlinked patterns |
+| 4 | Phases gain `exclusions`, the phases they must never time beside (a pair is excluded when either lists the other). Version 3 phases load with none |
 
 ## Validation rules
 
@@ -121,6 +123,9 @@ reject or run incorrectly; **warnings** are legal but unusual.
 | `phase.red-clear-range` | warning | Red clearance is at most 6.0 s |
 | `phase.ped-incomplete` | error | Pedestrian service has walk and clearance times; a pedestrian phase has pedestrian service |
 | `phase.walk-short` | warning | Walk is at least 7.0 s |
+| `phase.exclusion-self` | error | A phase does not exclude itself |
+| `phase.exclusion-unknown` | error | Exclusions only refer to defined phases |
+| `phase.exclusion-redundant` | warning | Excluded phases are in different rings of one barrier group (otherwise they never time together anyway) |
 | `ring.phase-repeated` | error | A phase appears once in the ring structure |
 | `ring.unknown-phase` | error | Rings only list defined phases |
 | `ring.phase-unassigned` | error | Every enabled phase is in a ring |
@@ -131,6 +136,7 @@ reject or run incorrectly; **warnings** are legal but unusual.
 | `overlap.no-included-phases` | error | An enabled overlap has included phases |
 | `overlap.unknown-phase` | error | Overlaps only refer to defined phases |
 | `preempt.unknown-phase` | error | Preempts only refer to defined phases |
+| `preempt.excluded-phases` | error | A preempt's track clearance, dwell or exit phases hold no excluded pair |
 | `pattern.duplicate-id` | error | Each pattern id is used once |
 | `pattern.sequence-membership` | error | A pattern sequence only reorders phases within their groups |
 | `pattern.cycle-missing` | error | A coordinated pattern has a cycle length |
@@ -146,6 +152,7 @@ reject or run incorrectly; **warnings** are legal but unusual.
 | `pattern.split-below-pedestrian` | error with pedestrian recall, otherwise warning | Split ≥ walk + pedestrian clearance + yellow + red clearance |
 | `pattern.barrier-misaligned` | error | In each barrier group, every ring with phases there has the same split total |
 | `pattern.cycle-sum` | error | The barrier group totals add up to the cycle |
+| `pattern.excluded-phases-concurrent` | error | The splits of two excluded phases do not overlap in time |
 | `schedule.duplicate-start` | error | Schedule entries start at different times |
 | `schedule.unknown-pattern` | error | Schedule entries use existing patterns |
 | `laneGroup.duplicate-id` | error | Each lane group id is used once |

@@ -1,6 +1,7 @@
 export * from './capacity';
 export * from './corridor';
 export * from './edits';
+export * from './exclusions';
 export * from './issues';
 export * from './measures';
 export * from './project';

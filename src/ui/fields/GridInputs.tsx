@@ -222,6 +222,60 @@ export function NumberInput({ path, label, value, onCommit, min, max, integer, o
   );
 }
 
+interface PhaseListInputProps extends BaseProps {
+  value: readonly number[];
+  onCommit: (value: number[]) => void;
+  /** Highest phase number accepted. */
+  max: number;
+}
+
+/** A list of phase numbers, typed as `1, 5` (spaces or commas). Blank is an empty list. */
+export function PhaseListInput({ path, label, value, onCommit, max, issues = [], disabled, style }: PhaseListInputProps) {
+  const display = value.join(', ');
+  const [draft, setDraft] = useState(display);
+  const [shown, setShown] = useState(display);
+  if (shown !== display) {
+    setShown(display);
+    setDraft(display);
+  }
+  const parse = (text: string): number[] | undefined => {
+    const tokens = text.split(/[\s,;]+/).filter((t) => t !== '');
+    const numbers = tokens.map(Number);
+    if (numbers.some((n) => !Number.isInteger(n) || n < 1 || n > max)) return undefined;
+    return [...new Set(numbers)].sort((a, b) => a - b);
+  };
+  const commit = () => {
+    const parsed = parse(draft);
+    if (parsed === undefined || parsed.join(', ') === display) {
+      setDraft(display);
+      return;
+    }
+    onCommit(parsed);
+  };
+  return withIssues(
+    issues,
+    <Input
+      id={fieldId(path)}
+      aria-label={label}
+      value={draft}
+      disabled={disabled}
+      placeholder="—"
+      data-severity={worstSeverity(issues) ?? undefined}
+      data-invalid={parse(draft) === undefined || undefined}
+      style={{ fontFamily: fontFamilyMono, ...style }}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') event.currentTarget.blur();
+        if (event.key === 'Escape') {
+          setDraft(display);
+          event.currentTarget.blur();
+        }
+      }}
+    />,
+  );
+}
+
 interface TextInputProps extends BaseProps {
   value: string;
   onCommit: (value: string) => void;

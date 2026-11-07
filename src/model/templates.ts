@@ -42,6 +42,7 @@ export function makePhase(number: number, options: PhaseOptions): Phase {
     lockingDetector: false,
     dualEntry: false,
     conditionalService: false,
+    exclusions: [],
   };
 }
 

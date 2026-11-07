@@ -45,6 +45,7 @@ sidebar marks **CSM**, and are written back when you export it again.
 | Patterns | 4 slots | More than 4 patterns without a schedule blocks export |
 | Schedule | One start hour per slot, whole hours only | More than 4 entries, or a start off the hour, blocks export |
 | Recall | None, minimum, maximum, soft | |
+| Phase exclusions | Any; a pair is excluded when either phase lists the other | |
 | Force-offs | Fixed only | Floating force-offs are a warning |
 | Max green in coordination | Max 2 whenever a phase has one | A pattern set to Max 1 with Max 2 phases is a warning |
 | Overlaps and preempts | Tied to signal circuits | SPATT-side overlaps and preempts are not exported (warning) |
@@ -101,7 +102,7 @@ in the repository under `test/fixtures/csm/`. An excerpt (one phase, part of the
       "yellow": 80, "redClear": 40,
       "addedInitial": 0, "maxInitial": 0, "minGap": 0, "timeBeforeReduce": 0, "timeToReduce": 0,
       "recall": "NONE", "pedRecall": false, "restInWalk": false,
-      "dualEntry": false, "conditionalService": false, "lockCall": false,
+      "dualEntry": false, "conditionalService": false, "lockCall": false, "exclusions": [],
       "walk": 140, "pedClear": 360, "label": "EB Thru"
     }
   ],
@@ -128,7 +129,7 @@ Optional fields, which the controller keeps its own values for when a plan leave
 
 | Where | Fields |
 |---|---|
-| Phase | `walk`, `pedClear`, `movement`, `circuit` (0-based, −1 none), `flash`, `delayedGreen`, `bikeMinGreen`, `permissivePhase` (flashing yellow arrow; 0 = protected only) |
+| Phase | `exclusions` (phases it must never time beside; SPATT always writes it), `walk`, `pedClear`, `movement`, `circuit` (0-based, −1 none), `flash`, `delayedGreen`, `bikeMinGreen`, `permissivePhase` (flashing yellow arrow; 0 = protected only) |
 | Plan | `patterns` entries (slots not listed are kept), `overlaps`, `preempts` and `priorities` (up to four transit priority plans), carried verbatim |
 
 Informational fields the controller ignores: `generator`, `name`, a phase's `label`, a pattern's

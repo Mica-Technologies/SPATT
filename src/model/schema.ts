@@ -12,8 +12,9 @@ import { z } from 'zod';
 /**
  * 2: corridors gained stops, directions and timing plans; CSM units.
  * 3: intersections gained lane groups, capacity settings and volume count sets; patterns link a count.
+ * 4: phases gained exclusions (phases they must not time beside).
  */
-export const PROJECT_SCHEMA_VERSION = 3;
+export const PROJECT_SCHEMA_VERSION = 4;
 
 export const lengthUnitSchema = z.enum(['ft', 'm', 'block']);
 export type LengthUnit = z.infer<typeof lengthUnitSchema>;
@@ -105,6 +106,11 @@ export const phaseSchema = z.object({
   lockingDetector: z.boolean(),
   dualEntry: z.boolean(),
   conditionalService: z.boolean(),
+  /**
+   * Phases this one must never time beside (ASC-3 phase concurrency). A pair is excluded when
+   * either phase lists the other; the editor keeps both lists in step.
+   */
+  exclusions: z.array(phaseNumberSchema).max(MAX_PHASES),
   clearanceBasis: clearanceBasisSchema.optional(),
   extensions: extensionsSchema.optional(),
 });

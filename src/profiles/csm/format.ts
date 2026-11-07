@@ -64,6 +64,8 @@ export const csmPhaseSchema = z.object({
   dualEntry: z.boolean(),
   conditionalService: z.boolean(),
   lockCall: z.boolean(),
+  /** Phases this one must never time beside (the controller's phase exclusions); a pair is excluded when either lists the other. */
+  exclusions: phaseList.optional(),
   // Optional: absent = the controller keeps its own value.
   walk: ticks.optional(),
   pedClear: ticks.optional(),

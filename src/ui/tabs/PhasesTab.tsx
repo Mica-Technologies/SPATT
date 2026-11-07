@@ -13,13 +13,16 @@ import MenuItem from '@mui/material/MenuItem';
 import Typography from '@mui/material/Typography';
 import {
   addPhase,
+  exclusionsOf,
+  MAX_PHASES,
   nextPhaseNumber,
   removePhase,
+  setExclusions,
   type Intersection,
   type Issue,
   type Phase,
 } from '../../model';
-import { CheckboxInput, SecondsInput, SelectInput, TextInput } from '../fields/GridInputs';
+import { CheckboxInput, PhaseListInput, SecondsInput, SelectInput, TextInput } from '../fields/GridInputs';
 import { APPROACHES, MOVEMENTS, RECALLS } from '../fields/phaseOptions';
 import { fieldId, issuesFor, type FieldPath } from '../fields/paths';
 import { useWorkspace } from '../state/workspace';
@@ -32,6 +35,9 @@ interface CellContext {
   path: FieldPath;
   issues: readonly Issue[];
   update: (label: string, recipe: (phase: Phase) => void) => void;
+  /** Every phase of the intersection, for rows that relate phases to each other. */
+  phases: readonly Phase[];
+  editIntersection: (label: string, recipe: (intersection: Intersection) => void) => void;
 }
 
 interface RowSpec {
@@ -188,6 +194,22 @@ const SECTIONS: { title: string; rows: RowSpec[] }[] = [
       flag('Locking detector', (p) => p.lockingDetector, (p, v) => (p.lockingDetector = v), ['lockingDetector']),
       flag('Dual entry', (p) => p.dualEntry, (p, v) => (p.dualEntry = v), ['dualEntry']),
       flag('Conditional service', (p) => p.conditionalService, (p, v) => (p.conditionalService = v), ['conditionalService']),
+      {
+        label: 'Not concurrent with',
+        render: ({ phase, path, issues, phases, editIntersection }) => {
+          const cellPath = [...path, 'exclusions'];
+          return (
+            <PhaseListInput
+              path={cellPath}
+              label={`Phases not concurrent with phase ${phase.number}`}
+              value={exclusionsOf(phases, phase.number)}
+              max={MAX_PHASES}
+              issues={issuesFor(issues, cellPath)}
+              onCommit={(v) => editIntersection(`Phase ${phase.number} exclusions`, (i) => setExclusions(i, phase.number, v))}
+            />
+          );
+        },
+      },
     ],
   },
 ];
@@ -270,7 +292,7 @@ export default function PhasesTab({ intersection, intersectionIndex, issues, pha
                     </Box>
                     {phases.map((phase, index) => (
                       <Box component="td" key={phase.number} sx={{ px: 0.5, py: 0.25, textAlign: 'center', opacity: phase.enabled ? 1 : 0.55 }}>
-                        {row.render({ phase, path: [...basePath, index], issues, update: update(phase.number) })}
+                        {row.render({ phase, path: [...basePath, index], issues, update: update(phase.number), phases, editIntersection })}
                       </Box>
                     ))}
                   </Box>
@@ -292,7 +314,7 @@ export default function PhasesTab({ intersection, intersectionIndex, issues, pha
           {next === null ? 'All 16 phases defined' : `Add phase ${next}`}
         </Button>
         <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-          Times in seconds. A new phase needs a place in Rings &amp; Barriers before it runs.
+          Times in seconds. A new phase needs a place in Rings &amp; Barriers before it runs. Not concurrent with: phases that must never time beside this one, such as 1, 5.
         </Typography>
       </Box>
 

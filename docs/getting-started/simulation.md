@@ -47,7 +47,9 @@ A generic dual-ring actuated controller built from SPATT's own plan:
   Pedestrian walk and clearance follow when called, then yellow and red clearance.
 - **Choosing the next phase.** Phases without a call are skipped. Rings cross a barrier together,
   once every ring in the group is ready, to the next group with a call. A dual-entry phase times in
-  a ring that has no call in that group.
+  a ring that has no call in that group. A phase excluded beside the phase another ring is timing
+  waits until that phase has cleared, and the other phase ends as soon as it can. The CSM ASC-3
+  controller does the same.
 - **Recalls.** Minimum recall places a constant call. Maximum recall also stops the phase gapping
   out. Soft recall calls only when nothing else is calling. Pedestrian recall calls the walk every
   time.

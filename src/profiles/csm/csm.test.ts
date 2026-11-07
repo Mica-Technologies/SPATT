@@ -19,7 +19,7 @@ describe('exportCsm — standard eight-phase, hand-worked', () => {
       number: 1, enabled: true, barrier: 0,
       minGreen: 100, passage: 40, maxGreen: 400, maxGreen2: 0, yellow: 70, redClear: 30,
       addedInitial: 0, maxInitial: 0, minGap: 0, timeBeforeReduce: 0, timeToReduce: 0,
-      recall: 'NONE', pedRecall: false, restInWalk: false, dualEntry: false, conditionalService: false, lockCall: false,
+      recall: 'NONE', pedRecall: false, restInWalk: false, dualEntry: false, conditionalService: false, lockCall: false, exclusions: [],
       label: 'WB Left',
     });
     // Phase 2 has pedestrian service: walk 7.0 s, clearance 18.0 s.
@@ -157,6 +157,17 @@ describe('importCsm', () => {
     expect(again.formatVersion).toBe(2);
     expect(again.priorities).toEqual([{ en: true }]);
     expect(again).not.toHaveProperty('priority');
+  });
+
+  it('exports phase exclusions from both sides of each pair and imports them back', () => {
+    const intersection = standardEightPhase();
+    intersection.phases[0]!.exclusions = [6]; // only phase 1 lists the pair
+    const plan = exported(intersection);
+    expect([plan.phases[0]!.exclusions, plan.phases[5]!.exclusions, plan.phases[1]!.exclusions]).toEqual([[6], [1], []]);
+    plan.phases[2]!.exclusions = [3, 7, 7];
+    const imported = importCsm(plan, { id: 'x' });
+    if (!imported.ok) throw new Error('import failed');
+    expect(imported.intersection.phases.map((p) => p.exclusions)).toEqual([[6], [], [7], [], [], [1], [], []]);
   });
 
   it('imports a PROTECTED (bus, train, bike) phase as an other movement and exports it back', () => {

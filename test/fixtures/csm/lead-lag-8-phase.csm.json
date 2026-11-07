@@ -25,6 +25,7 @@
       "dualEntry": false,
       "conditionalService": false,
       "lockCall": false,
+      "exclusions": [],
       "label": "WB Left"
     },
     {
@@ -48,6 +49,7 @@
       "dualEntry": false,
       "conditionalService": false,
       "lockCall": false,
+      "exclusions": [],
       "label": "EB Thru",
       "walk": 140,
       "pedClear": 360
@@ -73,6 +75,7 @@
       "dualEntry": false,
       "conditionalService": false,
       "lockCall": false,
+      "exclusions": [],
       "label": "NB Left"
     },
     {
@@ -96,6 +99,7 @@
       "dualEntry": false,
       "conditionalService": false,
       "lockCall": false,
+      "exclusions": [],
       "label": "SB Thru",
       "walk": 140,
       "pedClear": 280
@@ -121,6 +125,7 @@
       "dualEntry": false,
       "conditionalService": false,
       "lockCall": false,
+      "exclusions": [],
       "label": "EB Left"
     },
     {
@@ -144,6 +149,7 @@
       "dualEntry": false,
       "conditionalService": false,
       "lockCall": false,
+      "exclusions": [],
       "label": "WB Thru",
       "walk": 140,
       "pedClear": 360
@@ -169,6 +175,7 @@
       "dualEntry": false,
       "conditionalService": false,
       "lockCall": false,
+      "exclusions": [],
       "label": "SB Left"
     },
     {
@@ -192,6 +199,7 @@
       "dualEntry": false,
       "conditionalService": false,
       "lockCall": false,
+      "exclusions": [],
       "label": "NB Thru",
       "walk": 140,
       "pedClear": 280

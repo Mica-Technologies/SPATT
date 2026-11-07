@@ -14,11 +14,15 @@
  * split's green (floating), and only start if their minimum green (and a called pedestrian interval)
  * fits before the force-off.
  *
+ * Phase exclusions: a phase excluded beside the phase another ring is timing (in any interval)
+ * does not start; its ring waits for it at that point in its sequence, and the other ring's green
+ * treats it as a conflicting call and ends as soon as it may.
+ *
  * Simplifications: simultaneous gap-out at barriers is always on; conditional service is not
  * modelled; the max timer runs while a conflicting call is waiting and holds (does not reset) when
  * the call goes away; volume density's time before reduction counts from the start of green.
  */
-import { effectiveSequence, type Intersection, type Phase, type Ring } from '../../model';
+import { effectiveSequence, phasesExclude, type Intersection, type Phase, type Ring } from '../../model';
 import { projectCycle, type CycleProjection } from '../projection';
 import { TICKS_PER_TENTH, type ControllerInputs, type ControllerModel, type PhaseSignal, type Termination } from './types';
 
@@ -38,6 +42,8 @@ interface RingState {
   ready: Termination | null;
   /** Coordinated phases: the tick from which the phase may yield (its next scheduled end of green). */
   yieldTick: number;
+  /** Idle, waiting to start this phase until a phase excluded beside it in another ring has cleared. */
+  waiting: number | null;
 }
 
 interface PhaseTiming {
@@ -96,8 +102,10 @@ export class NemaController implements ControllerModel {
   private readonly pedestrianCalls = new Set<number>();
   private readonly redActuations = new Map<number, number>();
   private terminations: { phase: number; reason: Termination; tick: number }[] = [];
+  private readonly excludes: (a: number, b: number) => boolean;
 
   constructor(intersection: Intersection, options: NemaOptions) {
+    this.excludes = (a, b) => phasesExclude(intersection.phases, a, b);
     const pattern = intersection.patterns.find((p) => p.id === options.patternId) ?? null;
     this.sequence = pattern ? effectiveSequence(pattern, intersection.rings) : intersection.rings;
     this.groupCount = this.sequence[0]?.groups.length ?? 0;
@@ -244,6 +252,22 @@ export class NemaController implements ControllerModel {
     return list.slice(from).find((n) => this.phases.has(n) && this.serviceable(n)) ?? null;
   }
 
+  /** Whether another ring is timing (in any interval) a phase excluded beside `n`. */
+  private blocked(n: number, r: number): boolean {
+    return this.rings.some((ring, k) => k !== r && ring.phase !== null && ring.interval !== 'idle' && this.excludes(n, ring.phase));
+  }
+
+  /** Whether another ring is waiting to start a phase excluded beside `n`. */
+  private excludedWaiting(n: number, r: number): boolean {
+    return this.rings.some((ring, k) => k !== r && ring.waiting !== null && this.excludes(n, ring.waiting));
+  }
+
+  /** Starts `n`, or waits for it when a phase excluded beside it is timing in another ring. */
+  private startOrWait(ring: RingState, r: number, n: number): void {
+    if (this.blocked(n, r)) Object.assign(ring, { phase: null, interval: 'idle', elapsed: 0, ready: null, waiting: n });
+    else this.startGreen(ring, n);
+  }
+
   private demandElsewhere(): boolean {
     return this.nextGroupWithDemand() !== null;
   }
@@ -259,6 +283,12 @@ export class NemaController implements ControllerModel {
 
   private timeRing(ring: RingState, r: number, inputs: ControllerInputs): void {
     ring.elapsed++;
+    if (ring.interval === 'idle' && ring.waiting !== null) {
+      const n = this.serviceable(ring.waiting) ? ring.waiting : this.nextInGroup(r, ring.waiting);
+      ring.waiting = null;
+      if (n !== null) this.startOrWait(ring, r, n);
+      return;
+    }
     if (ring.interval === 'yellow') {
       const timing = this.phases.get(ring.phase!)!;
       if (ring.elapsed >= timing.yellow) Object.assign(ring, { interval: 'red', elapsed: 0 });
@@ -268,7 +298,7 @@ export class NemaController implements ControllerModel {
       const timing = this.phases.get(ring.phase!)!;
       if (ring.elapsed < timing.redClear) return;
       const next = this.nextInGroup(r, ring.phase);
-      if (next !== null) this.startGreen(ring, next);
+      if (next !== null) this.startOrWait(ring, r, next);
       else Object.assign(ring, { interval: 'idle', elapsed: 0 });
       return;
     }
@@ -278,7 +308,8 @@ export class NemaController implements ControllerModel {
     const timing = this.phases.get(n)!;
     const coordinatedPhase = this.coordination?.coordinated.has(n) ?? false;
     const withinGroup = this.nextInGroup(r, n) !== null;
-    const conflicting = withinGroup || this.demandElsewhere();
+    const excludedWaiting = this.excludedWaiting(n, r);
+    const conflicting = withinGroup || excludedWaiting || this.demandElsewhere();
 
     // Pedestrian intervals.
     if (ring.pedestrian === 'walk' || ring.pedestrian === 'clearance') ring.pedestrianElapsed++;
@@ -298,7 +329,7 @@ export class NemaController implements ControllerModel {
       ring.ready = conflicting && minimumDone ? this.termination(ring, timing, coordinatedPhase) : null;
     }
     if (ring.ready === null) return;
-    if (withinGroup) {
+    if (withinGroup || excludedWaiting) {
       this.endGreen(ring, n, ring.ready);
     }
     // Otherwise the ring waits at the barrier (see crossBarrier).
@@ -340,7 +371,7 @@ export class NemaController implements ControllerModel {
     const c = this.coordination;
     const s = c?.coordinated.has(n) ? c.schedule.get(n) : undefined;
     const yieldTick = c && s ? this.tick + mod(s.yellowStart - this.seq(), c.cycle) : 0;
-    Object.assign(ring, { phase: n, interval: 'green', elapsed: 0, gap: 0, maxElapsed: 0, initial, pedestrian: walk ? 'walk' : 'none', pedestrianElapsed: 0, ready: null, yieldTick } satisfies RingState);
+    Object.assign(ring, { phase: n, interval: 'green', elapsed: 0, gap: 0, maxElapsed: 0, initial, pedestrian: walk ? 'walk' : 'none', pedestrianElapsed: 0, ready: null, yieldTick, waiting: null } satisfies RingState);
   }
 
   private endGreen(ring: RingState, n: number, reason: Termination): void {
@@ -352,7 +383,7 @@ export class NemaController implements ControllerModel {
     const timing = (r: number) => this.sequence[r]!.groups[this.group] ?? [];
     // Rings still green in this group must all be ready to leave it.
     const green = this.rings.filter((ring) => ring.interval === 'green');
-    const clearing = this.rings.some((ring) => ring.interval === 'yellow' || ring.interval === 'red');
+    const clearing = this.rings.some((ring) => ring.interval === 'yellow' || ring.interval === 'red' || ring.waiting !== null);
     if (green.length > 0) {
       const allReady = green.every((ring) => ring.ready !== null && this.nextInGroup(this.rings.indexOf(ring), ring.phase) === null);
       if (allReady && !clearing && this.demandElsewhere()) {
@@ -367,15 +398,17 @@ export class NemaController implements ControllerModel {
     const starts = this.sequence.map((_, r) => timing(r).find((n) => this.phases.has(n) && this.serviceable(n)) ?? null);
     const anyStart = starts.some((n) => n !== null);
     this.rings.forEach((ring, r) => {
-      const n = starts[r] ?? (anyStart ? (timing(r).find((p) => this.phases.get(p)?.dualEntry) ?? null) : null);
-      if (n !== null) this.startGreen(ring, n);
-      else Object.assign(ring, { phase: null, interval: 'idle', elapsed: 0, ready: null });
+      // Dual entry passes over a phase excluded beside another ring's start.
+      const dual = () => timing(r).find((p) => this.phases.get(p)?.dualEntry && !starts.some((m, k) => k !== r && m !== null && this.excludes(p, m))) ?? null;
+      const n = starts[r] ?? (anyStart ? dual() : null);
+      if (n !== null) this.startOrWait(ring, r, n);
+      else Object.assign(ring, { phase: null, interval: 'idle', elapsed: 0, ready: null, waiting: null });
     });
   }
 }
 
 function idleRing(): RingState {
-  return { phase: null, interval: 'idle', elapsed: 0, gap: 0, maxElapsed: 0, initial: 0, pedestrian: 'none', pedestrianElapsed: 0, ready: null, yieldTick: 0 };
+  return { phase: null, interval: 'idle', elapsed: 0, gap: 0, maxElapsed: 0, initial: 0, pedestrian: 'none', pedestrianElapsed: 0, ready: null, yieldTick: 0, waiting: null };
 }
 
 function coordinationTiming(intersection: Intersection, patternId: string, floating: boolean): CoordinationTiming | null {

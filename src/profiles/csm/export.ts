@@ -12,6 +12,7 @@ import { convertOffset, mod, projectCycle } from '../../engine';
 import {
   effectiveSequence,
   error,
+  exclusionsOf,
   hasErrors,
   tenthsToTicks,
   validateIntersection,
@@ -206,6 +207,7 @@ export function exportCsm(intersection: Intersection, generator = 'SPATT'): CsmE
         dualEntry: phase.dualEntry,
         conditionalService: phase.conditionalService,
         lockCall: phase.lockingDetector,
+        exclusions: exclusionsOf(intersection.phases, phase.number),
         label: phase.label || undefined,
       };
       if (ped.enabled) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { newLaneGroup, twoPhase, type Intersection } from '../../model';
+import { newLaneGroup, setExclusions, standardEightPhase, twoPhase, type Intersection } from '../../model';
 import { analyzePattern } from '../capacity';
 import { NemaController } from './nema';
 import { simulate, type SimulationSettings } from './simulate';
@@ -110,5 +110,43 @@ describe('simulated traffic', () => {
     expect(side.green.max).toBeGreaterThanOrEqual(19);
     expect(result.trace.spans.some((s) => s.phase === 4 && s.signal === 'walk')).toBe(true);
     expect(result.trace.queues['eb']!.length).toBe(7500);
+  });
+});
+
+describe('NEMA controller with phase exclusions', () => {
+  /** Every phase called, free, for `ticks`: whether 1 and 5 were each served, and ever up together. */
+  function lefts(i: Intersection, ticks = 8000) {
+    const controller = new NemaController(i, { patternId: null });
+    const all = new Set(i.phases.map((p) => p.number));
+    const up = (n: number) => controller.signal(n).vehicle !== 'red';
+    let served1 = false;
+    let served5 = false;
+    let together = false;
+    for (let t = 0; t < ticks; t++) {
+      controller.step({ tick: t, presence: all, actuations: new Set(), pedestrianPresses: new Set() });
+      served1 ||= up(1);
+      served5 ||= up(5);
+      together ||= up(1) && up(5);
+    }
+    return { served1, served5, together };
+  }
+
+  it('runs the two lefts together without an exclusion, as the rings allow', () => {
+    expect(lefts(standardEightPhase()).together).toBe(true);
+  });
+
+  it('keeps excluded lefts apart, on either side of the pair, and still serves both', () => {
+    for (const lister of [1, 5]) {
+      const i = standardEightPhase();
+      i.phases.find((p) => p.number === lister)!.exclusions = [lister === 1 ? 5 : 1];
+      expect(lefts(i)).toEqual({ served1: true, served5: true, together: false });
+    }
+  });
+
+  it('keeps them apart with a lead-lag order too', () => {
+    const i = standardEightPhase();
+    setExclusions(i, 1, [5]);
+    i.rings[1]!.groups[0] = [6, 5];
+    expect(lefts(i)).toEqual({ served1: true, served5: true, together: false });
   });
 });

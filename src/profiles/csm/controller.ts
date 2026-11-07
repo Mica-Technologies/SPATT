@@ -50,6 +50,8 @@ interface RingRuntime {
   yieldedFor: number;
   /** Held at the barrier: finished, but the other ring still works this barrier (§4.3). */
   barrierWaiting: boolean;
+  /** Idle only because its next called phase is excluded beside the other ring's phase (§0.7). */
+  exclusionWait: boolean;
 }
 
 const DEFAULT_WALK = 140;
@@ -80,6 +82,7 @@ function newRing(): RingRuntime {
     coordYieldFor: 0,
     yieldedFor: 0,
     barrierWaiting: false,
+    exclusionWait: false,
   };
 }
 
@@ -199,6 +202,18 @@ export class CsmController implements ControllerModel {
     return p.pedClear ?? DEFAULT_PED_CLEAR;
   }
 
+  /** Whether phases `a` and `b` are excluded from timing together (`PLAN.excludes`). */
+  private excludes(a: number, b: number): boolean {
+    if (a === b) return false;
+    return (this.phase.get(a)?.exclusions ?? []).includes(b) || (this.phase.get(b)?.exclusions ?? []).includes(a);
+  }
+
+  /** Whether `n` may not start in `ringNum` because the other ring serves (in any interval) a phase excluded beside it. */
+  private excludedByOtherRing(ringNum: number, n: number): boolean {
+    const other = this.ring(ringNum === 1 ? 2 : 1);
+    return other.activePhase !== 0 && this.excludes(n, other.activePhase);
+  }
+
   private isActiveInEitherRing(n: number): boolean {
     return this.rings[0].activePhase === n || this.rings[1].activePhase === n;
   }
@@ -291,6 +306,7 @@ export class CsmController implements ControllerModel {
   private conflicts(activeN: number, activeRing: number, n: number): boolean {
     const active = this.phase.get(activeN);
     if (!active) return true;
+    if (this.excludes(activeN, n)) return true; // barred from timing together, whatever the rings say
     const other = this.phase.get(n);
     if (!other || other.barrier !== active.barrier) return true;
     const otherRing = this.ringOf(n);
@@ -598,18 +614,25 @@ export class CsmController implements ControllerModel {
   private fillIdleRing(ringNum: number): void {
     const r = this.ring(ringNum);
     if (r.activePhase !== 0) return;
+    r.exclusionWait = false;
     const seq = this.seq(ringNum);
     for (let idx = r.sequencePos + 1; idx < seq.length; idx++) {
-      r.sequencePos = idx;
       const n = seq[idx]!;
-      if (!this.active(n) || this.phase.get(n)!.barrier !== this.currentBarrier) continue;
+      const onBarrier = this.active(n) && this.phase.get(n)!.barrier === this.currentBarrier;
+      if (onBarrier && this.called.has(n) && this.excludedByOtherRing(ringNum, n)) {
+        // Called but excluded beside the other ring's phase: wait at this slot until it clears.
+        r.exclusionWait = true;
+        return;
+      }
+      r.sequencePos = idx;
+      if (!onBarrier) continue;
       if (this.called.has(n)) {
         this.startGreen(ringNum, n);
         return;
       }
     }
     if (!r.condServiceUsed) {
-      const n = seq.find((m) => this.active(m) && this.phase.get(m)!.barrier === this.currentBarrier && this.phase.get(m)!.conditionalService && this.called.has(m));
+      const n = seq.find((m) => this.active(m) && this.phase.get(m)!.barrier === this.currentBarrier && this.phase.get(m)!.conditionalService && this.called.has(m) && !this.excludedByOtherRing(ringNum, m));
       if (n !== undefined) {
         this.startGreen(ringNum, n);
         r.condServiceUsed = true;
@@ -617,7 +640,7 @@ export class CsmController implements ControllerModel {
       }
     }
     if (this.nextBarrierWithDemand() === this.currentBarrier) {
-      const idx = seq.findIndex((m) => this.active(m) && this.phase.get(m)!.barrier === this.currentBarrier && this.called.has(m) && !this.isActiveInEitherRing(m));
+      const idx = seq.findIndex((m) => this.active(m) && this.phase.get(m)!.barrier === this.currentBarrier && this.called.has(m) && !this.isActiveInEitherRing(m) && !this.excludedByOtherRing(ringNum, m));
       if (idx >= 0) {
         this.startGreen(ringNum, seq[idx]!);
         r.sequencePos = idx;
@@ -630,7 +653,7 @@ export class CsmController implements ControllerModel {
       const target = r.yieldedFor;
       r.yieldedFor = 0;
       const idx = seq.indexOf(target);
-      if (idx >= 0 && this.active(target) && this.phase.get(target)!.barrier === this.currentBarrier && this.called.has(target) && !this.isActiveInEitherRing(target)) {
+      if (idx >= 0 && this.active(target) && this.phase.get(target)!.barrier === this.currentBarrier && this.called.has(target) && !this.isActiveInEitherRing(target) && !this.excludedByOtherRing(ringNum, target)) {
         this.startGreen(ringNum, target);
         r.sequencePos = idx;
       }
@@ -641,14 +664,14 @@ export class CsmController implements ControllerModel {
   private fillDualEntry(idleNum: number, otherNum: number): void {
     const idle = this.ring(idleNum);
     const other = this.ring(otherNum);
-    if (idle.activePhase !== 0 || other.activePhase === 0 || other.dualEntry || other.serviceSeq === idle.clearedAlongside) return;
+    if (idle.activePhase !== 0 || other.activePhase === 0 || other.dualEntry || idle.exclusionWait || other.serviceSeq === idle.clearedAlongside) return;
     const otherPhase = this.phase.get(other.activePhase);
     if (!otherPhase || otherPhase.barrier !== this.currentBarrier || other.interval !== 'GREEN') return;
     const seq = this.seq(idleNum);
     for (let idx = 0; idx < seq.length; idx++) {
       const n = seq[idx]!;
       const p = this.phase.get(n);
-      if (!p || !this.active(n) || p.barrier !== this.currentBarrier || !p.dualEntry || this.withinBarrierConflict(n, idleNum, this.called)) continue;
+      if (!p || !this.active(n) || p.barrier !== this.currentBarrier || !p.dualEntry || this.withinBarrierConflict(n, idleNum, this.called) || this.excludedByOtherRing(idleNum, n)) continue;
       this.startGreen(idleNum, n);
       idle.dualEntry = true;
       idle.sequencePos = idx;
@@ -692,14 +715,15 @@ export class CsmController implements ControllerModel {
     return n === undefined ? 0 : this.phase.get(n)!.barrier;
   }
 
-  private restPhaseForRing(ringNum: number, barrier: number | null): number {
-    const candidates = this.seq(ringNum).filter((n) => this.active(n) && (barrier === null || this.phase.get(n)!.barrier === barrier));
+  /** The rest phase for a ring, on `barrier` if given, passing over any phase excluded beside `beside`. */
+  private restPhaseForRing(ringNum: number, barrier: number | null, beside = 0): number {
+    const candidates = this.seq(ringNum).filter((n) => this.active(n) && (barrier === null || this.phase.get(n)!.barrier === barrier) && !this.excludes(n, beside));
     return candidates.find((n) => this.restPreference.includes(n)) ?? candidates.find((n) => this.phase.get(n)!.recall === 'SOFT') ?? candidates[0] ?? 0;
   }
 
   private restInGreen(): void {
     const rest1 = this.restPhaseForRing(1, null);
-    const rest2 = this.restPhaseForRing(2, rest1 !== 0 ? this.phase.get(rest1)!.barrier : null);
+    const rest2 = this.restPhaseForRing(2, rest1 !== 0 ? this.phase.get(rest1)!.barrier : null, rest1);
     for (const [ringNum, n] of [
       [1, rest1],
       [2, rest2],

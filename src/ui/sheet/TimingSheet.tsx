@@ -9,6 +9,7 @@ import Typography from '@mui/material/Typography';
 import { analyzePattern, projectCycle, saturationFlow, toLocal } from '../../engine';
 import {
   effectiveSequence,
+  exclusionsOf,
   formatClock,
   formatDuration,
   formatMeasure,
@@ -67,6 +68,7 @@ function PhaseTable({ phases }: { phases: Phase[] }) {
     row('Dual entry', (p) => yes(p.dualEntry)),
     row('Locking detector', (p) => yes(p.lockingDetector)),
     row('Conditional service', (p) => yes(p.conditionalService)),
+    ...(phases.some((p) => p.exclusions.length > 0) ? [row('Not concurrent with', (p) => exclusionsOf(phases, p.number).join(', '))] : []),
   ];
   return <Table firstColumnLabel="Phase" head={phases.map((p) => p.number)} rows={rows} />;
 }
