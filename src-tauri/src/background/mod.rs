@@ -36,6 +36,8 @@ pub enum ServiceState {
     Running,
     Stopped,
     /// Starting, stopping or another transitional state, as the service manager names it.
+    /// launchd reports only loaded or not, so macOS never builds this one.
+    #[cfg_attr(target_os = "macos", allow(dead_code))]
     Other(String),
 }
 

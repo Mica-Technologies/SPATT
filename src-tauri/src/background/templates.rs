@@ -1,6 +1,7 @@
 //! The files the Linux and macOS installers write, as plain text so they can be tested on any
 //! platform. Windows registers everything through APIs instead.
-#![cfg_attr(target_os = "windows", allow(dead_code))]
+// Built everywhere so the tests run on every platform; each OS uses only its own templates.
+#![allow(dead_code)]
 
 use std::path::Path;
 
