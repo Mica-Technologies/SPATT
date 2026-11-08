@@ -38,6 +38,9 @@ export function migrateProject(raw: unknown): { value: unknown; issues: Issue[] 
   if (version < 3) {
     value = migrateV2(value);
   }
+  if (version < 4) {
+    value = migrateV3(value);
+  }
   return { value, issues: [] };
 }
 
@@ -87,6 +90,20 @@ function migrateV2(v2: Record<string, unknown>): Record<string, unknown> {
         laneGroups: [],
         volumeSets: [],
       };
+    }),
+  };
+}
+
+/** v3 → v4: phases gain an empty exclusion list; intersections have no red+amber or green flash. */
+function migrateV3(v3: Record<string, unknown>): Record<string, unknown> {
+  const intersections = Array.isArray(v3.intersections) ? v3.intersections : [];
+  return {
+    ...v3,
+    schemaVersion: 4,
+    intersections: intersections.map((raw) => {
+      const intersection = raw as Record<string, unknown>;
+      const phases = Array.isArray(intersection.phases) ? intersection.phases : [];
+      return { ...intersection, redAmber: 0, greenFlash: 0, phases: phases.map((phase) => ({ ...(phase as object), exclusions: [] })) };
     }),
   };
 }

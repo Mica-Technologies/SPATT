@@ -12,6 +12,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { splitMinimums } from '../../../engine';
 import { effectiveSequence, formatSeconds, type Intersection, type Issue, type Pattern, type Phase } from '../../../model';
+import ScrollArea from '../../components/ScrollArea';
 import { SecondsInput } from '../../fields/GridInputs';
 import { fieldId, issuesFor, type FieldPath } from '../../fields/paths';
 import { fontFamilyMono } from '../../theme/themePrimitives';
@@ -30,6 +31,9 @@ const CELL_WIDTH = 92;
 const s = formatSeconds;
 const barrierEdge = { borderLeft: 3, borderLeftStyle: 'double', borderLeftColor: 'text.disabled' } as const;
 const mono = { fontFamily: fontFamilyMono, fontVariantNumeric: 'tabular-nums' } as const;
+// The ring column and the ring totals stay in view while the phases scroll between them.
+const stickyStart = { position: 'sticky', left: 0, zIndex: 1, bgcolor: 'background.paper' } as const;
+const stickyEnd = { position: 'sticky', right: 0, zIndex: 1 } as const;
 
 export default function SplitGrid({ intersection, pattern, path, issues }: SplitGridProps) {
   const editIntersection = useWorkspace((st) => st.editIntersection);
@@ -72,10 +76,11 @@ export default function SplitGrid({ intersection, pattern, path, issues }: Split
 
   const cell = (n: number, phase: Phase) => {
     const cellPath = [...splitsPath, String(n)];
-    const min = splitMinimums(phase);
+    const min = splitMinimums(phase, intersection.redAmber);
+    const ra = intersection.redAmber > 0 && phase.movement.kind !== 'pedestrian' ? 'red+amber + ' : '';
     const minTip =
-      `Minimum ${phase.movement.kind === 'pedestrian' ? 'yellow + red clear' : 'green + yellow + red clear'}: ${s(min.vehicle)} s` +
-      (min.pedestrian === null ? '' : `\nWalk + pedestrian clearance + yellow + red clear: ${s(min.pedestrian)} s${phase.pedestrian.recall ? ' (pedestrian recall)' : ''}`);
+      `Minimum ${phase.movement.kind === 'pedestrian' ? 'yellow + red clear' : `${ra}green + yellow + red clear`}: ${s(min.vehicle)} s` +
+      (min.pedestrian === null ? '' : `\n${ra ? 'Red+amber + walk' : 'Walk'} + pedestrian clearance + yellow + red clear: ${s(min.pedestrian)} s${phase.pedestrian.recall ? ' (pedestrian recall)' : ''}`);
     return (
       <>
         <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.5, px: 0.5 }}>
@@ -87,7 +92,7 @@ export default function SplitGrid({ intersection, pattern, path, issues }: Split
               coord
             </Typography>
           ) : null}
-          <Typography variant="caption" noWrap sx={{ color: 'text.secondary', minWidth: 0 }}>
+          <Typography variant="caption" noWrap title={phase.label} sx={{ color: 'text.secondary', minWidth: 0 }}>
             {phase.label}
           </Typography>
         </Box>
@@ -134,11 +139,11 @@ export default function SplitGrid({ intersection, pattern, path, issues }: Split
         </Box>
       ) : null}
 
-      <Box sx={{ overflowX: 'auto', opacity: free ? 0.6 : 1 }}>
+      <ScrollArea sx={{ opacity: free ? 0.6 : 1 }}>
         <Box component="table" sx={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: 13, width: '100%' }}>
           <thead>
             <tr>
-              <Box component="th" scope="col" sx={{ ...headCell, width: 64 }}>
+              <Box component="th" scope="col" sx={{ ...headCell, ...stickyStart, width: 56 }}>
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                   Ring
                 </Typography>
@@ -150,7 +155,7 @@ export default function SplitGrid({ intersection, pattern, path, issues }: Split
                   </Typography>
                 </Box>
               ))}
-              <Box component="th" scope="col" sx={{ ...headCell, ...barrierEdge, textAlign: 'right' }}>
+              <Box component="th" scope="col" sx={{ ...headCell, ...barrierEdge, ...stickyEnd, bgcolor: 'background.paper', textAlign: 'right' }}>
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                   Ring total
                 </Typography>
@@ -160,7 +165,7 @@ export default function SplitGrid({ intersection, pattern, path, issues }: Split
           <tbody>
             {rows.map((row, r) => (
               <Box component="tr" key={r} sx={{ '& > td, & > th': { borderBottom: 1, borderColor: 'divider' } }}>
-                <Box component="th" scope="row" sx={{ px: 1, textAlign: 'left', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                <Box component="th" scope="row" sx={{ px: 1, textAlign: 'left', fontWeight: 600, whiteSpace: 'nowrap', ...stickyStart }}>
                   {r + 1}
                 </Box>
                 {row.map((groupPhases, g) => {
@@ -195,7 +200,7 @@ export default function SplitGrid({ intersection, pattern, path, issues }: Split
                     </Fragment>
                   );
                 })}
-                <Box component="td" sx={{ ...totalCell, ...barrierEdge }}>
+                <Box component="td" sx={{ ...totalCell, ...barrierEdge, ...stickyEnd, color: ringTotal(r) === pattern.cycle || free ? 'text.primary' : 'error.main', fontWeight: ringTotal(r) === pattern.cycle || free ? 400 : 600 }}>
                   <div>{s(ringTotal(r))}</div>
                   {ringWait(r) > 0 ? (
                     <Box sx={{ color: 'text.secondary', fontSize: 11 }}>incl. {s(ringWait(r))} s wait</Box>
@@ -204,7 +209,7 @@ export default function SplitGrid({ intersection, pattern, path, issues }: Split
               </Box>
             ))}
             <tr>
-              <Box component="th" scope="row" sx={{ px: 1, textAlign: 'left', fontWeight: 400, color: 'text.secondary', whiteSpace: 'nowrap' }}>
+              <Box component="th" scope="row" sx={{ px: 1, textAlign: 'left', fontWeight: 400, color: 'text.secondary', whiteSpace: 'nowrap', ...stickyStart }}>
                 Group
               </Box>
               {columns.map((count, g) => (
@@ -219,13 +224,13 @@ export default function SplitGrid({ intersection, pattern, path, issues }: Split
                   ) : null}
                 </Box>
               ))}
-              <Box component="td" sx={{ ...totalCell, ...barrierEdge, fontWeight: 600 }}>
+              <Box component="td" sx={{ ...totalCell, ...barrierEdge, ...stickyEnd, fontWeight: 600 }}>
                 {s(splitsTotal)} s
               </Box>
             </tr>
           </tbody>
         </Box>
-      </Box>
+      </ScrollArea>
 
       <Box id={fieldId(splitsPath)} tabIndex={-1} sx={{ px: 1.5, py: 1, display: 'flex', flexDirection: 'column', gap: 0.5, outline: 'none' }}>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3, fontSize: 13 }}>

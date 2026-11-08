@@ -6,6 +6,7 @@ import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import ScrollArea from '../../components/ScrollArea';
 import { saturationFlow } from '../../../engine';
 import {
   fromMetres,
@@ -75,7 +76,7 @@ export default function LaneGroupsSection({ intersection, basePath, issues, leng
         </>
       }
     >
-      <Box sx={{ overflowX: 'auto' }}>
+      <ScrollArea>
         <Box component="table" aria-label="Lane groups" sx={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: 13, width: '100%', minWidth: 760 }}>
           <thead>
             <tr>
@@ -182,7 +183,7 @@ export default function LaneGroupsSection({ intersection, basePath, issues, leng
             })}
           </tbody>
         </Box>
-      </Box>
+      </ScrollArea>
       <Typography variant="caption" component="p" sx={{ color: 'text.secondary', px: 1.5, py: 1, m: 0 }}>
         Saturation flow (veh/h of green) is calculated from the base flow per lane with the HCM lane width, heavy vehicle, grade, area type, lane utilization and turn factors. Shown here without turn shares; the analysis uses each count&apos;s turning volumes.
       </Typography>

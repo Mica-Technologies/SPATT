@@ -19,7 +19,7 @@ describe('exportCsm — standard eight-phase, hand-worked', () => {
       number: 1, enabled: true, barrier: 0,
       minGreen: 100, passage: 40, maxGreen: 400, maxGreen2: 0, yellow: 70, redClear: 30,
       addedInitial: 0, maxInitial: 0, minGap: 0, timeBeforeReduce: 0, timeToReduce: 0,
-      recall: 'NONE', pedRecall: false, restInWalk: false, dualEntry: false, conditionalService: false, lockCall: false,
+      recall: 'NONE', pedRecall: false, restInWalk: false, dualEntry: false, conditionalService: false, lockCall: false, exclusions: [],
       label: 'WB Left',
     });
     // Phase 2 has pedestrian service: walk 7.0 s, clearance 18.0 s.
@@ -83,11 +83,10 @@ describe('checkCsm', () => {
   it('reports what the controller cannot express', () => {
     const intersection = standardEightPhase();
     intersection.phases[1]!.maxGreen1 = 6010; // 601 s
-    intersection.phases[2]!.recall = 'maximum';
     intersection.schedule.push({ startMinute: 12 * 60 + 30, patternId: 'am-peak' });
     intersection.patterns[0]!.forceOffMode = 'floating';
     intersection.phases[3]!.maxGreen2 = 400;
-    expect(codes(intersection).sort()).toEqual(['csm.floating-force-off', 'csm.max-recall', 'csm.max2-in-coordination', 'csm.schedule-not-on-the-hour', 'csm.value-too-long'].sort());
+    expect(codes(intersection).sort()).toEqual(['csm.floating-force-off','csm.max2-in-coordination', 'csm.schedule-not-on-the-hour', 'csm.value-too-long'].sort());
     expect(checkCsm(intersection).find((i) => i.code === 'csm.value-too-long')?.path).toEqual(['phases', 1, 'maxGreen1']);
   });
 
@@ -146,12 +145,61 @@ describe('importCsm', () => {
     const result = importCsm({ format: 'csm-asc3-plan', formatVersion: 2 }, { id: 'x' });
     expect(result.ok).toBe(false);
     expect(result.issues[0]!.code).toBe('csm.invalid-plan');
+    expect(importCsm({ ...exported(twoPhase()), formatVersion: 3 }, { id: 'x' })).toMatchObject({ ok: false, issues: [{ code: 'csm.invalid-plan' }] });
+  });
+
+  it('reads a version 1 plan, its one priority plan becoming the list', () => {
+    const { priorities: _, ...v2 } = exported(standardEightPhase());
+    const v1 = { ...v2, formatVersion: 1, priority: { en: true } };
+    const imported = importCsm(JSON.stringify(v1), { id: 'x' });
+    if (!imported.ok) throw new Error(imported.issues.map((i) => i.message).join('\n'));
+    const again = exported(imported.intersection);
+    expect(again.formatVersion).toBe(2);
+    expect(again.priorities).toEqual([{ en: true }]);
+    expect(again).not.toHaveProperty('priority');
+  });
+
+  it('exports red+amber and green flash in ticks, limited to the controller choices, and imports them back', () => {
+    const intersection = standardEightPhase();
+    intersection.redAmber = 15;
+    intersection.greenFlash = 25;
+    expect(codes(intersection)).toEqual(['csm.red-amber-value', 'csm.green-flash-value']);
+    intersection.redAmber = 20;
+    intersection.greenFlash = 30;
+    const plan = exported(intersection);
+    expect([plan.redAmber, plan.greenFlash]).toEqual([40, 60]);
+    const imported = importCsm(plan, { id: 'x' });
+    if (!imported.ok) throw new Error('import failed');
+    expect([imported.intersection.redAmber, imported.intersection.greenFlash]).toEqual([20, 30]);
+    const { redAmber: _r, greenFlash: _g, ...without } = plan;
+    const plain = importCsm(without, { id: 'x' });
+    expect(plain.ok && [plain.intersection.redAmber, plain.intersection.greenFlash]).toEqual([0, 0]);
+  });
+
+  it('exports phase exclusions from both sides of each pair and imports them back', () => {
+    const intersection = standardEightPhase();
+    intersection.phases[0]!.exclusions = [6]; // only phase 1 lists the pair
+    const plan = exported(intersection);
+    expect([plan.phases[0]!.exclusions, plan.phases[5]!.exclusions, plan.phases[1]!.exclusions]).toEqual([[6], [1], []]);
+    plan.phases[2]!.exclusions = [3, 7, 7];
+    const imported = importCsm(plan, { id: 'x' });
+    if (!imported.ok) throw new Error('import failed');
+    expect(imported.intersection.phases.map((p) => p.exclusions)).toEqual([[6], [], [7], [], [], [1], [], []]);
+  });
+
+  it('imports a PROTECTED (bus, train, bike) phase as an other movement and exports it back', () => {
+    const plan = exported(standardEightPhase());
+    plan.phases[3]!.movement = 'PROTECTED';
+    const imported = importCsm(plan, { id: 'x' });
+    if (!imported.ok) throw new Error('import failed');
+    expect(imported.intersection.phases[3]!.movement.kind).toBe('other');
+    expect(exported(imported.intersection).phases[3]!.movement).toBe('PROTECTED');
   });
 
   it('keeps controller data SPATT does not model and gives it back on export', () => {
     const plan = exported(standardEightPhase());
     plan.overlaps = [{ en: true, oc: 4, in: [2, 3] }];
-    plan.priority = { en: false };
+    plan.priorities = [{ en: false }, { en: true, td: true, qj: 80 }];
     plan.phases[5]!.flash = 'RED';
     plan.phases[0]!.walk = 140; // a phase without pedestrian signals still has timers on the controller
     plan.phases[0]!.pedClear = 200;
@@ -161,7 +209,7 @@ describe('importCsm', () => {
     expect(imported.intersection.phases[0]!.pedestrian.enabled).toBe(false);
     const again = exported(imported.intersection);
     expect(again.overlaps).toEqual(plan.overlaps);
-    expect(again.priority).toEqual(plan.priority);
+    expect(again.priorities).toEqual(plan.priorities);
     expect(again.phases[5]!.flash).toBe('RED');
     expect(again.phases[0]).toMatchObject({ walk: 140, pedClear: 200 });
     expect(again.preempts).toBeUndefined();

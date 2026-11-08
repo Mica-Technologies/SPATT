@@ -28,19 +28,46 @@ in version control. The format is documented in [Project File Format](../develop
 
 - **Sidebar.** The project's intersections. **Add intersection** starts from a template: a
   standard eight-phase intersection, eight-phase with a lagging left, a split-phased side street,
-  two-phase, or the CSM ASC-3 controller's defaults, or imports a plan from that controller.
-  Each intersection's menu renames, duplicates, exports for the controller, or deletes it (see
-  [CSM ASC-3](../profiles/csm-asc3.md)).
-- **Tabs.** Phases, Rings & Barriers, Patterns, Schedule and Volumes, described below.
+  two-phase, or the CSM ASC-3 controller's defaults, or imports a plan from that controller or
+  intersections from a Synchro UTDF file ([Importing](imports.md)). An empty project offers the
+  same templates in the main area. A template whose name is already taken asks for a new name.
+  Each intersection's menu renames, duplicates, compares its plans
+  ([Comparing plans](#comparing-plans)), imports counts from CSV, exports for the controller, or
+  deletes it (see [CSM ASC-3](../profiles/csm-asc3.md)). On narrow windows the sidebar is a
+  drawer, opened with the menu button at the left of the header.
+- **Header.** Undo and redo, then the timing sheet, **Export**, the diagram toggle, project
+  **Settings** and **All projects** (back to the library). Wide windows label these buttons;
+  narrower ones show icons with tooltips, and phones put them in the **More actions** menu.
+- **Tabs.** Phases, Rings & Barriers, Patterns, Schedule, Volumes and Simulate, described below
+  and in [Simulation](simulation.md). A tab with problems shows their count.
 - **Ring-barrier diagram.** Docked on the right on wide windows (toggle it from the header). See
-  [The ring-barrier diagram](#the-ring-barrier-diagram) below.
+  [The ring-barrier diagram](#the-ring-barrier-diagram) below. The same panel switches to
+  [the intersection view](#the-intersection-view).
 - **Problems.** Every validation error and warning in the project. Click one to jump to the field
   it is about. A plan with errors still opens and saves, so it can be fixed.
 - **Undo and redo.** Every edit is one step: the header buttons, or ++ctrl+z++ and ++ctrl+y++ when
   the cursor is not in a text field.
 
 Values are entered in seconds and stored to the tenth. Grid fields commit when you press
-++enter++ or leave the field; ++esc++ puts the old value back.
+++enter++ or leave the field; ++esc++ puts the old value back. A grid wider than the window
+scrolls sideways inside its own panel; a fade and an arrow at the edge show there is more.
+
+### Keyboard shortcuts
+
+Press ++"?"++ (or the keyboard button in the header) for this list in the app. Apart from
+++ctrl+enter++, shortcuts do nothing while you are typing in a field.
+
+| Keys | Does |
+|---|---|
+| ++ctrl+z++ | Undo |
+| ++ctrl+y++ or ++ctrl+shift+z++ | Redo |
+| ++alt+1++ to ++alt+6++ | Go to a tab: Phases to Simulate, or a corridor's tabs |
+| ++ctrl+enter++ | Simulate tab: run the simulation |
+| ++space++ | Simulate tab: play or pause the playback |
+| ++"?"++ | Show the shortcuts |
+
+On a Mac use ++cmd++ for ++ctrl++ and ++option++ for ++alt++. The first ++tab++ on a page offers
+**Skip to editor**, which jumps past the header.
 
 ## Phases
 
@@ -119,7 +146,9 @@ The Volumes tab holds what the intersection's timing is designed for:
   phases** makes one per phase that has none. The saturation flow column shows the calculated
   value; type a number to override it, and clear it to calculate again.
 - **Counts.** Named sets of hourly volumes per lane group and movement (AM peak, PM peak), each with
-  a peak hour factor. The first count you add is linked to the intersection's patterns. A pattern's
+  a peak hour factor. The first count you add is linked to the intersection's patterns.
+  **Import CSV…** reads a turning-movement count file and adds its peak hour (see
+  [Importing](imports.md#turning-movement-counts)). A pattern's
   count can be changed on the Patterns tab or here.
 - **Analysis.** For the selected pattern and its count: v/c, delay and level of service per lane
   group, intersection delay, the critical flow ratio Y, lost time and Webster's cycle.
@@ -155,9 +184,54 @@ the offset, and the coordinated phases' green is shaded where it falls. Two inte
 same cycle whose coordinated greens line up on this strip turn green together.
 
 A pattern with timing errors, such as a split shorter than minimum green, is still drawn with the
-affected phases outlined in red. When the layout itself is undefined (rings that would miss a
-barrier, splits that do not add up to the cycle, no coordinated phase, a split too short for its
-own yellow and red clearance) the panel asks you to fix those problems first.
+affected phases outlined in red. When the splits do not add up to the cycle, the diagram is drawn
+over the splits' total with the entered cycle marked by a dashed red line, and the overrun (or the
+part of the cycle no split covers) hatched in red; the cycle clock and force-offs return once the
+two match. When the layout itself is undefined (rings that would miss a barrier, no coordinated
+phase, a split too short for its own yellow and red clearance) the panel asks you to fix those
+problems first.
+
+## The intersection view
+
+Switch the diagram panel from **Ring-barrier** to **Intersection** to see the selected pattern as
+signals on a drawing of the intersection. **Plan** draws it from above; **Oblique** draws the same
+layout from above the south-east corner, with the signal poles and heads standing up.
+
+Every vehicle head and the stop bar in front of its lanes show the phase's interval: green, yellow,
+or red (red clearance included). Pedestrian heads at each end of a crosswalk show walk (white)
+or don't walk (orange); the hand flashes during pedestrian clearance while the cycle plays. Drag
+the **cycle time** slider (arrow keys step 0.1 s, Page Up and Page Down 5 s) or press **Play** to
+run through the cycle in real time. With reduced motion turned on in your system, playback steps
+once a second and nothing flashes. The time is local time, measured from the pattern's offset
+reference, as on the ring-barrier diagram.
+
+The drawing is schematic, inferred from what the plan already holds:
+
+- **Legs** come from the phases' directions of travel. A leg is drawn on every side traffic arrives
+  from, and every side a through movement leaves on, so a T intersection has three legs. Phases
+  with no direction are placed by standard NEMA numbering (2 and 6 eastbound and westbound, 4 and
+  8 southbound and northbound, the odd phases their opposing lefts), and the view says so.
+- **Lanes** come from the lane groups on the Volumes tab: their lane counts, widths and movements,
+  left turns nearest the centre line. An approach without lane groups gets one lane per turn phase
+  and two through lanes. Opposite a left-turn lane, a painted median keeps the through lanes in
+  line.
+- **Size.** When a through phase has an intersection width in its clearance calculation, its stop
+  bar is set back to match; when a pedestrian phase has a crossing distance and the leg has no lane
+  groups, its lanes are sized to fit.
+- **Crosswalks** are drawn for phases with pedestrian service, across the leg on the right of the
+  phase's traffic (the eastbound phase's walk crosses the south leg), or on its left when that leg
+  does not exist. A pedestrian phase with no direction crosses every leg.
+- **Signal heads**: one per phase on each approach, on a mast arm over the lanes it serves, with
+  the phase number painted on those lanes.
+- **Overlaps** get a head of their own beside the phase heads, on the approach of an included
+  right-turn or through phase (the usual right-turn overlap), else of the first included phase.
+  An overlap is green while an included phase is green and through the change from one included
+  phase to the next, then runs its trail green and clears with its trail yellow and red, or those
+  of the phase it ended with. A minus green-yellow overlap is not green while a modifier phase is
+  green or yellow.
+
+A free pattern has no fixed cycle, and a pattern with problems that stop the ring-barrier diagram
+cannot be projected either; the intersection is still drawn, with every head dark.
 
 ## Timing sheets
 
@@ -168,7 +242,8 @@ The print button in the header opens the timing sheet preview. Choose **This int
 save a PDF. Each sheet has:
 
 - the phase timing table, with the same fields as the Phases tab;
-- the ring and barrier structure;
+- the ring and barrier structure, beside a schematic plan of the intersection (its lanes,
+  crosswalks and signal heads, as in the [intersection view](#the-intersection-view));
 - each pattern's cycle, offset and its reference, coordinated phases, splits, green starts and
   force-offs in local time, its ring-barrier diagram with a legend, and its cycle clock;
 - the daily schedule with end times and durations;
@@ -178,3 +253,33 @@ save a PDF. Each sheet has:
 
 Sheets always print in light colours, and every intersection starts on a new page. **Back to
 editor** returns to where you were.
+
+## Comparing plans
+
+**Compare…** in a pattern's menu on the Patterns tab, or **Compare plans…** in an intersection's
+menu in the sidebar, opens a side-by-side comparison of two timing plans:
+
+- **A** is a pattern of an intersection in the open project.
+- **B** is another pattern of **This project** (by default the same intersection's next
+  pattern), or a pattern of **Another project** in the library. With another project, SPATT
+  picks the intersection with the same name (ignoring case and spacing) and the pattern with the
+  same name, and says so when there is no such intersection. The other project is only read,
+  never changed.
+
+The comparison lists:
+
+- the pattern settings: mode, cycle, offset and its reference, coordinated phases, max green
+  and force-off mode, with the change in seconds. When the offset references differ, B's offset
+  is also given against A's reference, which shows whether the timing on the ground moved;
+- the phase order in each ring, barrier groups separated by `|`;
+- per phase: split, lead or lag, minimum green, passage, Max 1 and Max 2, yellow, red clearance,
+  recall, walk, pedestrian clearance and pedestrian recall. Phases are matched by number; a phase
+  defined on one side only is marked **A only** or **B only**;
+- both ring-barrier diagrams, stacked on one time scale;
+- when both patterns are linked to a count: v/c, delay and level of service per lane group and
+  for the intersection, with the change (higher in the error colour, lower in the success
+  colour). Across projects, lane groups are matched by phase and label.
+
+Changed values are highlighted and shown as *A → B*. **Only differences** hides the rows that
+match, **Swap** exchanges A and B within one project, and **Print** prints the comparison in
+light colours like a timing sheet.

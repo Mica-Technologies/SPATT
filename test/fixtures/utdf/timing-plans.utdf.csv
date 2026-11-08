@@ -1,0 +1,32 @@
+[Nodes]
+Node Data
+INTID,TYPE,X,Y,Z,DESCRIPTION,CBD
+5,0,0,0,0,Oak Rd & Pine St,0
+
+[Timeplans]
+Timing Plan Settings
+RECORDNAME,INTID,PLANID,DATA
+Control Type,5,AM,3
+Cycle Length,5,AM,80.0
+Referenced To,5,AM,0
+Reference Phase,5,AM,2
+Offset,5,AM,10.0
+Control Type,5,PM,3
+Cycle Length,5,PM,90.0
+Referenced To,5,PM,2
+Reference Phase,5,PM,2
+Offset,5,PM,20.0
+Control Type,5,NIGHT,2
+Cycle Length,5,NIGHT,60.0
+
+[Phases]
+Phasing Data
+RECORDNAME,INTID,PLANID,D2,D4
+MinGreen,5,,10.0,7.0
+MaxGreen,5,,30.0,20.0
+VehExt,5,,3.0,3.0
+Yellow,5,,4.0,3.5
+AllRed,5,,1.0,1.0
+Recall,5,,1,0
+MaxGreen,5,AM,45.0,25.5
+MaxGreen,5,PM,50.0,30.5

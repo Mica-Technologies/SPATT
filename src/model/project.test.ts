@@ -44,7 +44,7 @@ describe('loadProject', () => {
   it('writes stable, diffable text', () => {
     const text = saveProject(sampleProject());
     expect(text.endsWith('}\n')).toBe(true);
-    expect(text).toContain('\n  "schemaVersion": 3,\n');
+    expect(text).toContain('\n  "schemaVersion": 4,\n');
   });
 
   it('rejects text that is not JSON', () => {
@@ -60,7 +60,7 @@ describe('loadProject', () => {
   });
 
   it('refuses files from a newer SPATT instead of misreading them', () => {
-    const result = load({ ...sampleProject(), schemaVersion: 4 });
+    const result = load({ ...sampleProject(), schemaVersion: 5 });
     expect(result.ok).toBe(false);
     expect(result.issues[0]).toMatchObject({ code: 'file.newer-version', path: ['schemaVersion'] });
   });
@@ -71,7 +71,7 @@ describe('loadProject', () => {
     const result = load(v1);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.project.schemaVersion).toBe(3);
+    expect(result.project.schemaVersion).toBe(4);
     expect(result.project.corridors).toEqual([
       {
         id: 'main-st',
@@ -95,6 +95,12 @@ describe('loadProject', () => {
       intersections: v3.intersections.map(({ capacity: _c, laneGroups: _l, volumeSets: _v, ...rest }) => ({ ...rest, patterns: rest.patterns.map(({ volumeSetId: _s, ...p }) => p) })),
     };
     expect(load(v2)).toEqual({ ok: true, project: v3, issues: [] });
+  });
+
+  it('migrates a version 3 file: phases gain an empty exclusion list, intersections no red+amber or green flash', () => {
+    const v4 = sampleProject();
+    const v3 = { ...v4, schemaVersion: 3, intersections: v4.intersections.map(({ redAmber: _r, greenFlash: _g, ...i }) => ({ ...i, phases: i.phases.map(({ exclusions: _e, ...p }) => p) })) };
+    expect(load(v3)).toEqual({ ok: true, project: v4, issues: [] });
   });
 
   it('reports shape errors with their path', () => {

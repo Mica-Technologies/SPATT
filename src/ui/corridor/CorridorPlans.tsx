@@ -14,6 +14,7 @@ import ListItemText from '@mui/material/ListItemText';
 import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import ScrollArea from '../components/ScrollArea';
 import { formatSeconds, newCorridorPlan, randomId, uniqueName, type Corridor, type Issue, type Project } from '../../model';
 import IssueList from '../dialogs/IssueList';
 import { SelectInput, TextInput } from '../fields/GridInputs';
@@ -131,7 +132,7 @@ export default function CorridorPlans({ project, corridor, corridorIndex, issues
             </Button>
           </Stack>
 
-          <Box sx={{ overflowX: 'auto', border: 1, borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper' }}>
+          <ScrollArea sx={{ border: 1, borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper' }}>
             <Box component="table" sx={{ borderCollapse: 'separate', borderSpacing: 0, width: '100%' }}>
               <thead>
                 <tr>
@@ -182,7 +183,7 @@ export default function CorridorPlans({ project, corridor, corridorIndex, issues
                 })}
               </tbody>
             </Box>
-          </Box>
+          </ScrollArea>
           <Typography id={fieldId([...base, 'patterns'])} tabIndex={-1} variant="caption" sx={{ color: 'text.secondary', outline: 'none' }}>
             Offsets belong to each intersection&apos;s pattern: changing them here, on the time-space diagram or with offset optimization changes that pattern.
           </Typography>

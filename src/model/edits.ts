@@ -43,6 +43,9 @@ export function addPhase(intersection: Intersection, number: number): Phase {
 export function removePhase(intersection: Intersection, number: number): void {
   const without = (list: number[]) => list.filter((n) => n !== number);
   intersection.phases = intersection.phases.filter((p) => p.number !== number);
+  for (const phase of intersection.phases) {
+    phase.exclusions = without(phase.exclusions);
+  }
   for (const ring of intersection.rings) {
     ring.groups = ring.groups.map(without);
   }

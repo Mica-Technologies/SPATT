@@ -1,6 +1,6 @@
 {
   "format": "csm-asc3-plan",
-  "formatVersion": 1,
+  "formatVersion": 2,
   "generator": "SPATT",
   "name": "Elm St & 3rd Ave",
   "phases": [
@@ -25,6 +25,7 @@
       "dualEntry": false,
       "conditionalService": false,
       "lockCall": false,
+      "exclusions": [],
       "label": "EB",
       "walk": 140,
       "pedClear": 320
@@ -50,6 +51,7 @@
       "dualEntry": false,
       "conditionalService": false,
       "lockCall": false,
+      "exclusions": [],
       "label": "SB",
       "walk": 140,
       "pedClear": 240
@@ -75,6 +77,7 @@
       "dualEntry": false,
       "conditionalService": false,
       "lockCall": false,
+      "exclusions": [],
       "label": "WB",
       "walk": 140,
       "pedClear": 320
@@ -100,6 +103,7 @@
       "dualEntry": false,
       "conditionalService": false,
       "lockCall": false,
+      "exclusions": [],
       "label": "NB",
       "walk": 140,
       "pedClear": 240
@@ -150,5 +154,7 @@
       6,
       6
     ]
-  }
+  },
+  "redAmber": 0,
+  "greenFlash": 0
 }

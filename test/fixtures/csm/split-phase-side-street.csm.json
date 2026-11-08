@@ -1,6 +1,6 @@
 {
   "format": "csm-asc3-plan",
-  "formatVersion": 1,
+  "formatVersion": 2,
   "generator": "SPATT",
   "name": "Harbor Rd & Split Ave",
   "phases": [
@@ -25,6 +25,7 @@
       "dualEntry": false,
       "conditionalService": false,
       "lockCall": false,
+      "exclusions": [],
       "label": "WB Left"
     },
     {
@@ -48,6 +49,7 @@
       "dualEntry": false,
       "conditionalService": false,
       "lockCall": false,
+      "exclusions": [],
       "label": "EB Thru",
       "walk": 140,
       "pedClear": 360
@@ -73,6 +75,7 @@
       "dualEntry": false,
       "conditionalService": false,
       "lockCall": false,
+      "exclusions": [],
       "label": "SB All",
       "walk": 140,
       "pedClear": 280
@@ -98,6 +101,7 @@
       "dualEntry": false,
       "conditionalService": false,
       "lockCall": false,
+      "exclusions": [],
       "label": "EB Left"
     },
     {
@@ -121,6 +125,7 @@
       "dualEntry": false,
       "conditionalService": false,
       "lockCall": false,
+      "exclusions": [],
       "label": "WB Thru",
       "walk": 140,
       "pedClear": 360
@@ -146,6 +151,7 @@
       "dualEntry": false,
       "conditionalService": false,
       "lockCall": false,
+      "exclusions": [],
       "label": "NB All",
       "walk": 140,
       "pedClear": 280
@@ -200,5 +206,7 @@
       6,
       6
     ]
-  }
+  },
+  "redAmber": 0,
+  "greenFlash": 0
 }

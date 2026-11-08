@@ -10,8 +10,8 @@ import type { Corridor, Intersection, Project } from '../../model';
 
 export type WorkspaceTab = 'phases' | 'rings' | 'patterns' | 'schedule' | 'volumes' | 'simulate';
 
-/** The editor, or the printable timing sheet preview. */
-export type WorkspaceView = 'editor' | 'sheet';
+/** The editor, the printable timing sheet preview, or the plan comparison. */
+export type WorkspaceView = 'editor' | 'sheet' | 'compare';
 
 export type CorridorTab = 'layout' | 'plans' | 'progression';
 

@@ -7,7 +7,7 @@ src/
 ├── model/        timing plan types, schema and validation      ┐
 ├── engine/       timing math: cycle projection, offsets, bands  ├ pure TypeScript
 ├── profiles/     controller dialects (profiles/csm)             ┘
-├── io/           host detection, project storage adapters
+├── io/           host detection, project storage adapters, file imports (import/)
 ├── ui/           the SPATT interface (React + MUI, Mica theme)
 └── manager/      the desktop manager window
 crates/
@@ -40,6 +40,19 @@ Scripts are Node or Rust, never shell-specific, so every command works on every 
 turns a pattern into interval times; the ring-barrier diagram, the cycle clock and the timing
 sheet (`src/ui/diagram`, `src/ui/sheet`) only draw what it returns. It refuses layouts it cannot
 draw honestly and passes the remaining errors along, so every view agrees on what is drawable.
+The intersection view follows the same split: `src/engine/scene` infers the geometry
+(`buildScene`, metres, x east and y south), reads each phase's interval from a projection
+(`headStatesAt`) and holds the isometric projection; `src/ui/intersection` only draws it.
+Overlap signals come from one helper (`src/engine/overlaps.ts`) over a timeline of phase signals,
+fed by the projection in the intersection view and by the trace in the simulator.
+
+**Simulation playback draws positions it is given.** On request (`detail`), `simulate` records
+every vehicle (lane group, movement, arrival and departure ticks) and every pushbutton press, with
+movements from a random stream of their own so the run is unchanged. `prepareTraffic` and
+`trafficAt` (`src/engine/scene/traffic.ts`) place them on the scene at a moment: lane, queue slot,
+turn path (`scene.turnPaths`). The playback keeps its exact cursor in a ref; a canvas layer
+between the road and signal SVGs reads it every animation frame and redraws without React, while
+React state follows a few times a second for the heads, the timeline and the accessible summaries.
 
 **Printing is the browser's.** The timing sheet is ordinary HTML with print CSS (`@page` size,
 page breaks, a forced light colour scheme) and `window.print()`. That opens the print dialog in a

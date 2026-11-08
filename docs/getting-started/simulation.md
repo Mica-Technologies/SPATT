@@ -18,7 +18,7 @@ The simulation needs lane groups and a count, both set up on the **Volumes** tab
 - **Pushbutton calls per hour** for each phase with pedestrian service. Phases on pedestrian
   recall are called every cycle regardless.
 
-**Run** simulates in the background. An hour takes well under a second.
+**Run** (or ++ctrl+enter++) simulates in the background. An hour takes well under a second. A count\nwhose volumes are all zero has no traffic to simulate: the tab says so and links to the Volumes tab.
 
 ## What is simulated
 
@@ -47,7 +47,13 @@ A generic dual-ring actuated controller built from SPATT's own plan:
   Pedestrian walk and clearance follow when called, then yellow and red clearance.
 - **Choosing the next phase.** Phases without a call are skipped. Rings cross a barrier together,
   once every ring in the group is ready, to the next group with a call. A dual-entry phase times in
-  a ring that has no call in that group.
+  a ring that has no call in that group. A phase excluded beside the phase another ring is timing
+  waits until that phase has cleared, and the other phase ends as soon as it can. The CSM ASC-3
+  controller does the same.
+- **Red+amber and green flash.** Red+amber runs before each vehicle green and holds its timers
+  and its walk. The green flash is the end of the green: minimum and max green, force-offs and
+  coordinated yields come that much sooner, then the green flashes and turns yellow. The CSM ASC-3
+  controller does the same, running red+amber after any delayed green.
 - **Recalls.** Minimum recall places a constant call. Maximum recall also stops the phase gapping
   out. Soft recall calls only when nothing else is calling. Pedestrian recall calls the walk every
   time.
@@ -57,7 +63,9 @@ A generic dual-ring actuated controller built from SPATT's own plan:
   minimum green, and a called walk, fits before its force-off. Time a phase doesn't use goes to the
   phases after it.
 
-Not modelled: conditional service, preemption and overlaps. The max timer runs while a conflicting
+Not modelled: conditional service and preemption. Overlaps are shown in playback, worked out from
+their included phases as in the [intersection view](editor.md#the-intersection-view), but lane groups still move on their
+own phase's green, so an overlap does not serve traffic. The max timer runs while a conflicting
 call is waiting and holds, rather than resets, if the call goes away.
 
 ### CSM ASC-3
@@ -69,10 +77,16 @@ windows and their rounding are the controller's own. Where it differs from the N
 - **Timing.** The controller runs every 2 ticks (0.1 s), and every interval lasts at least one run.
 - **Detection and the max timer.** Detection is presence only. The max timer starts on the first
   green run that sees a conflicting call, and resets if the call goes away.
-- **Recalls.** Maximum recall behaves like minimum recall. The pedestrian recall setting adds a
-  walk to a phase that runs anyway, but does not call the phase; recall mode *Pedestrian* does.
+- **Recalls.** Maximum recall extends the green as a waiting vehicle would, so the phase runs to
+  its max green when a conflicting call is waiting. The pedestrian recall setting adds a walk to a
+  phase that runs anyway, but does not call the phase; recall mode *Pedestrian* does.
+- **Barrier hold.** A green whose only opposing calls are across the barrier holds while the other
+  ring still has work in the barrier group, then both rings end together. Force-offs and
+  coordinated yields are not held. A dual-entry phase riding beside the other ring ends with it,
+  without waiting to gap out.
 - **Calls during coordination.** A non-coordinated phase's call is only accepted inside its window,
-  up to its force-off point, and then latches. When a green ends, every waiting conflicting call is
+  up to its force-off point, and then latches. A phase whose ring skipped the phases ahead of it in
+  the barrier group (they had no call) takes their time: its window starts where theirs did. When a green ends, every waiting conflicting call is
   committed and will be served.
 - **Coordinated phases.** They yield when their green has run to the yield point, measured from
   where the green started. A coordinated green that starts late holds for most of a cycle. It can
@@ -80,14 +94,16 @@ windows and their rounding are the controller's own. Where it differs from the N
 - **Pedestrian and conditional service.** A press during walk is lost when the flashing don't walk
   starts. Conditional service has no time check.
 - **Rest.** With no calls anywhere, the controller rests on the coordinated phases even when free.
+  A resting phase still maxes out once a conflicting call is waiting, but is not forced off.
 
 !!! warning "A return to the main street before a side-street through"
-    With coordination, a phase that ends before the next phase's window opens leaves its barrier
-    with no accepted call, because calls only register inside windows. A typical case is a
-    side-street left turn gapping out at its minimum. The controller goes back to the coordinated
-    phases for their minimum green and then clears to the side street again. The background cycle
-    holds, but main-street traffic gets an extra stop and the side street waits longer. The NEMA
-    controller starts the next phase early instead. This follows the mod's code and is waiting to be
+    With coordination, a phase that is served but ends before the next phase's window opens leaves
+    its barrier with no accepted call, because calls only register inside windows. A typical case
+    is a side-street left turn gapping out at its minimum. The controller goes back to the
+    coordinated phases for their minimum green and then clears to the side street again. The
+    background cycle holds, but main-street traffic gets an extra stop and the side street waits
+    longer. The NEMA controller starts the next phase early instead. A left with no call does not
+    cause this: the through takes its time. This follows the mod's code and is waiting to be
     confirmed in the game.
 
 Simplifications: every phase has its own detector and pushbutton, so there are no calls from
@@ -108,6 +124,32 @@ and time-of-day pattern changes are not simulated.
 ## Playback
 
 The playback draws each ring's phases over a three-minute window: green and yellow bars on red,
-with walk and pedestrian clearance as a thin strip underneath. Drag the slider, or press play at 1,
-5, 20 or 60 times real time. Under the diagram are each phase's signal and each lane group's queue
-at the cursor.
+with walk and pedestrian clearance as a strip underneath. Drag the slider, or press play (or
+++space++) at 1, 5, 20 or 60 times real time. When the system asks for reduced motion, playing
+steps once a second instead of scrolling smoothly. Under the diagram are each phase's signal and
+each lane group's queue at the cursor, the queue bar coloured by its phase's signal and scaled to
+the longest queue of the run.
+
+### Intersection playback
+
+**Intersection** (beside **Ring timeline**) draws the same moment on the
+[intersection view](editor.md#the-intersection-view), in **Plan** or **Oblique**: every signal head
+and stop bar shows the simulated signal at the cursor, and the simulated vehicles and pedestrians
+move over it as the playback runs.
+
+- **Vehicles** take a lane of their lane group that carries their movement (left, through or
+  right, drawn at random in proportion to the count). They approach at about 43 km/h, stop a car
+  length and a gap (7 m) behind the vehicle ahead or at the stop bar, and while the queue
+  discharges it moves up a place for each vehicle that leaves. A vehicle leaves when the simulation
+  serves it: it crosses the stop bar, accelerating if it had stopped, and follows its turn into
+  the matching lane of the leg it leaves by. Queued vehicles show brake lights.
+- **Spillback.** Legs are drawn long enough for the longest queue in a lane, up to 40 m. Vehicles
+  queued beyond the end of a leg are counted there, in a red badge.
+- **Pedestrians** wait beside the crosswalk from their pushbutton press and walk across at
+  1.2 m/s from the start of the walk that serves them.
+- **Overlaps** have heads of their own and show what their included phases give them.
+
+The moving vehicles are a picture of the simulation, not a traffic model of their own: the
+simulation's point queues decide when each vehicle arrives and leaves, and the drawing only places
+it. The drawing keeps up to 40,000 vehicles and as many presses; a run with more draws its first
+part and says so. With reduced motion requested, the traffic steps once a second with the cursor.

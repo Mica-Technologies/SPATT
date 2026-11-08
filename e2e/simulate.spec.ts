@@ -41,12 +41,28 @@ test('simulates the controller against a count and plays it back', async ({ page
   await expect(results.getByRole('table', { name: 'Lane group results' }).getByRole('row', { name: /^EB/ })).toBeVisible();
 
   const playback = page.getByRole('region', { name: 'Playback' });
-  await expect(playback.getByRole('img', { name: /^Signal playback at / })).toBeVisible();
+  await expect(playback.getByRole('img', { name: /^Signal playback/ })).toBeVisible();
   const slider = playback.getByRole('slider', { name: 'Playback time' });
   await slider.focus();
   await page.keyboard.press('End');
-  await expect(playback.getByRole('img', { name: 'Signal playback at 20:00' })).toBeVisible();
+  await expect(slider).toHaveAttribute('aria-valuetext', '20:00');
   await expect(playback.getByRole('list', { name: 'Signals at the cursor' }).getByRole('listitem')).toHaveCount(4);
+
+  // The same playback drawn on the intersection, with the simulated traffic.
+  await playback.getByRole('button', { name: 'Intersection' }).click();
+  await expect(playback.getByRole('img', { name: /^Signal playback/ })).toHaveCount(0);
+  await expect(playback.getByRole('img', { name: 'Plan view of Elm St & 3rd Ave with the simulated traffic' })).toBeVisible();
+  await slider.focus();
+  await page.keyboard.press('Home');
+  await playback.getByRole('button', { name: 'Play', exact: true }).click();
+  await page.waitForTimeout(500);
+  await playback.getByRole('button', { name: 'Pause playback' }).click();
+  await playback.getByRole('button', { name: 'Oblique' }).click();
+  await expect(playback.getByRole('img', { name: 'Oblique view of Elm St & 3rd Ave with the simulated traffic' })).toBeVisible();
+  await expect(playback.getByRole('group', { name: 'Queues at the cursor' })).toBeVisible();
+  await expect(playback.getByRole('list', { name: 'Signals at the cursor' }).getByRole('listitem')).toHaveCount(4);
+  await playback.getByRole('button', { name: 'Ring timeline' }).click();
+  await expect(playback.getByRole('img', { name: /^Signal playback/ })).toBeVisible();
 
   // The same run on the City Super Mod controller's logic.
   await page.getByLabel('Controller').click();

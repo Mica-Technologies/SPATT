@@ -30,6 +30,11 @@ describe('splitMinimums', () => {
     expect(splitMinimums(phase)).toEqual({ vehicle: 160, pedestrian: 310, floor: 160 });
   });
 
+  it('adds red+amber before the green and the walk', () => {
+    const phase = standardEightPhase().phases[1]!;
+    expect(splitMinimums(phase, 20)).toEqual({ vehicle: 180, pedestrian: 330, floor: 180 });
+  });
+
   it('raises the floor to the pedestrian minimum with pedestrian recall', () => {
     const phase = standardEightPhase().phases[1]!;
     phase.pedestrian.recall = true;

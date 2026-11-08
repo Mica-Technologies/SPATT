@@ -41,6 +41,21 @@ This gives the rule SPATT checks on every coordination pattern: **within each ba
 splits of each ring must add up to the same total.** If ring 1's phases 1 and 2 total 50 s but
 ring 2's phases 5 and 6 total 46 s, the rings would reach the barrier at different moments.
 
+## Phase exclusions
+
+Sometimes two phases in different rings of one barrier group must still never time together,
+for example two lefts whose paths cross on a skewed approach. Enter them in the phase's **Not
+concurrent with** row on the Phases tab (the ASC-3 calls this phase concurrency). SPATT keeps
+both phases' lists in step, and a pair is excluded when either phase lists the other.
+
+A controller with an exclusion holds the second phase until the first has cleared, then serves
+it. SPATT checks that:
+
+- in each coordinated pattern, the splits of two excluded phases do not overlap in time;
+- no preempt serves an excluded pair together;
+- the exclusion is needed: phases in the same ring or in different barrier groups never time
+  together anyway, so excluding them is a warning.
+
 ## Sequence: lead and lag
 
 The order of phases inside a barrier group is the **sequence**. A left turn that runs before its

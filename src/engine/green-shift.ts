@@ -45,7 +45,7 @@ export function shiftCoordinatedGreen(intersection: Intersection, patternId: str
 
   const splits: Record<string, Tenths> = { ...pattern.splits };
   const get = (n: number) => splits[String(n)] ?? 0;
-  const spare = (n: number) => Math.max(0, get(n) - splitMinimums(phases.get(n)!).floor);
+  const spare = (n: number) => Math.max(0, get(n) - splitMinimums(phases.get(n)!, intersection.redAmber).floor);
   const targets = serving(coordGroup).map((list) => list.find((n) => coordinated.has(n)) ?? list.at(-1)!);
 
   let applied: Tenths;

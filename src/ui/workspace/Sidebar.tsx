@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import MoreVertRoundedIcon from '@mui/icons-material/MoreVertRounded';
 import Box from '@mui/material/Box';
@@ -15,32 +15,20 @@ import ListItemText from '@mui/material/ListItemText';
 import ListSubheader from '@mui/material/ListSubheader';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
+import Snackbar from '@mui/material/Snackbar';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import {
-  csmDefault,
-  leadLagEightPhase,
-  randomId,
-  removeIntersectionFromCorridors,
-  splitPhaseSideStreet,
-  standardEightPhase,
-  twoPhase,
-  uniqueName,
-  type Intersection,
-} from '../../model';
+import { randomId, removeIntersectionFromCorridors, uniqueName, type Intersection } from '../../model';
 import AddCorridorDialog from '../corridor/AddCorridorDialog';
 import CsmExportDialog from '../dialogs/CsmExportDialog';
+import CountImportDialog from '../dialogs/CountImportDialog';
 import CsmImportDialog from '../dialogs/CsmImportDialog';
+import UtdfImportDialog from '../dialogs/UtdfImportDialog';
 import { useIssues } from '../state/useIssues';
 import { useWorkspace } from '../state/workspace';
-
-const TEMPLATES: { label: string; build: (id: string) => Intersection }[] = [
-  { label: 'Standard eight-phase', build: standardEightPhase },
-  { label: 'Eight-phase, lead-lag', build: leadLagEightPhase },
-  { label: 'Split-phase side street', build: splitPhaseSideStreet },
-  { label: 'Two-phase', build: twoPhase },
-  { label: 'CSM ASC-3 default', build: csmDefault },
-];
+import { addTemplateIntersection } from './addIntersection';
+import TemplateSketch from './TemplateSketch';
+import { TEMPLATES } from './templates';
 
 type Kind = 'intersection' | 'corridor';
 interface Target {
@@ -53,7 +41,7 @@ export default function Sidebar() {
   const project = useWorkspace((s) => s.project)!;
   const selectedId = useWorkspace((s) => s.selectedIntersectionId);
   const selectedCorridorId = useWorkspace((s) => s.selectedCorridorId);
-  const { edit, selectIntersection, selectCorridor } = useWorkspace.getState();
+  const { edit, selectIntersection, selectCorridor, setView } = useWorkspace.getState();
   const issues = useIssues();
   const [addAnchor, setAddAnchor] = useState<HTMLElement | null>(null);
   const [itemMenu, setItemMenu] = useState<{ anchor: HTMLElement; target: Target } | null>(null);
@@ -61,12 +49,18 @@ export default function Sidebar() {
   const [deleting, setDeleting] = useState<Target | null>(null);
   const [csmExport, setCsmExport] = useState<string | null>(null);
   const [csmImportId, setCsmImportId] = useState<string | null>(null);
+  const [utdfImport, setUtdfImport] = useState(false);
+  const [countImport, setCountImport] = useState<string | null>(null);
   const [addingCorridor, setAddingCorridor] = useState(false);
+  // An added template whose name was taken: offered for renaming without interrupting the user.
+  const [numbered, setNumbered] = useState<Target | null>(null);
+  const renameInput = useRef<HTMLInputElement>(null);
 
   const add = (build: (id: string) => Intersection) => {
-    const id = randomId('i');
-    insert(build(id));
     setAddAnchor(null);
+    const added = addTemplateIntersection(build);
+    // Another intersection already has the template's name: offer a rename rather than leave a numbered copy unnoticed.
+    setNumbered(added.renamed ? { kind: 'intersection', id: added.id, name: added.name } : null);
   };
 
   const insert = (intersection: Intersection) => {
@@ -74,6 +68,17 @@ export default function Sidebar() {
     intersection.name = uniqueName(intersection.name, project.intersections.map((i) => i.name));
     edit(`Add ${intersection.name}`, (p) => p.intersections.push(intersection));
     selectIntersection(id);
+  };
+
+  /** Several imported intersections, as one undo step. */
+  const insertAll = (intersections: Intersection[]) => {
+    const taken = project.intersections.map((i) => i.name);
+    for (const intersection of intersections) {
+      intersection.name = uniqueName(intersection.name, taken);
+      taken.push(intersection.name);
+    }
+    edit(intersections.length === 1 ? `Add ${intersections[0]!.name}` : `Import ${intersections.length} intersections`, (p) => p.intersections.push(...intersections));
+    if (intersections[0]) selectIntersection(intersections[0].id);
   };
 
   const duplicate = (id: string) => {
@@ -161,16 +166,30 @@ export default function Sidebar() {
         })}
       </List>
       <Box sx={{ px: 1.5, pb: 2 }}>
-        <Button size="small" variant="outlined" fullWidth startIcon={<AddRoundedIcon />} onClick={() => setAddingCorridor(true)} disabled={project.intersections.length === 0}>
+        <Button size="small" variant="outlined" fullWidth startIcon={<AddRoundedIcon />} onClick={() => setAddingCorridor(true)} disabled={project.intersections.length === 0} aria-describedby={project.intersections.length < 2 ? 'add-corridor-hint' : undefined}>
           Add corridor
         </Button>
+        {project.intersections.length < 2 ? (
+          <Typography id="add-corridor-hint" variant="caption" component="p" sx={{ color: 'text.secondary', mt: 0.75, px: 0.5 }}>
+            {project.intersections.length === 0 ? 'A corridor links intersections: add one first.' : 'A corridor links two or more intersections in travel order.'}
+          </Typography>
+        ) : null}
       </Box>
 
-      <Menu anchorEl={addAnchor} open={addAnchor !== null} onClose={() => setAddAnchor(null)}>
+      <Menu
+        anchorEl={addAnchor}
+        open={addAnchor !== null}
+        onClose={() => setAddAnchor(null)}
+      >
         <ListSubheader sx={{ lineHeight: '32px' }}>Start from</ListSubheader>
-        {TEMPLATES.map((template) => (
-          <MenuItem key={template.label} onClick={() => add(template.build)}>
-            {template.label}
+        {TEMPLATES.map((template, k) => (
+          <MenuItem key={template.label} aria-label={template.label} aria-describedby={`template-description-${k}`} onClick={() => add(template.build)} sx={{ gap: 1.5, alignItems: 'center', maxWidth: 400 }}>
+            <TemplateSketch template={template} width={56} />
+            <ListItemText
+              primary={template.label}
+              secondary={template.description}
+              slotProps={{ secondary: { id: `template-description-${k}`, sx: { whiteSpace: 'normal' } } }}
+            />
           </MenuItem>
         ))}
         <Divider />
@@ -182,17 +201,54 @@ export default function Sidebar() {
         >
           Import from CSM ASC-3…
         </MenuItem>
+        <MenuItem
+          onClick={() => {
+            setUtdfImport(true);
+            setAddAnchor(null);
+          }}
+        >
+          Import from Synchro UTDF…
+        </MenuItem>
       </Menu>
 
       <Menu anchorEl={itemMenu?.anchor} open={itemMenu !== null} onClose={() => setItemMenu(null)}>
         <MenuItem onClick={closeMenuAnd((target) => setRenaming(target))}>Rename…</MenuItem>
         {itemMenu?.target.kind === 'intersection' ? <MenuItem onClick={closeMenuAnd((target) => duplicate(target.id))}>Duplicate</MenuItem> : null}
+        {itemMenu?.target.kind === 'intersection' ? (
+          <MenuItem
+            onClick={closeMenuAnd((target) => {
+              selectIntersection(target.id);
+              setView('compare');
+            })}
+          >
+            Compare plans…
+          </MenuItem>
+        ) : null}
+        {itemMenu?.target.kind === 'intersection' ? <MenuItem onClick={closeMenuAnd((target) => setCountImport(target.id))}>Import counts from CSV…</MenuItem> : null}
         {itemMenu?.target.kind === 'intersection' ? <MenuItem onClick={closeMenuAnd((target) => setCsmExport(target.id))}>Export for CSM ASC-3…</MenuItem> : null}
         <MenuItem sx={{ color: 'error.main' }} onClick={closeMenuAnd((target) => setDeleting(target))}>
           Delete…
         </MenuItem>
       </Menu>
 
+      <Snackbar
+        open={numbered !== null}
+        autoHideDuration={8000}
+        onClose={(_, reason) => reason !== 'clickaway' && setNumbered(null)}
+        message={numbered ? `Added as “${numbered.name}”: that name was taken.` : ''}
+        action={
+          <Button
+            color="inherit"
+            size="small"
+            onClick={() => {
+              setRenaming(numbered);
+              setNumbered(null);
+            }}
+          >
+            Rename
+          </Button>
+        }
+      />
       <CsmExportDialog
         open={csmExport !== null}
         onClose={() => setCsmExport(null)}
@@ -200,6 +256,8 @@ export default function Sidebar() {
         intersectionIndex={project.intersections.findIndex((i) => i.id === csmExport)}
       />
       <CsmImportDialog open={csmImportId !== null} id={csmImportId ?? ''} onClose={() => setCsmImportId(null)} onImport={insert} />
+      <UtdfImportDialog open={utdfImport} onClose={() => setUtdfImport(false)} onImport={insertAll} />
+      <CountImportDialog open={countImport !== null} onClose={() => setCountImport(null)} intersection={project.intersections.find((i) => i.id === countImport) ?? null} />
       <AddCorridorDialog
         open={addingCorridor}
         project={project}
@@ -211,7 +269,22 @@ export default function Sidebar() {
         }}
       />
 
-      <Dialog open={renaming !== null} onClose={() => setRenaming(null)} fullWidth maxWidth="xs">
+      <Dialog
+        open={renaming !== null}
+        onClose={() => setRenaming(null)}
+        aria-labelledby="rename-dialog-title"
+        fullWidth
+        maxWidth="xs"
+        // Focus once shown: a closing menu may hand focus back to its button after autoFocus ran.
+        slotProps={{
+          transition: {
+            onEntered: () => {
+              renameInput.current?.focus();
+              renameInput.current?.select();
+            },
+          },
+        }}
+      >
         <form
           onSubmit={(event) => {
             event.preventDefault();
@@ -226,9 +299,9 @@ export default function Sidebar() {
             setRenaming(null);
           }}
         >
-          <DialogTitle>Rename {renaming?.kind}</DialogTitle>
+          <DialogTitle id="rename-dialog-title">Rename {renaming?.kind}</DialogTitle>
           <DialogContent>
-            <TextField autoFocus fullWidth label="Name" value={renaming?.name ?? ''} onChange={(e) => setRenaming((r) => (r ? { ...r, name: e.target.value } : r))} sx={{ mt: 1 }} slotProps={{ htmlInput: { maxLength: 120 } }} />
+            <TextField autoFocus inputRef={renameInput} fullWidth label="Name" value={renaming?.name ?? ''} onFocus={(e) => e.target.select()} onChange={(e) => setRenaming((r) => (r ? { ...r, name: e.target.value } : r))} sx={{ mt: 1 }} slotProps={{ htmlInput: { maxLength: 120 } }} />
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setRenaming(null)}>Cancel</Button>

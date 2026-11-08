@@ -20,19 +20,21 @@ export interface SplitMinimums {
   floor: Tenths;
 }
 
-export function splitMinimums(phase: Phase): SplitMinimums {
+/** `redAmber`: the intersection's red+amber time, which comes before a vehicle phase's green inside its split. */
+export function splitMinimums(phase: Phase, redAmber: Tenths = 0): SplitMinimums {
   const clearance = phase.yellow + phase.redClear;
-  const vehicle = phase.movement.kind === 'pedestrian' ? clearance : phase.minGreen + clearance;
+  const before = phase.movement.kind === 'pedestrian' ? 0 : redAmber;
+  const vehicle = phase.movement.kind === 'pedestrian' ? clearance : before + phase.minGreen + clearance;
   const ped = phase.pedestrian;
-  const pedestrian = ped.enabled ? ped.walk + ped.clearance + clearance : null;
+  const pedestrian = ped.enabled ? before + ped.walk + ped.clearance + clearance : null;
   return { vehicle, pedestrian, floor: pedestrian !== null && ped.recall ? Math.max(vehicle, pedestrian) : vehicle };
 }
 
 /** The phase time is the minimum-with-pedestrians need of `cycleBounds`: green that serves both. */
-function minimumWithPedestrians(phase: Phase): Tenths {
+function minimumWithPedestrians(phase: Phase, redAmber: Tenths): Tenths {
   const vehicleGreen = phase.movement.kind === 'pedestrian' ? 0 : phase.minGreen;
   const pedestrianGreen = phase.pedestrian.enabled ? phase.pedestrian.walk + phase.pedestrian.clearance : 0;
-  return Math.max(vehicleGreen, pedestrianGreen) + phase.yellow + phase.redClear;
+  return (phase.movement.kind === 'pedestrian' ? 0 : redAmber) + Math.max(vehicleGreen, pedestrianGreen) + phase.yellow + phase.redClear;
 }
 
 interface GroupRing {
@@ -101,7 +103,7 @@ export function balanceSplits(intersection: Intersection, patternId: string): Re
 
   for (const ring of sequence) {
     for (const n of ring.groups.flat().filter(enabled)) {
-      const floor = splitMinimums(phases.get(n)!).floor;
+      const floor = splitMinimums(phases.get(n)!, intersection.redAmber).floor;
       if (get(n) < floor) {
         splits[String(n)] = floor;
       }
@@ -149,7 +151,7 @@ export function balanceSplits(intersection: Intersection, patternId: string): Re
   // Too long: take time off group by group (the coordinated phases' group first), the same amount
   // from every serving ring, each ring giving from its target phase first and then from its other
   // phases, last to first, never below a floor.
-  const spare = (n: number) => Math.max(0, get(n) - splitMinimums(phases.get(n)!).floor);
+  const spare = (n: number) => Math.max(0, get(n) - splitMinimums(phases.get(n)!, intersection.redAmber).floor);
   const givingOrder = (entry: GroupRing) => [target(entry), ...entry.phases.filter((n) => n !== target(entry)).reverse()];
   const groupOrder = [coordGroup, ...Array.from({ length: groupCount }, (_, g) => g).filter((g) => g !== coordGroup)];
   let excess = -remainder;
@@ -183,7 +185,7 @@ export function balanceSplits(intersection: Intersection, patternId: string): Re
 export function evenSplits(intersection: Intersection, cycle: Tenths): Record<string, Tenths> {
   const phases = new Map(intersection.phases.map((p) => [p.number, p]));
   const enabled = (n: number) => phases.get(n)?.enabled === true;
-  const need = (n: number): Tenths => minimumWithPedestrians(phases.get(n)!);
+  const need = (n: number): Tenths => minimumWithPedestrians(phases.get(n)!, intersection.redAmber);
   const groupCount = intersection.rings[0]?.groups.length ?? 0;
 
   const groups = Array.from({ length: groupCount }, (_, g) => servingRings(intersection.rings, g, enabled));

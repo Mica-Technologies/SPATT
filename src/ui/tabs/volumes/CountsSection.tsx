@@ -1,6 +1,7 @@
 /** Volume counts: hourly volumes per lane group and movement, with a peak hour factor. */
 import { useState } from 'react';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
+import FileUploadRoundedIcon from '@mui/icons-material/FileUploadRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -9,6 +10,8 @@ import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import ScrollArea from '../../components/ScrollArea';
+import CountImportDialog from '../../dialogs/CountImportDialog';
 import { MOVEMENT_LABEL, MOVEMENTS, newVolumeSet, randomId, removeVolumeSet, uniqueName, zeroVolumes, type Intersection, type Issue, type VolumeSet } from '../../../model';
 import { NumberInput, TextInput } from '../../fields/GridInputs';
 import { issuesFor, type FieldPath } from '../../fields/paths';
@@ -26,6 +29,7 @@ interface CountsSectionProps {
 export default function CountsSection({ intersection, basePath, issues }: CountsSectionProps) {
   const editIntersection = useWorkspace((s) => s.editIntersection);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
   const index = Math.max(0, intersection.volumeSets.findIndex((s) => s.id === selectedId));
   const set = intersection.volumeSets[index];
   const path = [...basePath, 'volumeSets', index];
@@ -52,9 +56,14 @@ export default function CountsSection({ intersection, basePath, issues }: Counts
     <Section
       title="Counts"
       actions={
-        <Button size="small" variant="outlined" startIcon={<AddRoundedIcon />} onClick={add}>
-          Add count
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <Button size="small" variant="outlined" startIcon={<FileUploadRoundedIcon />} onClick={() => setImporting(true)}>
+            Import CSV…
+          </Button>
+          <Button size="small" variant="outlined" startIcon={<AddRoundedIcon />} onClick={add}>
+            Add count
+          </Button>
+        </Box>
       }
     >
       {!set ? (
@@ -99,7 +108,7 @@ export default function CountsSection({ intersection, basePath, issues }: Counts
               Add lane groups to enter volumes.
             </Typography>
           ) : (
-            <Box sx={{ overflowX: 'auto', border: 1, borderColor: 'divider', borderRadius: 1 }}>
+            <ScrollArea sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}>
               <Box component="table" aria-label={`Volumes in ${set.name || 'count'}`} sx={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: 13, width: '100%', minWidth: 520 }}>
                 <thead>
                   <tr>
@@ -155,10 +164,11 @@ export default function CountsSection({ intersection, basePath, issues }: Counts
                   })}
                 </tbody>
               </Box>
-            </Box>
+            </ScrollArea>
           )}
         </Box>
       )}
+      <CountImportDialog open={importing} onClose={() => setImporting(false)} intersection={intersection} />
     </Section>
   );
 }

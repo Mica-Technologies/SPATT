@@ -77,28 +77,35 @@ export default function SheetScreen({ project, selectedIntersectionId, corridor 
           title="SPATT"
           subtitle={corridor ? `${project.name} · ${corridor.name} · Time-space sheet` : `${project.name} · Timing sheet`}
           actions={
-            <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-              <Button size="small" startIcon={<ArrowBackRoundedIcon />} onClick={onBack}>
-                Back to editor
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+              <Button size="small" startIcon={<ArrowBackRoundedIcon />} onClick={onBack} aria-label="Back to editor">
+                <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                  Back to editor
+                </Box>
+                <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>
+                  Back
+                </Box>
               </Button>
-              <ToggleButtonGroup size="small" exclusive value={scope} onChange={(_, value: 'selected' | 'all' | null) => value && setScope(value)} aria-label={corridor ? 'Plans to print' : 'Intersections to print'}>
-                <ToggleButton value="selected">{corridor ? 'This plan' : 'This intersection'}</ToggleButton>
-                <ToggleButton value="all">All ({corridor ? corridor.plans.length : project.intersections.length})</ToggleButton>
-              </ToggleButtonGroup>
-              <ToggleButtonGroup size="small" exclusive value={paper} onChange={(_, value: Paper | null) => value && setPaper(value)} aria-label="Paper size">
-                <ToggleButton value="letter">Letter</ToggleButton>
-                <ToggleButton value="legal">Legal</ToggleButton>
-                <ToggleButton value="a4">A4</ToggleButton>
-              </ToggleButtonGroup>
               <Button size="small" variant="contained" startIcon={<PrintRoundedIcon />} disabled={pages.length === 0} onClick={() => window.print()}>
                 Print
               </Button>
             </Stack>
           }
         />
+        <Stack direction="row" useFlexGap spacing={1.5} sx={{ flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', px: 2, py: 1, borderBottom: 1, borderColor: 'divider', bgcolor: 'background.paper' }}>
+          <ToggleButtonGroup size="small" exclusive value={scope} onChange={(_, value: 'selected' | 'all' | null) => value && setScope(value)} aria-label={corridor ? 'Plans to print' : 'Intersections to print'}>
+            <ToggleButton value="selected">{corridor ? 'This plan' : 'This intersection'}</ToggleButton>
+            <ToggleButton value="all">All ({corridor ? corridor.plans.length : project.intersections.length})</ToggleButton>
+          </ToggleButtonGroup>
+          <ToggleButtonGroup size="small" exclusive value={paper} onChange={(_, value: Paper | null) => value && setPaper(value)} aria-label="Paper size">
+            <ToggleButton value="letter">Letter</ToggleButton>
+            <ToggleButton value="legal">Legal</ToggleButton>
+            <ToggleButton value="a4">A4</ToggleButton>
+          </ToggleButtonGroup>
+        </Stack>
       </Box>
 
-      <Box className="sheet-stack" sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, p: 3, overflowX: 'auto' }}>
+      <Box className="sheet-stack" sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'safe center', position: 'relative', minWidth: 0, gap: 3, p: 3, overflowX: 'auto' }}>
         {pages.length === 0 ? (
           <Typography variant="body1" sx={{ color: 'text.secondary', mt: 6 }}>
             {corridor ? 'Add a timing plan to print its time-space sheet.' : 'Add an intersection to print its timing sheet.'}

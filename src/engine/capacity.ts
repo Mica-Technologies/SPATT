@@ -323,7 +323,7 @@ export function suggestTiming(intersection: Intersection, patternId: string, opt
   const enabled = (n: number) => phases.get(n)?.enabled === true;
 
   const floorCycle = critical.groups.reduce((sum, g) => {
-    const ringFloors = sequence.map((ring) => (ring.groups[g.group] ?? []).filter(enabled).reduce((s, n) => s + splitMinimums(phases.get(n)!).floor, 0));
+    const ringFloors = sequence.map((ring) => (ring.groups[g.group] ?? []).filter(enabled).reduce((s, n) => s + splitMinimums(phases.get(n)!, intersection.redAmber).floor, 0));
     return sum + Math.max(0, ...ringFloors);
   }, 0);
   let cycle = critical.webster ?? maxCycle;

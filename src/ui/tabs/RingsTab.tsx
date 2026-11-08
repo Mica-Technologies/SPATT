@@ -36,6 +36,7 @@ import {
   type Issue,
   type Phase,
 } from '../../model';
+import ScrollArea from '../components/ScrollArea';
 import { fieldId, issuesFor, worstSeverity, type FieldPath } from '../fields/paths';
 import { useWorkspace } from '../state/workspace';
 import { fontFamilyMono } from '../theme/themePrimitives';
@@ -261,7 +262,7 @@ export default function RingsTab({ intersection, intersectionIndex, issues }: Ta
         </Box>
       ) : null}
 
-      <Box sx={{ overflowX: 'auto', border: 1, borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper' }}>
+      <ScrollArea sx={{ border: 1, borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper' }}>
         <Box
           id={fieldId(ringsPath)}
           tabIndex={-1}
@@ -354,7 +355,7 @@ export default function RingsTab({ intersection, intersectionIndex, issues }: Ta
             </Box>
           ))}
         </Box>
-      </Box>
+      </ScrollArea>
 
       <Box
         role="group"

@@ -282,7 +282,6 @@ export default function ServerCard({ service }: { service: ServiceServer | null 
           </Box>
 
           <FormControlLabel control={<Switch checked={status.keepServingOnClose} disabled={busy} onChange={(e) => update({ keepServingOnClose: e.target.checked })} />} label="Keep serving in the tray when this window is closed" />
-          <FormControlLabel control={<Switch disabled />} label="Run in the background at login or as a service (coming soon)" />
 
           <Box>
             <Typography variant="caption" sx={{ color: 'text.secondary' }}>

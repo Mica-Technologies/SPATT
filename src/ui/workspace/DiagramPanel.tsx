@@ -2,19 +2,23 @@
  * The live ring-barrier diagram docked beside the editor, with the cycle clock, the pattern's
  * offset, force-offs and the free-operation cycle bounds.
  */
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
-import { convertOffset, cycleBounds, projectCycle, toLocal } from '../../engine';
+import { convertOffset, cycleBounds, toLocal } from '../../engine';
 import { formatSeconds, tenthsToTicks, type Intersection } from '../../model';
 import CycleClock from '../diagram/CycleClock';
 import { flaggedPhases } from '../diagram/flags';
 import { REFERENCE_LABEL } from '../diagram/diagramText';
 import RingBarrierDiagram from '../diagram/RingBarrierDiagram';
+import { projectForDiagram } from '../diagram/sketch';
+import IntersectionView from '../intersection/IntersectionView';
 import { fontFamilyMono } from '../theme/themePrimitives';
 import { useWorkspace } from '../state/workspace';
 
@@ -34,16 +38,28 @@ function Row({ label, value }: { label: string; value: string }) {
 export default function DiagramPanel({ intersection, patternId }: { intersection: Intersection; patternId: string | null }) {
   const selectPattern = useWorkspace((s) => s.selectPattern);
   const pattern = intersection.patterns.find((p) => p.id === patternId) ?? intersection.patterns[0] ?? null;
-  const result = useMemo(() => (pattern ? projectCycle(intersection, pattern.id) : null), [intersection, pattern]);
+  const drawn = useMemo(() => (pattern ? projectForDiagram(intersection, pattern.id) : null), [intersection, pattern]);
+  const result = drawn?.result ?? null;
+  // Set when the splits do not fill the cycle and the drawing spans the splits instead.
+  const enteredCycle = drawn?.enteredCycle ?? null;
   const bounds = useMemo(() => cycleBounds(intersection, pattern?.maxGreen === 'max2'), [intersection, pattern]);
   const errors = result?.ok ? result.issues.length : 0;
+  const [view, setView] = useState<'diagram' | 'intersection'>('diagram');
 
   return (
     <Box component="aside" aria-label="Ring-barrier diagram" sx={{ borderLeft: 1, borderColor: 'divider', bgcolor: 'background.paper', p: 2, overflowY: 'auto' }}>
       <Stack spacing={2}>
         <Typography variant="subtitle2" component="h2">
-          Ring-barrier diagram
+          {view === 'intersection' ? 'Intersection view' : 'Ring-barrier diagram'}
         </Typography>
+        <ToggleButtonGroup size="small" exclusive fullWidth value={view} onChange={(_, next: typeof view | null) => next && setView(next)} aria-label="Diagram">
+          <ToggleButton value="diagram" sx={{ py: 0.25 }}>
+            Ring-barrier
+          </ToggleButton>
+          <ToggleButton value="intersection" sx={{ py: 0.25 }}>
+            Intersection
+          </ToggleButton>
+        </ToggleButtonGroup>
         {pattern ? (
           <TextField select size="small" label="Pattern" value={pattern.id} onChange={(e) => selectPattern(e.target.value)}>
             {intersection.patterns.map((p) => (
@@ -59,14 +75,22 @@ export default function DiagramPanel({ intersection, patternId }: { intersection
           </Typography>
         )}
 
-        {result && result.ok ? (
+        {/* The view animates a real cycle only: a sketch over splits that miss the cycle shows dark heads. */}
+        {view === 'intersection' ? <IntersectionView intersection={intersection} result={enteredCycle === null ? result : null} /> : null}
+        {view === 'diagram' && result && result.ok ? (
           <>
-            {errors > 0 ? (
+            {enteredCycle !== null ? (
+              <Alert severity="error" variant="outlined">
+                The splits total {formatSeconds(result.projection.cycle)} s but the cycle is {formatSeconds(enteredCycle)} s. The hatched part shows the {result.projection.cycle > enteredCycle ? 'overrun' : 'time no split covers'}; the clock and force-offs return once they match.
+              </Alert>
+            ) : errors > 0 ? (
               <Alert severity="warning" variant="outlined">
                 This pattern has {errors} error{errors === 1 ? '' : 's'}. The diagram shows the timing as entered; outlined phases need attention.
               </Alert>
             ) : null}
-            <RingBarrierDiagram projection={result.projection} intersection={intersection} flagged={flaggedPhases(intersection, result.issues)} />
+            <RingBarrierDiagram projection={result.projection} intersection={intersection} flagged={flaggedPhases(intersection, result.issues)} cycleMark={enteredCycle} />
+            {enteredCycle !== null ? null : (
+            <>
             <Box>
               <Typography variant="overline" sx={{ color: 'text.secondary' }}>
                 Cycle clock
@@ -92,10 +116,12 @@ export default function DiagramPanel({ intersection, patternId }: { intersection
                   ))}
               </Stack>
             </Box>
+            </>
+            )}
           </>
         ) : null}
 
-        {result && !result.ok ? (
+        {view === 'diagram' && result && !result.ok ? (
           result.issues[0]?.code === 'projection.free-pattern' ? (
             <Typography variant="body2" sx={{ color: 'text.secondary' }}>
               This pattern runs free, so it has no fixed cycle to draw.
