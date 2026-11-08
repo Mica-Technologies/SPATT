@@ -32,6 +32,7 @@ test('opens a fixture, draws its diagram and previews the timing sheet for print
   await expect(sheet).toHaveCount(1);
   await expect(sheet.getByRole('heading', { level: 4, name: 'PM Peak (lead-lag)' })).toBeVisible();
   await expect(sheet.getByRole('img', { name: 'Ring-barrier diagram, 90.0 s cycle' })).toBeVisible();
+  await expect(sheet.getByRole('img', { name: /^Plan of .*: lanes, crosswalks and signal heads by phase$/ })).toBeVisible();
 
   await page.emulateMedia({ media: 'print' });
   await expect(page.getByRole('button', { name: 'Print' })).toBeHidden();

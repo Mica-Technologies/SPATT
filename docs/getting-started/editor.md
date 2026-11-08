@@ -238,7 +238,8 @@ The print button in the header opens the timing sheet preview. Choose **This int
 save a PDF. Each sheet has:
 
 - the phase timing table, with the same fields as the Phases tab;
-- the ring and barrier structure;
+- the ring and barrier structure, beside a schematic plan of the intersection (its lanes,
+  crosswalks and signal heads, as in the [intersection view](#the-intersection-view));
 - each pattern's cycle, offset and its reference, coordinated phases, splits, green starts and
   force-offs in local time, its ring-barrier diagram with a legend, and its cycle clock;
 - the daily schedule with end times and durations;
