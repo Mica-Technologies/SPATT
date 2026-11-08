@@ -3,14 +3,13 @@
  * and stop bar coloured by its current interval. The road layer depends only on the scene and the
  * view and is memoised; only the signal layer redraws as the cycle plays.
  */
-import { memo, type ReactElement } from 'react';
+import { memo, useMemo, type ReactElement, type ReactNode } from 'react';
 import Box from '@mui/material/Box';
 import {
   boxFaces,
   headSignal,
   paintersOrder,
   projectorFor,
-  sceneExtent,
   signalFor,
   type HeadStates,
   type OverlapStates,
@@ -23,8 +22,8 @@ import {
   type SceneView,
 } from '../../engine';
 import { drawingSx, LAMP, lampOf, type Lamp } from './drawingStyle';
+import { drawingExtent } from './extent';
 
-const PAD = 3;
 /** How far the oblique road slab's edge shows below its surface. */
 const SLAB = 0.7;
 const HEAD = { x: 1.2, y: 1.2, z: 3.2 };
@@ -44,11 +43,29 @@ export interface IntersectionDrawingProps {
   /** Whether a flashing don't-walk hand is lit at this moment. */
   flashOn: boolean;
   label: string;
+  /** Drawn between the roads and the signals, absolutely positioned over the drawing (a canvas of moving traffic). */
+  layer?: ReactNode;
 }
 
-export default function IntersectionDrawing({ scene, view, states, overlaps = null, flashOn, label }: IntersectionDrawingProps) {
-  const b = sceneExtent(scene, view, PAD);
+
+export default function IntersectionDrawing({ scene, view, states, overlaps = null, flashOn, label, layer }: IntersectionDrawingProps) {
+  // Memoised so the road layer (memoised on it) only redraws when the scene or the view changes.
+  const b = useMemo(() => drawingExtent(scene, view), [scene, view]);
   const viewBox = `${n(b.minX)} ${n(b.minY)} ${n(b.maxX - b.minX)} ${n(b.maxY - b.minY)}`;
+  if (layer) {
+    // Ground, then the layer (vehicles), then the poles and heads above them.
+    return (
+      <Box sx={{ position: 'relative' }}>
+        <Box component="svg" viewBox={viewBox} role="img" aria-label={label} sx={drawingSx}>
+          <Ground scene={scene} view={view} extent={b} />
+        </Box>
+        {layer}
+        <Box component="svg" viewBox={viewBox} aria-hidden="true" sx={[drawingSx, { position: 'absolute', inset: 0, pointerEvents: 'none' }]}>
+          <Signals scene={scene} view={view} states={states} overlaps={overlaps} flashOn={flashOn} />
+        </Box>
+      </Box>
+    );
+  }
   return (
     <Box component="svg" viewBox={viewBox} role="img" aria-label={label} sx={drawingSx}>
       <Ground scene={scene} view={view} extent={b} />

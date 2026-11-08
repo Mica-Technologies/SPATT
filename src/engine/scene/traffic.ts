@@ -268,11 +268,13 @@ export function trafficAt(prepared: PreparedTraffic, t: number): TrafficFrame {
     const ny = dx * lateral;
     const start = p.record.start === null ? null : p.record.start / TICKS_PER_SECOND;
     if (start === null || t < start) {
-      pedestrians.push({ id: p.record.id, x: p.from.x - dx * 0.9 + nx, y: p.from.y - dy * 0.9 + ny, heading: angle(dy, dx), state: 'waiting' });
+      // Off to the side of the pushbutton pole while waiting.
+      const aside = p.side * (1 + (p.record.id % 3) * 0.3);
+      pedestrians.push({ id: p.record.id, x: p.from.x - dx * 0.6 - dy * aside, y: p.from.y - dy * 0.6 + dx * aside, heading: angle(dy, dx), state: 'waiting' });
       continue;
     }
-    const walked = (t - start) * o.walkingSpeed - 0.9;
-    if (walked > p.length + 0.9) continue;
+    const walked = (t - start) * o.walkingSpeed - 0.6;
+    if (walked > p.length + 0.6) continue;
     pedestrians.push({ id: p.record.id, x: p.from.x + dx * walked + nx, y: p.from.y + dy * walked + ny, heading: angle(dy, dx), state: 'crossing' });
   }
   return { vehicles, pedestrians, overflow };

@@ -129,3 +129,27 @@ with walk and pedestrian clearance as a strip underneath. Drag the slider, or pr
 steps once a second instead of scrolling smoothly. Under the diagram are each phase's signal and
 each lane group's queue at the cursor, the queue bar coloured by its phase's signal and scaled to
 the longest queue of the run.
+
+### Intersection playback
+
+**Intersection** (beside **Ring timeline**) draws the same moment on the
+[intersection view](editor.md#the-intersection-view), in **Plan** or **Oblique**: every signal head
+and stop bar shows the simulated signal at the cursor, and the simulated vehicles and pedestrians
+move over it as the playback runs.
+
+- **Vehicles** take a lane of their lane group that carries their movement (left, through or
+  right, drawn at random in proportion to the count). They approach at about 43 km/h, stop a car
+  length and a gap (7 m) behind the vehicle ahead or at the stop bar, and while the queue
+  discharges it moves up a place for each vehicle that leaves. A vehicle leaves when the simulation
+  serves it: it crosses the stop bar, accelerating if it had stopped, and follows its turn into
+  the matching lane of the leg it leaves by. Queued vehicles show brake lights.
+- **Spillback.** Legs are drawn long enough for the longest queue in a lane, up to 40 m. Vehicles
+  queued beyond the end of a leg are counted there, in a red badge.
+- **Pedestrians** wait beside the crosswalk from their pushbutton press and walk across at
+  1.2 m/s from the start of the walk that serves them.
+- **Overlaps** have heads of their own and show what their included phases give them.
+
+The moving vehicles are a picture of the simulation, not a traffic model of their own: the
+simulation's point queues decide when each vehicle arrives and leaves, and the drawing only places
+it. The drawing keeps up to 40,000 vehicles and as many presses; a run with more draws its first
+part and says so. With reduced motion requested, the traffic steps once a second with the cursor.

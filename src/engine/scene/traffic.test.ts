@@ -110,7 +110,7 @@ describe('pedestrian positions', () => {
     const waiting = vehiclePositions(tr, scene, 55).pedestrians[0]!;
     expect(waiting.state).toBe('waiting');
     expect(Math.hypot(waiting.x - a.x, waiting.y - a.y)).toBeLessThan(1.5);
-    const halfway = 60 + (length / 2 + 0.9) / 1.2;
+    const halfway = 60 + (length / 2 + 0.6) / 1.2;
     const walking = vehiclePositions(tr, scene, halfway).pedestrians[0]!;
     expect(walking.state).toBe('crossing');
     expect(Math.hypot(walking.x - (a.x + b.x) / 2, walking.y - (a.y + b.y) / 2)).toBeLessThan(1.2);
