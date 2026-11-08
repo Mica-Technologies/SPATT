@@ -97,6 +97,9 @@ semver `YYYY.M.(D*100+N)`, MSI `(YYYY-2000).M.P.B`); assets renamed by
 ## Conventions & gotchas
 
 - TypeScript is pinned to `~6.0`: typescript-eslint and friends do not support TS 7 yet.
+- `@tauri-apps/cli` is pinned to `2.11.4`: the 2.12 bundler refuses a `-` in the RPM version, so
+  Linux pre-release builds (`…-pre.N`) fail. Unpin once a CLI release accepts it again; only a
+  pre-release build in CI shows whether it does.
 - Commits: never include a Claude session link or `Claude-Session:` trailer. `Co-Authored-By` is fine.
 - Working plans live in `docs/agent-plans/` (gitignored, excluded from the wiki). Never commit them.
 - `tauri.conf.json` `version` points at `../package.json`; the Cargo workspace version is separate.
