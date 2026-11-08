@@ -220,3 +220,77 @@ describe('buildScene — inference', () => {
     expect(west.inbound.map((l) => l.movements)).toEqual([['left', 'through'], ['through', 'right']]);
   });
 });
+
+describe('buildScene — turn paths', () => {
+  const scene = buildScene(standardEightPhase());
+  const pathsFrom = (side: string) => scene.turnPaths.filter((p) => p.from === side);
+  const heading = (a: { x: number; y: number }, b: { x: number; y: number }) => {
+    const length = Math.hypot(b.x - a.x, b.y - a.y);
+    return { x: (b.x - a.x) / length, y: (b.y - a.y) / length };
+  };
+
+  it('has one path per inbound lane and movement', () => {
+    const expected = scene.legs.reduce((total, l) => total + l.inbound.reduce((sum, lane) => sum + lane.movements.length, 0), 0);
+    expect(scene.turnPaths).toHaveLength(expected);
+    expect(pathsFrom('W').map((p) => [p.laneIndex, p.movement, p.to, p.toLane])).toEqual([
+      [0, 'left', 'N', 0],
+      [1, 'through', 'E', 0],
+      [2, 'through', 'E', 1],
+      [2, 'right', 'S', 1],
+    ]);
+  });
+
+  it('starts at the lane’s stop bar heading in and ends at the end of the outbound lane heading out', () => {
+    const west = leg(scene, 'W');
+    const north = leg(scene, 'N');
+    const left = pathsFrom('W').find((p) => p.movement === 'left')!;
+    const lane = west.inbound[0]!;
+    expect(left.points[0]).toEqual(lane.centreline[1]);
+    expect(left.points[left.points.length - 1]).toEqual(north.outbound[0]!.centreline[1]);
+    const first = heading(left.points[0]!, left.points[1]!);
+    expect(first.x).toBeCloseTo(1, 1);
+    expect(Math.abs(first.y)).toBeLessThan(0.1);
+    const n = left.points.length;
+    const last = heading(left.points[n - 2]!, left.points[n - 1]!);
+    expect(last.x).toBeCloseTo(0, 5);
+    expect(last.y).toBeCloseTo(-1, 5);
+  });
+
+  it('runs straight for a through movement and measures its length', () => {
+    const through = pathsFrom('W').find((p) => p.movement === 'through')!;
+    const west = leg(scene, 'W');
+    const east = leg(scene, 'E');
+    // Lanes line up across the intersection: every point is on one line of constant y.
+    expect(new Set(through.points.map((p) => p.y)).size).toBe(1);
+    expect(through.turnLength).toBeCloseTo(west.stopBar + east.stopBar, 1);
+    expect(through.length).toBeCloseTo(west.stopBar + east.end, 1);
+  });
+
+  it('turns right into the curb lane, inside the turn', () => {
+    const right = pathsFrom('W').find((p) => p.movement === 'right')!;
+    expect(right.to).toBe('S');
+    expect(right.toLane).toBe(leg(scene, 'S').outbound.length - 1);
+    // A right turn is shorter than a left turn.
+    expect(right.turnLength).toBeLessThan(pathsFrom('W').find((p) => p.movement === 'left')!.turnLength);
+  });
+
+  it('only leaves by legs that exist', () => {
+    const t = splitPhaseSideStreet();
+    t.phases.find((p) => p.number === 4)!.enabled = false;
+    const s = buildScene(t);
+    for (const path of s.turnPaths) {
+      expect(s.legs.some((l) => l.side === path.to)).toBe(true);
+      expect(path.to).not.toBe(path.from);
+    }
+  });
+
+  it('tags lanes drawn from lane groups and draws legs as long as asked', () => {
+    const x = twoPhase();
+    x.laneGroups = [laneGroup('eb', 2, 2, { left: true, through: true, right: true })];
+    const longer = buildScene(x, { approachLength: 80 });
+    const west = leg(longer, 'W');
+    expect(west.inbound.map((l) => l.laneGroupId)).toEqual(['eb', 'eb']);
+    expect(west.end - west.stopBar).toBeCloseTo(80);
+    expect(leg(longer, 'N').inbound.every((l) => l.laneGroupId === null)).toBe(true);
+  });
+});

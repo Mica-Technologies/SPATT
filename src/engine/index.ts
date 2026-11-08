@@ -5,6 +5,7 @@ export * from './compare';
 export * from './cycle-bounds';
 export * from './green-shift';
 export * from './optimize';
+export * from './overlaps';
 export * from './progression';
 export * from './projection';
 export * from './scene';

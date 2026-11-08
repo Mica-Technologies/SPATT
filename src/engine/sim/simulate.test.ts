@@ -113,6 +113,81 @@ describe('simulated traffic', () => {
   });
 });
 
+describe('vehicle and pedestrian detail', () => {
+  const detailed = (more: Partial<SimulationSettings> = {}) => settings('all-day', { durationSeconds: 1800, pedestrianCallsPerHour: { 4: 40 }, detail: { seconds: 2100, limit: 100_000 }, ...more });
+
+  it('leaves the default trace and every statistic unchanged', () => {
+    const plain = run(counted(), settings('all-day', { durationSeconds: 1800, pedestrianCallsPerHour: { 4: 40 } }));
+    const withDetail = run(counted(), detailed());
+    expect(plain.trace.vehicles).toBeUndefined();
+    const { vehicles, pedestrians, detailUntil, ...trace } = withDetail.trace;
+    expect(vehicles!.length).toBeGreaterThan(0);
+    expect(pedestrians!.length).toBeGreaterThan(0);
+    expect(detailUntil).toBe(withDetail.ticks);
+    expect({ ...withDetail, trace }).toEqual(plain);
+  });
+
+  it('records every vehicle: departures after the warm-up equal those served, queues match', () => {
+    const result = run(counted(), detailed());
+    const vehicles = result.trace.vehicles!;
+    for (const lane of result.laneGroups) {
+      const mine = vehicles.filter((v) => v.laneGroupId === lane.laneGroupId);
+      expect(mine.filter((v) => v.arrive >= result.warmUpTicks).length).toBe(lane.arrivals);
+      expect(mine.filter((v) => v.arrive >= result.warmUpTicks && v.depart !== null).length).toBe(lane.departures);
+      expect(mine.filter((v) => v.depart === null).length).toBe(lane.finalQueue);
+      // Point queue: first come, first served, and never before arriving.
+      const departed = mine.filter((v) => v.depart !== null);
+      for (let k = 1; k < departed.length; k++) expect(departed[k]!.depart!).toBeGreaterThanOrEqual(departed[k - 1]!.depart!);
+      for (const v of departed) expect(v.depart!).toBeGreaterThanOrEqual(v.arrive);
+      // The sampled queue at second s is the vehicles arrived and not yet gone.
+      const s = 900;
+      const t = s * 20;
+      expect(mine.filter((v) => v.arrive <= t && (v.depart === null || v.depart > t)).length).toBe(result.trace.queues[lane.laneGroupId]![s]);
+    }
+    // Movements follow the count: the north approach's 50 rights out of 300.
+    const nb = vehicles.filter((v) => v.laneGroupId === 'nb');
+    const rights = nb.filter((v) => v.movement === 'right').length / nb.length;
+    expect(rights).toBeGreaterThan(0.08);
+    expect(rights).toBeLessThan(0.26);
+    expect(vehicles.filter((v) => v.laneGroupId === 'eb').every((v) => v.movement === 'through')).toBe(true);
+  });
+
+  it('serves every press with the next walk, and crosses by the end of its clearance', () => {
+    const result = run(counted(), detailed());
+    const walks = result.trace.spans.filter((s) => s.phase === 4 && s.signal === 'walk');
+    const clearances = result.trace.spans.filter((s) => s.phase === 4 && s.signal === 'clearance');
+    const served = result.trace.pedestrians!.filter((p) => p.start !== null);
+    expect(served.length).toBeGreaterThan(5);
+    for (const p of served) {
+      expect(p.phase).toBe(4);
+      expect(p.start!).toBeGreaterThanOrEqual(p.press);
+      const walk = walks.find((w) => w.start <= p.start! && w.end > p.start!)!;
+      expect(walk).toBeDefined();
+      // Pressed during the walk, or waiting since before it.
+      expect(p.press >= walk.start || p.start === walk.start).toBe(true);
+      const clearance = clearances.find((c) => c.start === walk.end);
+      expect(p.end).toBe(clearance ? clearance.end : walk.end);
+    }
+  });
+
+  it('repeats exactly for a seed and differs for another', () => {
+    const a = run(counted(), detailed({ seed: 3 }));
+    expect(run(counted(), detailed({ seed: 3 })).trace).toEqual(a.trace);
+    expect(run(counted(), detailed({ seed: 4 })).trace.vehicles).not.toEqual(a.trace.vehicles);
+  });
+
+  it('keeps to the window and the limit', () => {
+    const windowed = run(counted(), detailed({ detail: { seconds: 120, limit: 100_000 } }));
+    expect(windowed.trace.detailUntil).toBe(2400);
+    expect(windowed.trace.vehicles!.every((v) => v.arrive < 2400)).toBe(true);
+    expect(windowed.trace.pedestrians!.every((p) => p.press < 2400)).toBe(true);
+    const capped = run(counted(), detailed({ detail: { seconds: 2100, limit: 50 } }));
+    expect(capped.trace.vehicles).toHaveLength(50);
+    expect(capped.trace.vehicles!.every((v) => v.arrive < capped.trace.detailUntil!)).toBe(true);
+    expect(capped.trace.detailUntil!).toBeLessThan(capped.ticks);
+  });
+});
+
 describe('NEMA controller with red+amber and green flash', () => {
   it('runs red+amber before each green and takes the green flash out of it', () => {
     // Two-phase on minimum recall: 2 s red+amber + 10 s green (its last 3 s flashing) + 4 + 2, twice.

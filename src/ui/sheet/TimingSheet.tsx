@@ -6,7 +6,7 @@
 import type { ReactNode } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import { analyzePattern, projectCycle, saturationFlow, toLocal } from '../../engine';
+import { analyzePattern, buildScene, projectCycle, saturationFlow, toLocal } from '../../engine';
 import {
   effectiveSequence,
   exclusionsOf,
@@ -31,6 +31,7 @@ import { REFERENCE_LABEL } from '../diagram/diagramText';
 import { flaggedPhases } from '../diagram/flags';
 import RingBarrierDiagram from '../diagram/RingBarrierDiagram';
 import { APPROACHES, MOVEMENTS, RECALLS, optionLabel } from '../fields/phaseOptions';
+import IntersectionDrawing from '../intersection/IntersectionDrawing';
 import { Alarm, Facts, Mono, Section, SheetFooter, SheetHeader, Table } from './sheetParts';
 
 const DIAGRAM_WIDTH = 720;
@@ -233,6 +234,7 @@ export default function TimingSheet({ project, intersection, printedAt }: { proj
   const warnings = issues.length - errors.length;
   const phases = [...intersection.phases].sort((a, b) => a.number - b.number);
   const patternName = new Map(intersection.patterns.map((p) => [p.id, p.name]));
+  const scene = buildScene(intersection, { lengthUnit: project.units.length });
 
   return (
     <Box component="article" className="sheet-page" aria-label={`Timing sheet, ${intersection.name}`}>
@@ -247,9 +249,25 @@ export default function TimingSheet({ project, intersection, printedAt }: { proj
         ) : null}
       </Section>
 
-      <Section title="Rings and barriers">
-        <RingTable intersection={intersection} />
-      </Section>
+      {scene.legs.length > 0 ? (
+        // The ring table is narrow: the layout plan sits beside it.
+        <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start', breakInside: 'avoid-page' }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Section title="Rings and barriers">
+              <RingTable intersection={intersection} />
+            </Section>
+          </Box>
+          <Box sx={{ width: 250, flexShrink: 0 }}>
+            <Section title="Layout (schematic)">
+              <IntersectionDrawing scene={scene} view="plan" states={null} flashOn={false} label={`Plan of ${intersection.name}: lanes, crosswalks and signal heads by phase`} />
+            </Section>
+          </Box>
+        </Box>
+      ) : (
+        <Section title="Rings and barriers">
+          <RingTable intersection={intersection} />
+        </Section>
+      )}
 
       <Section title="Patterns" keepTogether={false}>
         {intersection.patterns.length === 0 ? (

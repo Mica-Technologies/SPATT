@@ -23,6 +23,8 @@ import type { TabProps } from './types';
 import { cellSx, headSx, numberCellSx } from './volumes/tableStyles';
 
 const FREE = '';
+/** What playback keeps of every vehicle and pedestrian: the whole run, up to a limit. */
+const PLAYBACK_DETAIL = { seconds: 9 * 3600, limit: 40_000 };
 const BEHAVIOURS: { value: ControllerBehaviour; label: string }[] = [
   { value: 'nema', label: 'NEMA actuated' },
   { value: 'csm', label: 'CSM ASC-3' },
@@ -77,7 +79,7 @@ export default function SimulateTab({ intersection }: TabProps) {
     setFailure(null);
     const w = new Worker(new URL('./simulate/simulation.worker.ts', import.meta.url), { type: 'module' });
     worker.current = w;
-    const settings = { ...DEFAULT_SIMULATION, patternId: pattern?.id ?? null, volumeSetId, durationSeconds: minutes * 60, warmUpSeconds: warmUp * 60, seed, pedestrianCallsPerHour: pedestrianRates };
+    const settings = { ...DEFAULT_SIMULATION, patternId: pattern?.id ?? null, volumeSetId, durationSeconds: minutes * 60, warmUpSeconds: warmUp * 60, seed, pedestrianCallsPerHour: pedestrianRates, detail: PLAYBACK_DETAIL };
     w.onmessage = (event: MessageEvent<SimulationMessage>) => {
       if (event.data.type === 'done') setResult({ result: event.data.result, patternId: settings.patternId, volumeSetId });
       else setFailure(event.data.message);

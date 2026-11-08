@@ -11,7 +11,7 @@
  * The scene is schematic: it shows which lanes each phase serves and where its heads are, not a
  * surveyed layout. Traffic drives on the right.
  */
-import { DEFAULT_LANE_WIDTH, toMetres, type Approach, type Intersection, type LaneGroup, type LengthUnit, type MovementKind, type Phase } from '../../model';
+import { DEFAULT_LANE_WIDTH, toMetres, type Approach, type Intersection, type LaneGroup, type LengthUnit, type MovementKind, type Overlap, type Phase } from '../../model';
 
 export interface ScenePoint {
   x: number;
@@ -38,6 +38,8 @@ export interface SceneLane {
   movements: TurnMovement[];
   /** The phase whose green the lane moves on (inbound only). */
   phase: number | null;
+  /** The lane group the lane belongs to (inbound lanes drawn from lane groups only). */
+  laneGroupId: string | null;
   /** The lane's piece of the stop bar (inbound only). */
   stopBar: [ScenePoint, ScenePoint] | null;
 }
@@ -99,8 +101,10 @@ export interface SceneCrosswalk {
 export interface SceneSignalHead {
   id: string;
   kind: 'vehicle' | 'pedestrian';
-  /** The phases it shows (one for a vehicle head; a crosswalk may be served by several). */
+  /** The phases it shows (one for a vehicle head; a crosswalk may be served by several; an overlap's included phases). */
   phases: number[];
+  /** Set on an overlap's head: the overlap's letter. */
+  overlap?: string;
   leg: Approach;
   movement: TurnMovement | 'pedestrian';
   /** The centre of the head's housing. */
@@ -135,6 +139,8 @@ export interface IntersectionScene {
   heads: SceneSignalHead[];
   poles: ScenePole[];
   bounds: SceneBounds;
+  /** One path per inbound lane and movement it carries, from its stop bar to the outbound lane it turns into. */
+  turnPaths: SceneTurnPath[];
   /** Plain-language notes on what had to be assumed, for display. */
   assumptions: string[];
   /** Enabled phases the scene could not place (no direction, or not a vehicle or pedestrian movement it knows). */
@@ -144,6 +150,8 @@ export interface IntersectionScene {
 export interface SceneOptions {
   /** The unit of the phases' clearance-basis lengths (the project's length unit). */
   lengthUnit?: LengthUnit;
+  /** How far each leg is drawn beyond its stop bar, metres (default 20), e.g. to show long queues. */
+  approachLength?: number;
 }
 
 const DEFAULT_THROUGH_LANES = 2;
@@ -153,6 +161,7 @@ const CROSSWALK_SETBACK = 0.6;
 const CROSSWALK_WIDTH = 3;
 const STOP_BAR_SETBACK = 1.2;
 const APPROACH_LENGTH = 20;
+const MAX_APPROACH_LENGTH = 400;
 const CURB_RADIUS = 5;
 const MAX_FILLET_ANGLE = (135 * Math.PI) / 180;
 const STRIPE_WIDTH = 0.5;
@@ -162,6 +171,7 @@ const VEHICLE_HEAD_HEIGHT = 5.6;
 const MAST_HEIGHT = 6.6;
 const PED_HEAD_HEIGHT = 2.7;
 const PEDESTAL_HEIGHT = 3.3;
+const OVERLAP_HEAD_SPACING = 2.2;
 
 const S = Math.SQRT1_2;
 /** Unit vectors toward each compass direction, in plan coordinates (y south). */
@@ -233,6 +243,7 @@ interface LaneSpec {
   width: number;
   movements: TurnMovement[];
   phase: number;
+  laneGroupId: string | null;
 }
 
 const laneOrder = (g: LaneGroup): number => {
@@ -256,7 +267,7 @@ function lanesFromGroups(groups: LaneGroup[]): LaneSpec[] {
       if (through) movements.push('through');
       if (right && (last || (!through && !left))) movements.push('right');
       if (movements.length === 0) movements.push(left ? 'left' : 'right');
-      lanes.push({ width: group.laneWidth, movements, phase: group.phase });
+      lanes.push({ width: group.laneWidth, movements, phase: group.phase, laneGroupId: group.id });
     }
   }
   return lanes;
@@ -267,19 +278,19 @@ function lanesFromPhases(placed: PlacedPhase[], width: number): LaneSpec[] {
   const through = placed.find((p) => p.kind === 'through');
   const right = placed.find((p) => p.kind === 'right');
   const lanes: LaneSpec[] = [];
-  if (left) lanes.push({ width, movements: ['left'], phase: left.phase.number });
+  if (left) lanes.push({ width, movements: ['left'], phase: left.phase.number, laneGroupId: null });
   if (through) {
     for (let i = 0; i < DEFAULT_THROUGH_LANES; i++) {
       const movements: TurnMovement[] = [];
       if (!left && i === 0) movements.push('left');
       movements.push('through');
       if (!right && i === DEFAULT_THROUGH_LANES - 1) movements.push('right');
-      lanes.push({ width, movements, phase: through.phase.number });
+      lanes.push({ width, movements, phase: through.phase.number, laneGroupId: null });
     }
   }
-  if (right) lanes.push({ width, movements: ['right'], phase: right.phase.number });
+  if (right) lanes.push({ width, movements: ['right'], phase: right.phase.number, laneGroupId: null });
   if (lanes.length === 0 && left === undefined && placed[0]) {
-    lanes.push({ width, movements: [placed[0].kind], phase: placed[0].phase.number });
+    lanes.push({ width, movements: [placed[0].kind], phase: placed[0].phase.number, laneGroupId: null });
   }
   return lanes;
 }
@@ -455,10 +466,30 @@ export function buildScene(intersection: Intersection, options: SceneOptions = {
     assumptions.push('Stop bars are set back to match the intersection widths entered for clearance calculations.');
   }
 
-  const legs = drafts.map((draft) => buildLeg(draft));
+  const approachLength = Math.max(APPROACH_LENGTH, Math.min(MAX_APPROACH_LENGTH, options.approachLength ?? APPROACH_LENGTH));
+  const legs = drafts.map((draft) => buildLeg(draft, approachLength));
   const crosswalks: SceneCrosswalk[] = [];
   const heads: SceneSignalHead[] = [];
   const poles: ScenePole[] = [];
+
+  // An overlap has no direction of its own: its heads go on the approach of an included right
+  // turn or through phase (the usual right-turn overlap), else of its first included phase.
+  const overlapsBySide = new Map<Approach, { overlap: Overlap; movement: TurnMovement }[]>();
+  const unplacedOverlaps: string[] = [];
+  for (const overlap of intersection.overlaps) {
+    if (!overlap.enabled) continue;
+    const included = overlap.includedPhases.map((n) => placedByNumber.get(n)).filter((p): p is PlacedPhase => p !== undefined);
+    const carrier = included.find((p) => p.kind === 'right') ?? included.find((p) => p.kind === 'through') ?? included[0];
+    const side = carrier ? oppositeSide(carrier.direction) : null;
+    if (!carrier || !side || !legs.some((l) => l.side === side)) {
+      unplacedOverlaps.push(overlap.id);
+      continue;
+    }
+    overlapsBySide.set(side, [...(overlapsBySide.get(side) ?? []), { overlap, movement: carrier.kind === 'left' ? 'left' : 'right' }]);
+  }
+  if (unplacedOverlaps.length > 0) {
+    assumptions.push(`Overlap${unplacedOverlaps.length === 1 ? '' : 's'} ${unplacedOverlaps.join(', ')} not drawn: no included phase has a direction of travel.`);
+  }
 
   for (const leg of legs) {
     const at = (distance: number, offset: number) => onLeg(leg.axis, leg.across, distance, offset);
@@ -486,6 +517,23 @@ export function buildScene(intersection: Intersection, options: SceneOptions = {
         facing: leg.axis,
       };
     });
+    // Overlap heads: beside the phase heads, on the side of the turn they serve.
+    const phaseOffsets = vehicleHeads.map((h) => dot(h.position, leg.across));
+    let outer = phaseOffsets.length > 0 ? Math.max(...phaseOffsets) : leg.inboundWidth - OVERLAP_HEAD_SPACING;
+    let inner = phaseOffsets.length > 0 ? Math.min(...phaseOffsets) : OVERLAP_HEAD_SPACING;
+    for (const { overlap, movement } of overlapsBySide.get(leg.side) ?? []) {
+      const offset = movement === 'left' ? (inner -= OVERLAP_HEAD_SPACING) : (outer += OVERLAP_HEAD_SPACING);
+      vehicleHeads.push({
+        id: `${leg.side}-overlap-${overlap.id}`,
+        kind: 'vehicle',
+        phases: [...overlap.includedPhases],
+        overlap: overlap.id,
+        leg: leg.side,
+        movement,
+        position: { ...at(armDistance, offset), z: VEHICLE_HEAD_HEIGHT },
+        facing: leg.axis,
+      });
+    }
     heads.push(...vehicleHeads);
     const rightPole: ScenePole = { base: at(armDistance, curbRight), height: MAST_HEIGHT, arm: null, armHeight: MAST_HEIGHT - 0.4, heads: vehicleHeads.map((h) => h.id) };
     if (vehicleHeads.length > 0) {
@@ -539,13 +587,13 @@ export function buildScene(intersection: Intersection, options: SceneOptions = {
         }
       : { minX: -10, minY: -10, maxX: 10, maxY: 10 };
 
-  return { legs, box, corners: corners(legs), crosswalks, heads, poles, bounds, assumptions, unplacedPhases };
+  return { legs, box, corners: corners(legs), crosswalks, heads, poles, turnPaths: turnPaths(legs), bounds, assumptions, unplacedPhases };
 }
 
-function buildLeg(draft: LegDraft): SceneLeg {
+function buildLeg(draft: LegDraft, approachLength: number): SceneLeg {
   const { axis, across, edge, side } = draft;
   const stopBar = edge + CROSSWALK_SETBACK + CROSSWALK_WIDTH + STOP_BAR_SETBACK;
-  const end = stopBar + APPROACH_LENGTH;
+  const end = stopBar + approachLength;
   const at = (distance: number, offset: number) => onLeg(axis, across, distance, offset);
 
   let offset = 0;
@@ -560,12 +608,13 @@ function buildLeg(draft: LegDraft): SceneLeg {
       centreline: [at(end, centre), at(stopBar, centre)],
       movements: spec.movements,
       phase: spec.phase,
+      laneGroupId: spec.laneGroupId,
       stopBar: [at(stopBar, centre - spec.width / 2), at(stopBar, centre + spec.width / 2)],
     };
   });
   const outbound: SceneLane[] = Array.from({ length: draft.outboundLanes }, (_, index) => {
     const centre = -(draft.median + (index + 0.5) * draft.outboundLaneWidth);
-    return { direction: 'outbound', index, width: draft.outboundLaneWidth, offset: round(centre), centreline: [at(edge, centre), at(end, centre)], movements: [], phase: null, stopBar: null };
+    return { direction: 'outbound', index, width: draft.outboundLaneWidth, offset: round(centre), centreline: [at(edge, centre), at(end, centre)], movements: [], phase: null, laneGroupId: null, stopBar: null };
   });
 
   const inboundWidth = round(draft.inboundWidth);
@@ -690,4 +739,87 @@ function convexHull(points: ScenePoint[]): ScenePoint[] {
     return out;
   };
   return [...half(sorted), ...half([...sorted].reverse())];
+}
+
+/** A vehicle's path through the intersection: from an inbound lane's stop bar to the end of the outbound lane it turns into. */
+export interface SceneTurnPath {
+  /** The leg it starts on and the inbound lane's index there. */
+  from: Approach;
+  laneIndex: number;
+  movement: TurnMovement;
+  /** The leg it leaves on and the outbound lane's index there. */
+  to: Approach;
+  toLane: number;
+  /** From the stop bar, through the turn (a sampled quadratic Bézier) to the far crosswalk, then out to the end of the leg. */
+  points: ScenePoint[];
+  /** Length of the turn itself, stop bar to the far side of the outgoing crosswalk, metres. */
+  turnLength: number;
+  /** Length of the whole path, metres. */
+  length: number;
+}
+
+const TURN_SAMPLES = 16;
+/** How closely a leg must line up with a movement's exit direction to take it (cos ≈ 67°). */
+const MIN_EXIT_ALIGNMENT = 0.38;
+
+/** The leg a movement from `from` leaves on: the one lying most nearly in its exit direction. */
+function exitLeg(legs: SceneLeg[], from: SceneLeg, movement: TurnMovement): SceneLeg | null {
+  const travel = oppositeSide(from.side);
+  const exit = COMPASS[movement === 'through' ? travel : turn(travel, movement === 'left' ? -2 : 2)];
+  let best: SceneLeg | null = null;
+  let bestDot = MIN_EXIT_ALIGNMENT;
+  for (const leg of legs) {
+    if (leg === from || leg.outbound.length === 0) continue;
+    const d = dot(leg.axis, exit);
+    if (d > bestDot + 1e-9) {
+      best = leg;
+      bestDot = d;
+    }
+  }
+  return best;
+}
+
+const pathLength = (points: ScenePoint[]): number => points.slice(1).reduce((total, p, k) => total + Math.hypot(p.x - points[k]!.x, p.y - points[k]!.y), 0);
+
+/**
+ * Turn paths for every inbound lane and movement. Lanes pair up in order: the k-th lane from the
+ * centre line carrying a left turn or a through movement takes the k-th outbound lane from the
+ * centre line, and the k-th from the curb carrying a right turn the k-th from the curb.
+ */
+function turnPaths(legs: SceneLeg[]): SceneTurnPath[] {
+  const paths: SceneTurnPath[] = [];
+  for (const leg of legs) {
+    for (const movement of ['left', 'through', 'right'] as const) {
+      const target = exitLeg(legs, leg, movement);
+      if (!target) continue;
+      const lanes = leg.inbound.filter((l) => l.movements.includes(movement));
+      const count = target.outbound.length;
+      lanes.forEach((lane, k) => {
+        const fromCurb = lanes.length - 1 - k;
+        const toLane = movement === 'right' ? Math.max(0, count - 1 - fromCurb) : Math.min(k, count - 1);
+        const out = target.outbound[toLane]!;
+        const p0 = onLeg(leg.axis, leg.across, leg.stopBar, lane.offset);
+        const p2 = onLeg(target.axis, target.across, target.stopBar, out.offset);
+        const d0 = scale(leg.axis, -1);
+        const d2 = target.axis;
+        const gap = { x: p2.x - p0.x, y: p2.y - p0.y };
+        const det = cross(d0, d2);
+        let control = scale(add(p0, p2), 0.5);
+        if (Math.abs(det) > 0.05) {
+          const s = cross(gap, d2) / det;
+          const u = cross(d0, gap) / det;
+          if (s > 0 && u > 0) control = add(p0, scale(d0, s));
+        }
+        const curve: ScenePoint[] = [];
+        for (let i = 0; i <= TURN_SAMPLES; i++) {
+          const t = i / TURN_SAMPLES;
+          const v = 1 - t;
+          curve.push(tidy(add(add(scale(p0, v * v), scale(control, 2 * v * t)), scale(p2, t * t))));
+        }
+        const points = [...curve, onLeg(target.axis, target.across, target.end, out.offset)];
+        paths.push({ from: leg.side, laneIndex: lane.index, movement, to: target.side, toLane, points, turnLength: round(pathLength(curve)), length: round(pathLength(points)) });
+      });
+    }
+  }
+  return paths;
 }

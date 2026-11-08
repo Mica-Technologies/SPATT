@@ -12,11 +12,12 @@
  * a green with no queue has none; it is closest to HCM uniform plus incremental delay without the
  * deceleration and acceleration a real vehicle adds.
  */
-import { MOVEMENTS, type Intersection, type Ring } from '../../model';
+import { MOVEMENTS, type Intersection, type Movement, type Ring } from '../../model';
 import { effectiveSequence } from '../../model';
 import { saturationFlow } from '../capacity';
+import { allOverlapSpans, overlapTimingOf, type OverlapSpan } from '../overlaps';
 import { nextArrivalTicks, seededRandom } from './random';
-import { TICKS_PER_SECOND, type ControllerModel, type PedestrianSignal, type Termination, type VehicleSignal } from './types';
+import { TICKS_PER_SECOND, TICKS_PER_TENTH, type ControllerModel, type PedestrianSignal, type Termination, type VehicleSignal } from './types';
 
 export interface SimulationSettings {
   /** The pattern the controller runs, or `null` to run free. */
@@ -29,6 +30,33 @@ export interface SimulationSettings {
   seed: number;
   /** Pushbutton presses per hour, by phase number. */
   pedestrianCallsPerHour: Record<string, number>;
+  /**
+   * Opt in to a record of every vehicle and pedestrian, for drawing them: those arriving in the
+   * first `seconds` of the run (warm-up included), up to `limit` vehicles and `limit` pedestrians.
+   */
+  detail?: { seconds: number; limit: number };
+}
+
+/** One simulated vehicle, in ticks from the start of the run. */
+export interface VehicleRecord {
+  id: number;
+  laneGroupId: string;
+  movement: Movement;
+  /** When it reaches the stop bar, or the back of its queue (the same moment in a point queue). */
+  arrive: number;
+  /** When it crosses the stop bar; `null` if it was still waiting at the end. */
+  depart: number | null;
+}
+
+/** One pushbutton press, in ticks from the start of the run. */
+export interface PedestrianRecord {
+  id: number;
+  phase: number;
+  press: number;
+  /** The start of the walk that served it (the press itself during a walk); `null` if never served. */
+  start: number | null;
+  /** The end of that walk's pedestrian clearance; `null` if never served. */
+  end: number | null;
 }
 
 export const DEFAULT_SIMULATION: Omit<SimulationSettings, 'patternId' | 'volumeSetId'> = { durationSeconds: 3600, warmUpSeconds: 300, seed: 1, pedestrianCallsPerHour: {} };
@@ -91,6 +119,13 @@ export interface SimulationResult {
     spans: SignalSpan[];
     /** Queue length per lane group, sampled every second (index = second). */
     queues: Record<string, number[]>;
+    /** Overlap signals from their included phases, when the intersection has enabled overlaps (the controller does not time them). */
+    overlaps?: OverlapSpan[];
+    /** With `detail` only: the vehicles and presses recorded. */
+    vehicles?: VehicleRecord[];
+    pedestrians?: PedestrianRecord[];
+    /** With `detail` only: the tick recording stopped at, the window's end or where a limit was reached. */
+    detailUntil?: number;
   };
 }
 
@@ -139,12 +174,38 @@ export function simulate(intersection: Intersection, settings: SimulationSetting
       delayTicks: 0,
       maxQueue: 0,
       samples: [] as number[],
+      volumes,
+      /** With `detail`: the record index of each queued vehicle (−1 when not recorded), in queue order. */
+      ids: [] as number[],
     };
   });
   const pedestrians = phaseNumbers.map((n) => {
     const rate = settings.pedestrianCallsPerHour[String(n)] ?? 0;
     return { phase: n, rate, next: nextArrivalTicks(random, rate, TICKS_PER_SECOND) };
   });
+
+  // The detailed record draws each vehicle's movement from a stream of its own, so opting in
+  // changes nothing else about the run.
+  const detail = settings.detail ? { limit: Math.max(0, Math.floor(settings.detail.limit)) } : null;
+  let detailUntil = settings.detail ? Math.min(ticks, Math.max(0, Math.round(settings.detail.seconds * TICKS_PER_SECOND))) : 0;
+  const movementRandom = seededRandom((settings.seed ^ 0x5bd1e995) >>> 0);
+  const vehicleRecords: VehicleRecord[] = [];
+  const pedestrianRecords: PedestrianRecord[] = [];
+  const waitingPedestrians = new Map<number, number[]>(phaseNumbers.map((n) => [n, []]));
+  const crossingPedestrians = new Map<number, number[]>(phaseNumbers.map((n) => [n, []]));
+  const recordVehicle = (lane: (typeof lanes)[number], tick: number): number => {
+    if (tick >= detailUntil) return -1;
+    if (vehicleRecords.length >= detail!.limit) {
+      detailUntil = tick;
+      return -1;
+    }
+    const { volumes } = lane;
+    const total = volumes.left + volumes.through + volumes.right;
+    const r = movementRandom() * total;
+    const movement: Movement = total <= 0 ? 'through' : r < volumes.left ? 'left' : r < volumes.left + volumes.through ? 'through' : 'right';
+    vehicleRecords.push({ id: vehicleRecords.length, laneGroupId: lane.group.id, movement, arrive: tick, depart: null });
+    return vehicleRecords.length - 1;
+  };
 
   const greenStart = new Map<number, number>();
   const greens = new Map<number, number[]>(phaseNumbers.map((n) => [n, []]));
@@ -171,6 +232,7 @@ export function simulate(intersection: Intersection, settings: SimulationSetting
     for (const lane of lanes) {
       while (lane.next <= tick) {
         lane.queue.push(tick);
+        if (detail) lane.ids.push(recordVehicle(lane, tick));
         if (measuring) lane.arrivals++;
         actuations.add(lane.group.phase);
         lane.next += nextArrivalTicks(random, lane.rate, TICKS_PER_SECOND);
@@ -181,6 +243,14 @@ export function simulate(intersection: Intersection, settings: SimulationSetting
     for (const ped of pedestrians) {
       while (ped.next <= tick) {
         presses.add(ped.phase);
+        if (detail && tick < detailUntil) {
+          if (pedestrianRecords.length < detail.limit) {
+            waitingPedestrians.get(ped.phase)!.push(pedestrianRecords.length);
+            pedestrianRecords.push({ id: pedestrianRecords.length, phase: ped.phase, press: tick, start: null, end: null });
+          } else {
+            detailUntil = tick;
+          }
+        }
         ped.next += nextArrivalTicks(random, ped.rate, TICKS_PER_SECOND);
       }
     }
@@ -193,6 +263,10 @@ export function simulate(intersection: Intersection, settings: SimulationSetting
         lane.credit += lane.perTick;
         while (lane.credit >= 1 && lane.queue.length > 0) {
           const arrived = lane.queue.shift()!;
+          if (detail) {
+            const id = lane.ids.shift()!;
+            if (id >= 0) vehicleRecords[id]!.depart = tick;
+          }
           lane.credit -= 1;
           if (arrived >= warmUpTicks) {
             lane.departures++;
@@ -210,6 +284,22 @@ export function simulate(intersection: Intersection, settings: SimulationSetting
     let homeActive = false;
     for (const n of phaseNumbers) {
       const signal = controller.signal(n);
+      if (detail) {
+        // Waiting pedestrians start on the walk (a press during the walk is served by it) and are
+        // across by the end of the clearance.
+        if (signal.pedestrian === 'walk') {
+          const waiting = waitingPedestrians.get(n)!;
+          for (const id of waiting) pedestrianRecords[id]!.start = tick;
+          if (waiting.length > 0) {
+            crossingPedestrians.get(n)!.push(...waiting);
+            waiting.length = 0;
+          }
+        } else if (signal.pedestrian === 'dont-walk') {
+          const crossing = crossingPedestrians.get(n)!;
+          for (const id of crossing) pedestrianRecords[id]!.end = tick;
+          crossing.length = 0;
+        }
+      }
       if (home.has(n) && signal.vehicle !== 'red') homeActive = true;
       for (const [key, value] of [
         ['v', signal.vehicle === 'red' ? null : signal.vehicle],
@@ -252,7 +342,9 @@ export function simulate(intersection: Intersection, settings: SimulationSetting
     homeWasActive = homeActive;
   }
   for (const span of open.values()) spans.push({ ...span, end: ticks });
+  for (const crossing of crossingPedestrians.values()) for (const id of crossing) pedestrianRecords[id]!.end = ticks;
   spans.sort((a, b) => a.start - b.start || a.phase - b.phase);
+  const overlapSpans = intersection.overlaps.some((o) => o.enabled) ? allOverlapSpans(intersection.overlaps, spans, overlapTimingOf(intersection, TICKS_PER_TENTH)) : null;
 
   const cycleLengths = cycleStarts.slice(1).map((t, k) => (t - cycleStarts[k]!) / TICKS_PER_SECOND);
   const departed = lanes.reduce((sum, l) => sum + l.departures, 0);
@@ -279,6 +371,11 @@ export function simulate(intersection: Intersection, settings: SimulationSetting
       finalQueue: l.queue.length,
     })),
     meanDelay: departed > 0 ? lanes.reduce((sum, l) => sum + l.delayTicks, 0) / departed / TICKS_PER_SECOND : null,
-    trace: { spans, queues: Object.fromEntries(lanes.map((l) => [l.group.id, l.samples])) },
+    trace: {
+      spans,
+      queues: Object.fromEntries(lanes.map((l) => [l.group.id, l.samples])),
+      ...(overlapSpans ? { overlaps: overlapSpans } : {}),
+      ...(detail ? { vehicles: vehicleRecords, pedestrians: pedestrianRecords, detailUntil } : {}),
+    },
   };
 }

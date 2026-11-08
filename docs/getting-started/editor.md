@@ -222,7 +222,13 @@ The drawing is schematic, inferred from what the plan already holds:
   phase's traffic (the eastbound phase's walk crosses the south leg), or on its left when that leg
   does not exist. A pedestrian phase with no direction crosses every leg.
 - **Signal heads**: one per phase on each approach, on a mast arm over the lanes it serves, with
-  the phase number painted on those lanes. Overlaps are not drawn.
+  the phase number painted on those lanes.
+- **Overlaps** get a head of their own beside the phase heads, on the approach of an included
+  right-turn or through phase (the usual right-turn overlap), else of the first included phase.
+  An overlap is green while an included phase is green and through the change from one included
+  phase to the next, then runs its trail green and clears with its trail yellow and red, or those
+  of the phase it ended with. A minus green-yellow overlap is not green while a modifier phase is
+  green or yellow.
 
 A free pattern has no fixed cycle, and a pattern with problems that stop the ring-barrier diagram
 cannot be projected either; the intersection is still drawn, with every head dark.
@@ -236,7 +242,8 @@ The print button in the header opens the timing sheet preview. Choose **This int
 save a PDF. Each sheet has:
 
 - the phase timing table, with the same fields as the Phases tab;
-- the ring and barrier structure;
+- the ring and barrier structure, beside a schematic plan of the intersection (its lanes,
+  crosswalks and signal heads, as in the [intersection view](#the-intersection-view));
 - each pattern's cycle, offset and its reference, coordinated phases, splits, green starts and
   force-offs in local time, its ring-barrier diagram with a legend, and its cycle clock;
 - the daily schedule with end times and durations;

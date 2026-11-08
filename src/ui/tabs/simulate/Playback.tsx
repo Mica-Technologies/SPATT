@@ -4,7 +4,7 @@
  * Space plays and pauses. With reduced motion requested, playing advances in whole-second steps
  * once a second instead of animating.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PauseRoundedIcon from '@mui/icons-material/PauseRounded';
 import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
 import Box from '@mui/material/Box';
@@ -12,14 +12,17 @@ import IconButton from '@mui/material/IconButton';
 import MenuItem from '@mui/material/MenuItem';
 import Slider from '@mui/material/Slider';
 import TextField from '@mui/material/TextField';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
-import { TICKS_PER_SECOND, type SimulationResult } from '../../../engine';
+import { TICKS_PER_SECOND, type SceneView, type SimulationResult } from '../../../engine';
 import type { Intersection, Ring } from '../../../model';
 import { isEditable } from '../../fields/keys';
 import { fontFamilyMono } from '../../theme/themePrimitives';
+import SimIntersection from './SimIntersection';
 import { indexSpans } from './spanIndex';
 
 const WIDTH = 1000;
@@ -28,6 +31,8 @@ const ROW = 34;
 const BAR = 18;
 const PED = 6;
 const WINDOW_SECONDS = 180;
+/** How often the cursor's React state follows it while playing, ms. */
+const COMMIT_MS = 80;
 
 const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
 
@@ -39,29 +44,45 @@ export default function Playback({ intersection, sequence, result }: { intersect
   const palette = (theme.vars || theme).palette;
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)', { noSsr: true });
   const total = result.ticks / TICKS_PER_SECOND;
-  const [cursor, setCursor] = useState(Math.min(total, result.warmUpTicks / TICKS_PER_SECOND + WINDOW_SECONDS));
+  // The exact cursor lives in a ref that the traffic canvas reads every frame; React state
+  // follows it a few times a second for the timeline, the heads and the summaries.
+  const start = Math.min(total, result.warmUpTicks / TICKS_PER_SECOND + WINDOW_SECONDS);
+  const cursorRef = useRef(start);
+  const [cursor, setCursorState] = useState(start);
+  const setCursor = useCallback((value: number) => {
+    cursorRef.current = value;
+    setCursorState(value);
+  }, []);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(5);
+  const [display, setDisplay] = useState<'timeline' | 'intersection'>('timeline');
+  const [view, setView] = useState<SceneView>('plan');
 
   useEffect(() => {
     if (!playing) return;
-    const advance = (dt: number) =>
-      setCursor((c) => {
-        const next = Math.min(total, c + dt);
-        if (next >= total) setPlaying(false);
-        return next;
-      });
+    const advance = (dt: number, commit: boolean) => {
+      const next = Math.min(total, cursorRef.current + dt);
+      cursorRef.current = next;
+      if (commit || next >= total) setCursorState(next);
+      if (next >= total) setPlaying(false);
+    };
     if (reducedMotion) {
-      const timer = setInterval(() => advance(speed), 1000);
+      const timer = setInterval(() => advance(speed, true), 1000);
       return () => clearInterval(timer);
     }
     let last = performance.now();
+    let committed = last;
     let frame = requestAnimationFrame(function step(now) {
-      advance(((now - last) / 1000) * speed);
+      const commit = now - committed >= COMMIT_MS;
+      if (commit) committed = now;
+      advance(((now - last) / 1000) * speed, commit);
       last = now;
       frame = requestAnimationFrame(step);
     });
-    return () => cancelAnimationFrame(frame);
+    return () => {
+      cancelAnimationFrame(frame);
+      setCursorState(cursorRef.current);
+    };
   }, [playing, speed, total, reducedMotion]);
 
   // Space plays and pauses, unless the keyboard is on a field or a control with its own Space.
@@ -87,6 +108,7 @@ export default function Playback({ intersection, sequence, result }: { intersect
   const fill = { green: palette.success.main, yellow: palette.warning.main, walk: palette.info.main, clearance: palette.info.light } as const;
 
   const atCursor = index.at(tick(cursor));
+  const sceneTick = Math.floor(tick(cursor));
   const signalsOf = (phase: number) => atCursor.filter((s) => s.phase === phase).map((s) => s.signal);
   const vehicleOf = (phase: number): Vehicle => {
     const signals = signalsOf(phase);
@@ -117,44 +139,73 @@ export default function Playback({ intersection, sequence, result }: { intersect
         </Typography>
       </Box>
 
-      <Box component="svg" viewBox={`0 0 ${WIDTH} ${height}`} role="img" aria-label="Signal playback: each ring's phases over a three-minute window around the cursor" sx={{ width: '100%', height: 'auto', display: 'block', fontFamily: fontFamilyMono }}>
-        {rows.map(({ r, phases }) => {
-          const y = r * ROW + 4;
-          return (
-            <g key={r}>
-              <text x={LEFT - 10} y={y + BAR / 2 + 5} fontSize={14} fontWeight={600} textAnchor="end" fill={palette.text.secondary}>
-                Ring {r + 1}
-              </text>
-              <rect x={LEFT} y={y} width={WIDTH - LEFT - 8} height={BAR} fill={palette.error.main} fillOpacity={0.25} />
-              {visible
-                .filter((s) => phases.has(s.phase))
-                .map((s) => {
-                  const pedestrian = s.signal === 'walk' || s.signal === 'clearance';
-                  const x1 = x(Math.max(from, s.start / TICKS_PER_SECOND));
-                  const x2 = x(Math.min(to, s.end / TICKS_PER_SECOND));
-                  return (
-                    <g key={`${s.phase}-${s.signal}-${s.start}`}>
-                      <rect x={x1} y={pedestrian ? y + BAR + 2 : y} width={Math.max(0, x2 - x1)} height={pedestrian ? PED : BAR} rx={pedestrian ? 1 : 0} fill={fill[s.signal]} />
-                      {s.signal === 'green' && x2 - x1 > 20 ? (
-                        <text x={x1 + 4} y={y + 13} fontSize={12} fontWeight={600} fill={palette.common.white}>
-                          {s.phase}
-                        </text>
-                      ) : null}
-                    </g>
-                  );
-                })}
-            </g>
-          );
-        })}
-        <line x1={x(cursor)} x2={x(cursor)} y1={0} y2={height - 20} stroke={palette.text.primary} strokeWidth={1.5} />
-        {Array.from({ length: Math.floor(WINDOW_SECONDS / 30) + 1 }, (_, k) => Math.ceil(from / 30) * 30 + k * 30)
-          .filter((s) => s <= to)
-          .map((s) => (
-            <text key={s} x={x(s)} y={height - 6} fontSize={11} textAnchor="middle" fill={palette.text.secondary}>
-              {clock(s)}
-            </text>
-          ))}
+      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+        <ToggleButtonGroup size="small" exclusive value={display} onChange={(_, next: typeof display | null) => next && setDisplay(next)} aria-label="Playback display">
+          <ToggleButton value="timeline" sx={{ px: 1.25, py: 0.25 }}>
+            Ring timeline
+          </ToggleButton>
+          <ToggleButton value="intersection" sx={{ px: 1.25, py: 0.25 }}>
+            Intersection
+          </ToggleButton>
+        </ToggleButtonGroup>
+        {display === 'intersection' ? (
+          <ToggleButtonGroup size="small" exclusive value={view} onChange={(_, next: SceneView | null) => next && setView(next)} aria-label="Intersection view">
+            <ToggleButton value="plan" sx={{ px: 1.25, py: 0.25 }}>
+              Plan
+            </ToggleButton>
+            <ToggleButton value="oblique" sx={{ px: 1.25, py: 0.25 }}>
+              Oblique
+            </ToggleButton>
+          </ToggleButtonGroup>
+        ) : null}
       </Box>
+
+      {display === 'intersection' ? (
+        <Box sx={{ maxWidth: view === 'plan' ? 640 : 760, width: '100%', alignSelf: 'center' }}>
+          <SimIntersection intersection={intersection} result={result} view={view} index={index} tick={sceneTick} timeRef={cursorRef} reducedMotion={reducedMotion} />
+        </Box>
+      ) : null}
+
+      {display === 'timeline' ? (
+        <Box component="svg" viewBox={`0 0 ${WIDTH} ${height}`} role="img" aria-label="Signal playback: each ring's phases over a three-minute window around the cursor" sx={{ width: '100%', height: 'auto', display: 'block', fontFamily: fontFamilyMono }}>
+          {rows.map(({ r, phases }) => {
+            const y = r * ROW + 4;
+            return (
+              <g key={r}>
+                <text x={LEFT - 10} y={y + BAR / 2 + 5} fontSize={14} fontWeight={600} textAnchor="end" fill={palette.text.secondary}>
+                  Ring {r + 1}
+                </text>
+                <rect x={LEFT} y={y} width={WIDTH - LEFT - 8} height={BAR} fill={palette.error.main} fillOpacity={0.25} />
+                {visible
+                  .filter((s) => phases.has(s.phase))
+                  .map((s) => {
+                    const pedestrian = s.signal === 'walk' || s.signal === 'clearance';
+                    const x1 = x(Math.max(from, s.start / TICKS_PER_SECOND));
+                    const x2 = x(Math.min(to, s.end / TICKS_PER_SECOND));
+                    return (
+                      <g key={`${s.phase}-${s.signal}-${s.start}`}>
+                        <rect x={x1} y={pedestrian ? y + BAR + 2 : y} width={Math.max(0, x2 - x1)} height={pedestrian ? PED : BAR} rx={pedestrian ? 1 : 0} fill={fill[s.signal]} />
+                        {s.signal === 'green' && x2 - x1 > 20 ? (
+                          <text x={x1 + 4} y={y + 13} fontSize={12} fontWeight={600} fill={palette.common.white}>
+                            {s.phase}
+                          </text>
+                        ) : null}
+                      </g>
+                    );
+                  })}
+              </g>
+            );
+          })}
+          <line x1={x(cursor)} x2={x(cursor)} y1={0} y2={height - 20} stroke={palette.text.primary} strokeWidth={1.5} />
+          {Array.from({ length: Math.floor(WINDOW_SECONDS / 30) + 1 }, (_, k) => Math.ceil(from / 30) * 30 + k * 30)
+            .filter((s) => s <= to)
+            .map((s) => (
+              <text key={s} x={x(s)} y={height - 6} fontSize={11} textAnchor="middle" fill={palette.text.secondary}>
+                {clock(s)}
+              </text>
+            ))}
+        </Box>
+      ) : null}
 
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
         <Box role="list" aria-label="Signals at the cursor" sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', alignContent: 'flex-start', flex: '1 1 320px' }}>
